@@ -7,6 +7,8 @@ falls apart. This plugin makes them live forever, wandering Wyrmscraig.
 
 You can even name them.
 
+![Hundreds of golems roaming Wyrmscraig](golem-island.jpg)
+
 ## Settings
 
 Golems roam freely and persist permanently. There is a limit

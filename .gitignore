@@ -16,3 +16,6 @@ dev-tools/*.txt
 
 # Internal copy-review notes; kept locally, not shipped.
 USER-FACING-TEXT.md
+
+# Full-resolution screenshot source; the README ships the compressed version.
+GolemIsland.png
