@@ -1,0 +1,18 @@
+.gradle/
+build/
+bin/
+*.class
+*.iml
+.idea/
+out/
+# keep gradle/wrapper/gradle-wrapper.jar
+
+# dev-tools are standalone harvesters run by hand against the game cache; they are
+# kept as a record of where the hardcoded IDs came from, but their inputs and outputs
+# are large and regenerable.
+dev-tools/*.zip
+dev-tools/*.gz
+dev-tools/*.txt
+
+# Internal copy-review notes; kept locally, not shipped.
+USER-FACING-TEXT.md
