@@ -37,9 +37,16 @@ import net.runelite.api.coords.WorldPoint;
  * west are not stored because they are the north and east of the neighbouring tile;
  * halving the data for free matters when it has to fit in a config value.
  *
- * <p>Nothing is bundled. Wyrmscraig is new, so there is no prebuilt map to ship, and
- * a harvested one has the advantage of being right about the island as it actually
- * is rather than as it was when someone last exported it.
+ * <p>This is now the <i>live</i> half of a pair. {@link WorldMesh} is the shipped,
+ * read-only floor covering the whole reachable world; this is what the client has actually
+ * been asked about, and it takes precedence everywhere the two disagree. A harvested
+ * region reflects the world as it is right now, including objects that come and go, where
+ * the mesh is a static export — which also means this covers the window between a game
+ * update and the mesh being regenerated.
+ *
+ * <p>Only the island is persisted to configuration. Nine regions of base64 in a properties
+ * file is reasonable; the 1,158 the mesh covers would be an abuse of one, so world-scale
+ * passability lives in the jar and the live harvest beyond the island is session-scoped.
  */
 @Slf4j
 @Singleton
@@ -101,6 +108,9 @@ class IslandMemory
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private WorldMesh worldMesh;
 
 	// ---- the shipped baseline ----
 
@@ -391,7 +401,30 @@ class IslandMemory
 		return get(x, y, plane, FLAG_EAST);
 	}
 
-	/** Can something step one cardinal tile from (x, y)? */
+	/** The four cardinals, named as the collision format stores them. */
+	private boolean south(int x, int y, int plane)
+	{
+		return north(x, y - 1, plane);
+	}
+
+	private boolean west(int x, int y, int plane)
+	{
+		return east(x - 1, y, plane);
+	}
+
+	/**
+	 * Can something step one tile from (x, y), cardinal or diagonal?
+	 *
+	 * <p>A diagonal is not one move but a corner, and the game will not cut one: both
+	 * ways round have to be clear, or a golem would slip between two walls that meet at a
+	 * point. The four-term tests below are the game's own rule, taken from Shortest Path's
+	 * {@code CollisionMap} so that golems corner exactly the way a player does.
+	 *
+	 * <p>Diagonals matter more than they look. Sailing runs in long straight
+	 * eight-directional legs — Port Tasks' own routes are 854 perfect diagonals against
+	 * 817 axis-aligned segments — so a cardinal-only pathfinder makes every crossing a
+	 * staircase.
+	 */
 	boolean canStep(int x, int y, int plane, int dx, int dy)
 	{
 		if (dx == 0 && dy == 1)
@@ -400,7 +433,7 @@ class IslandMemory
 		}
 		if (dx == 0 && dy == -1)
 		{
-			return north(x, y - 1, plane);
+			return south(x, y, plane);
 		}
 		if (dx == 1 && dy == 0)
 		{
@@ -408,20 +441,72 @@ class IslandMemory
 		}
 		if (dx == -1 && dy == 0)
 		{
-			return east(x - 1, y, plane);
+			return west(x, y, plane);
+		}
+		if (dx == 1 && dy == 1)
+		{
+			return north(x, y, plane) && east(x, y + 1, plane)
+				&& east(x, y, plane) && north(x + 1, y, plane);
+		}
+		if (dx == -1 && dy == 1)
+		{
+			return north(x, y, plane) && west(x, y + 1, plane)
+				&& west(x, y, plane) && north(x - 1, y, plane);
+		}
+		if (dx == 1 && dy == -1)
+		{
+			return south(x, y, plane) && east(x, y - 1, plane)
+				&& east(x, y, plane) && south(x + 1, y, plane);
+		}
+		if (dx == -1 && dy == -1)
+		{
+			return south(x, y, plane) && west(x, y - 1, plane)
+				&& west(x, y, plane) && south(x - 1, y, plane);
 		}
 		return false;
 	}
 
+	/**
+	 * Passability for one tile and direction, live harvest first.
+	 *
+	 * <p>A region harvested from a loaded scene reflects the world as it is right now,
+	 * including objects that come and go; the shipped mesh is a static export that was
+	 * true when it was generated. Where both have an opinion the live one wins, which is
+	 * also what covers the window between a game update and the mesh being rebuilt.
+	 *
+	 * <p>Falling through to the mesh is what lets a golem walk ground the player has never
+	 * stood on — which, once golems leave the island, is nearly all of it.
+	 */
 	private boolean get(int x, int y, int plane, int flag)
 	{
 		long[] bits = regions.get(key(regionIdOf(x, y), plane));
-		if (bits == null)
+		if (bits != null)
 		{
-			return false;
+			int bit = bitIndex(x & REGION_MASK, y & REGION_MASK, flag);
+			return (bits[bit >> 6] >>> (bit & 63) & 1L) != 0L;
 		}
-		int bit = bitIndex(x & REGION_MASK, y & REGION_MASK, flag);
-		return (bits[bit >> 6] >>> (bit & 63) & 1L) != 0L;
+
+		// The mesh says water is passable, because it is — to a boat. A walking golem must
+		// not be offered it, so a step is refused unless both ends are ground the land
+		// fill actually reached. Both ends, not just the tile being left: land beside
+		// water has a perfectly open edge leading straight off the beach.
+		//
+		// This tests the land mask rather than the ocean bit. Ocean marks only the one
+		// connected sea, so cave water, lakes and enclosed basins passed the old check and
+		// golems walked out onto them — most visibly on the water inside Wyrmscraig's own
+		// caves.
+		//
+		// The live harvest above needs no such check. It comes from the client, which
+		// blocks water for the same reason it blocks a wall.
+		if (flag == FLAG_NORTH)
+		{
+			return worldMesh.isLandWalkable(x, y, plane)
+				&& worldMesh.isLandWalkable(x, y + 1, plane)
+				&& worldMesh.north(x, y, plane);
+		}
+		return worldMesh.isLandWalkable(x, y, plane)
+			&& worldMesh.isLandWalkable(x + 1, y, plane)
+			&& worldMesh.east(x, y, plane);
 	}
 
 	private static void set(long[] bits, int rx, int ry, int flag)

@@ -14,7 +14,15 @@ package com.golemsdontdie;
  *   <li>NPC and animation IDs — {@code dev-tools/CacheRecon.java}</li>
  *   <li>Animation frame counts and durations — {@code dev-tools/RegionRecon.java}</li>
  *   <li>Island terrain and extent — {@code dev-tools/TerrainProbe.java}</li>
+ *   <li>Rig compatibility and transport animations — {@code dev-tools/FramemapProbe.java}</li>
+ *   <li>The island's own shortcuts — {@code dev-tools/WyrmscraigRecon.java}, turned into
+ *       transport rows by {@code dev-tools/BuildWyrmscraigTransports.java}</li>
  * </ul>
+ *
+ * <p>The shortcuts are not constants here because they are data, not identity: four
+ * crossings, shipped in the transport table like every other one in the game. They live
+ * in a table of our own only because no published table has them — Shortest Path maps the
+ * whole world and has nothing on Wyrmscraig.
  */
 final class GolemContent
 {
@@ -125,6 +133,159 @@ final class GolemContent
 		10274, 10275, 10276,
 		10530, 10531, 10532,
 	};
+
+	// ---------------------------------------------------------------------------
+	// Transport animations
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * The golem's rig, and why the game's own animations can be played on it.
+	 *
+	 * <p>An animation's frames are transforms addressed by vertex-group number, and the
+	 * numbering belongs to a <i>framemap</i>. Play a frame built for one framemap against
+	 * a model rigged for another and every transform lands on the wrong vertices. There is
+	 * no retargeting at runtime: the ids match or the golem folds through itself.
+	 *
+	 * <p>{@code dev-tools/FramemapProbe.java} measured it. The golem's own four sequences
+	 * — spawn, walk, idle and crumble — are all on <b>framemap 0</b>, which is the human
+	 * rig and the largest in the game: 3,957 of the cache's 13,569 sequences sit on it,
+	 * against 109 for the next biggest. The golem is a human-rigged NPC.
+	 *
+	 * <p>That makes every animation below free. They are shared {@code Animation} objects
+	 * from {@link GolemModelFactory}, applied by the client's own
+	 * {@code applyTransformations} exactly as the walk cycle already is — no authored
+	 * clips, no cloned models, no per-frame re-lighting.
+	 *
+	 * <p>The ids are hardcoded for the same reason every other id here is: they were
+	 * harvested once, and a constant cannot go stale in a way a player would have to
+	 * debug. Re-derive with {@code FramemapProbe} after a cache update.
+	 */
+	static final int GOLEM_FRAMEMAP = 0;
+
+	/**
+	 * Reaching for a ladder or stair. Plays in place; the plane change happens under it.
+	 *
+	 * <p>The biggest single group in the transport network by a wide margin — ladders,
+	 * staircases, ships' ladders, ropes and trapdoors together are 2,234 rows.
+	 *
+	 * <p><b>The downward clip is disputed and nobody has measured it.</b> 833 was taken
+	 * from the handover's catalogue on the strength of its name, and three independent
+	 * reimplementations of the server — one 2004-era, one 2009-era, one 2019-era — all
+	 * play <b>827</b> ({@code HUMAN_PICKUPFLOOR}, a crouch-and-reach-down) for a ladder
+	 * descended. Agreement across three eras is a good deal more than a name is worth.
+	 *
+	 * <p>It is left at 833 rather than quietly switched, because the fix for a guess is a
+	 * measurement and not a better guess. Climb down any ladder with {@code ShortcutRecon}
+	 * running and the journal will settle it for 613 rows. The presence of a modern
+	 * {@code HUMAN_REACHFORLADDER_WALKMERGE} (13991) suggests this path has been reworked
+	 * since any of those servers, so the answer may be none of the three.
+	 */
+	static final int ANIM_LADDER_GRAB = 828;
+	static final int ANIM_LADDER_GRAB_TOP = 833;
+
+	/**
+	 * A sustained climb: mount, loop, dismount.
+	 *
+	 * <p>The loop carries the root motion, so one clip set covers every length — a
+	 * three-tile scramble loops three times and an eight-tile one loops eight. Authoring
+	 * a clip per obstacle length would be the standard mistake here.
+	 */
+	static final int ANIM_CLIMB_READY = 738;
+	static final int ANIM_CLIMB_LOOP = 4435;
+	static final int ANIM_CLIMB_MERGE = 12338;
+
+	/**
+	 * Climbing down, which is a clip of its own and not the ascent in reverse.
+	 *
+	 * <p>Measured: Wyrmscraig's rock climb is two co-located objects, and the one
+	 * approached from the high side plays this rather than the loop above. Corroborated
+	 * independently — three reimplementations of the server, spanning 2004 to 2019, all
+	 * play 740 for a descent.
+	 */
+	static final int ANIM_CLIMB_DOWN = 740;
+
+	/**
+	 * Vaulting the Wilderness ditch. One clip, and on its own it covers 668 rows — more
+	 * than every jump, stile, squeeze and swing in the game combined.
+	 */
+	static final int ANIM_DITCH_VAULT = 6132;
+
+	/**
+	 * Hopping between stepping stones — <b>measured</b>, not assumed.
+	 *
+	 * <p>Watching a player cross Wyrmscraig's basalt stones showed 741, a 38-cycle clip,
+	 * repeated once per stone two ticks apart. The catalogue had named
+	 * {@code HUMAN_STEPPINGSTONEJUMP} (769) for this, which is a real animation and 68
+	 * cycles long — nearly double — so every hop ran at half speed until it was measured.
+	 *
+	 * <p>769 is kept below for the longer leaps it does suit.
+	 */
+	static final int ANIM_JUMP_STEPPINGSTONE = 741;
+
+	/** The longer, higher jump the catalogue originally named for stepping stones. */
+	static final int ANIM_JUMP_GAP = 769;
+	static final int ANIM_JUMP_STONES = 1604;
+	static final int ANIM_JUMP_LONG = 807;
+
+	/** Climbing over a wall, stile or broken fence. */
+	static final int ANIM_WALL_JUMP = 2583;
+	static final int ANIM_STILE = 14235;
+
+	/** Squeezing through a pipe or crevice. Mount, loop, dismount, as with the climb. */
+	static final int ANIM_SQUEEZE_READY = 747;
+	static final int ANIM_SQUEEZE_LOOP = 746;
+	static final int ANIM_SQUEEZE_END = 748;
+
+	/** Crossing a log, rope bridge or tightrope — slow, arms out. */
+	static final int ANIM_BALANCE_WALK = 762;
+	static final int ANIM_BALANCE_WALK_LOOP = 7134;
+	static final int ANIM_TIGHTROPE = 4772;
+
+	/**
+	 * Three animations the golem deliberately does not play, and why.
+	 *
+	 * <p>The handover's catalogue listed these alongside the human clips, but the probe
+	 * shows they are on other rigs entirely: {@code DOCK_GANGPLANK01} (13562) is on
+	 * framemap 2503 and the raft helm pair (13335/13336) on framemap 2486. They are not
+	 * player animations that happen to be incompatible — they are <i>prop</i> animations,
+	 * belonging to the gangplank and the boat. Nothing is lost.
+	 *
+	 * <ul>
+	 *   <li><b>Gangplank.</b> Walking a plank is walking. The golem keeps its own gait and
+	 *       the boarding reads from the geometry, which is what a real boarding looks
+	 *       like — the plank animates, not the person on it.</li>
+	 *   <li><b>Helm grip.</b> Belongs to the boat model, not its passenger.</li>
+	 * </ul>
+	 *
+	 * <p>The helm pair is still worth having: {@link FakeRaft} draws a boat model, and a
+	 * boat model is on framemap 2486 — the same rig these clips were built for. So the
+	 * raft can play its own helm animation even though the golem cannot.
+	 */
+	static final int ANIM_RAFT_HELM = 13335;
+	static final int ANIM_RAFT_HELM_LOOP = 13336;
+	static final int RAFT_FRAMEMAP = 2486;
+
+	/**
+	 * Animations that belong to scenery, played on a copy of the object rather than on
+	 * the golem.
+	 *
+	 * <p>These are the two the probe found on other rigs. Neither can be applied to the
+	 * golem — framemaps 2503 and 2486 against the golem's 0 — but both are perfectly
+	 * playable on the thing they were authored for, which is what {@link FakeProp} draws.
+	 * The gangplank lowers, the golem walks up it, and the two are separate actors exactly
+	 * as they are in the real game.
+	 */
+	/**
+	 * Kept for the record rather than used. {@link PropFactory} reads each object's own
+	 * {@code animationID} out of the cache, so a plank, a gate and a fairy ring each get
+	 * the motion they were authored with — which is strictly better than naming one clip
+	 * here and applying it to all of them.
+	 */
+	static final int ANIM_PROP_GANGPLANK = 13562;
+	static final int PROP_GANGPLANK_FRAMEMAP = 2503;
+
+	/** How long a scenery animation is drawn for, in client cycles. */
+	static final int PROP_CYCLES = 60;
 
 	/** True if this NPC is the crafted golem. */
 	static boolean isGolem(int npcId)

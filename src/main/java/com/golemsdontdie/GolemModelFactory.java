@@ -119,6 +119,45 @@ class GolemModelFactory
 	}
 
 	/**
+	 * How long a clip runs for, in client cycles, or 0 if it is not known.
+	 *
+	 * <p>Asked of the client rather than measured offline and shipped. The length is the
+	 * sum of the animation's own frame lengths, so this is the game's answer to how long
+	 * the action takes — and it stays right if Jagex ever retimes one, where a harvested
+	 * constant would quietly drift.
+	 *
+	 * <p>Used to pace a golem through a shortcut. Guessing that instead is what had golems
+	 * scaling a cliff in two thirds of a second.
+	 */
+	int animationCycles(int animationId)
+	{
+		Animation animation = animationFor(animationId);
+		if (animation == null)
+		{
+			return 0;
+		}
+
+		int duration = animation.getDuration();
+		if (duration > 0)
+		{
+			return duration;
+		}
+
+		// Some clips report no duration; their frame lengths still add up to one.
+		int[] frames = animation.getFrameLengths();
+		if (frames == null)
+		{
+			return 0;
+		}
+		int total = 0;
+		for (int length : frames)
+		{
+			total += length;
+		}
+		return total;
+	}
+
+	/**
 	 * Drops the shared models and animations. Called when the plugin stops, so a
 	 * disable/enable cycle does not keep handing out resources built against a client
 	 * that has moved on.

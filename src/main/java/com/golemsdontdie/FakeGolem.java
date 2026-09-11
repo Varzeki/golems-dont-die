@@ -154,7 +154,11 @@ class FakeGolem extends RuneLiteObjectController
 		// sink into a rise and float off a dip.
 		if (Golem.isInScene(wv, localX, localY))
 		{
-			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getPlane()));
+			// Terrain height, plus whatever the golem is doing above it. Mid-jump that is
+			// an arc, so a stepping-stone hop leaves the ground instead of sliding across
+			// the water at ankle height.
+			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getPlane())
+				- golem.jumpArc());
 		}
 	}
 

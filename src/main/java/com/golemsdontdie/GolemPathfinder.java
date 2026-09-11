@@ -35,8 +35,22 @@ class GolemPathfinder
 	/** Tries for a reachable destination before the golem gives up and idles. */
 	private static final int DESTINATION_ATTEMPTS = 10;
 
-	private static final int[] DX = {1, -1, 0, 0};
-	private static final int[] DY = {0, 0, 1, -1};
+	/**
+	 * The eight steps a golem may take, cardinals first.
+	 *
+	 * <p>Uniform-cost BFS over eight neighbours is correct for this game rather than an
+	 * approximation of it: a diagonal step costs one game tick exactly as a cardinal one
+	 * does, so there is no diagonal penalty to model and no need for the weighted queue
+	 * A* would want.
+	 *
+	 * <p>Cardinals are listed first so that where two routes are the same length the
+	 * straight one is found first, which is what a golem crossing open ground should do.
+	 * Whether a diagonal is legal at all is {@link IslandMemory#canStep}'s business — it
+	 * applies the game's corner rule, which will not let a golem slip between two walls
+	 * that meet at a point.
+	 */
+	private static final int[] DX = {1, -1, 0, 0, 1, -1, 1, -1};
+	private static final int[] DY = {0, 0, 1, -1, 1, 1, -1, -1};
 
 	@Inject
 	private IslandMemory memory;
