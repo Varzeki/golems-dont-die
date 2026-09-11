@@ -1,0 +1,22 @@
+# Origin	Destination	menuOption menuTarget objectID	Skills	Items	Quests	Varbits	VarPlayers	Duration	Display info
+# Wyrmscraig shortcuts, derived by dev-tools/BuildWyrmscraigTransports.
+# Objects and positions read from the game cache; destinations derived
+# from the collision map by finding the two components each joins.
+2550 2209 0	2554 2209 0	Climb Rocks 62267							
+2554 2209 0	2550 2209 0	Climb Rocks 62265							
+2565 2217 0	2565 2219 0	Cross Slippery basalt stepping stone 62262						1	
+2565 2219 0	2565 2217 0	Cross Slippery basalt stepping stone 62262						1	
+2565 2219 0	2565 2221 0	Cross Slippery basalt stepping stone 62262						1	
+2565 2221 0	2565 2219 0	Cross Slippery basalt stepping stone 62262						1	
+2614 2250 0	2614 2248 0	Cross Extra slippery basalt stepping stone 62261						1	
+2614 2248 0	2614 2250 0	Cross Extra slippery basalt stepping stone 62261						1	
+2614 2248 0	2614 2246 0	Cross Extra slippery basalt stepping stone 62261						1	
+2614 2246 0	2614 2248 0	Cross Extra slippery basalt stepping stone 62261						1	
+2584 2280 0	2584 2282 0	Cross Basalt stepping stone 62260						1	
+2584 2282 0	2584 2280 0	Cross Basalt stepping stone 62260						1	
+2584 2282 0	2584 2284 0	Cross Basalt stepping stone 62260						1	
+2584 2284 0	2584 2282 0	Cross Basalt stepping stone 62260						1	
+2584 2284 0	2584 2286 0	Cross Basalt stepping stone 62260						1	
+2584 2286 0	2584 2284 0	Cross Basalt stepping stone 62260						1	
+2534 2204 0	2564 8630 0	Enter Cave 62219						3	
+2564 8630 0	2534 2204 0	Exit Cave 62220						3	
