@@ -71,6 +71,8 @@ public class GolemsDontDiePlugin extends Plugin
 	/** Game ticks between position saves. Two minutes: cheap, and bounds what a crash costs. */
 	private static final int SAVE_INTERVAL_TICKS = 200;
 
+	private static final int DANCE_DURATION_CRAFT = 30;
+
 	/**
 	 * Path searches allowed per frame across all golems. At 50fps this is 200 a
 	 * second, far more than a roaming population actually asks for, while still
@@ -154,6 +156,8 @@ public class GolemsDontDiePlugin extends Plugin
 
 	private int lastGameCycle = -1;
 	private int ticksSinceSave = 0;
+
+	private int danceUntilTick = 0;
 
 	/** Set when a golem is added, removed or restored, so the panel redraws once. */
 	private boolean rosterChanged = true;
@@ -262,7 +266,16 @@ public class GolemsDontDiePlugin extends Plugin
 		if (tally.observe(event.getMessage()))
 		{
 			rosterChanged = true;
+			if (config.danceOnCraft())
+			{
+				danceFor(DANCE_DURATION_CRAFT);
+			}
 		}
+	}
+
+	private void danceFor(int ticks)
+	{
+		danceUntilTick = Math.max(danceUntilTick, client.getTickCount() + ticks);
 	}
 
 	/**
@@ -591,8 +604,11 @@ public class GolemsDontDiePlugin extends Plugin
 		// built five hundred times a frame to produce the same answer.
 		WorldView wv = client.getTopLevelWorldView();
 
+		boolean dancing = config.alwaysDance() || client.getTickCount() < danceUntilTick;
+
 		for (Golem golem : golems)
 		{
+			golem.setDancing(dancing);
 			if (nearIsland && elapsed > 0)
 			{
 				if (golem.advance(elapsed, islandMemory, pathfinder, searchBudget > 0))
@@ -765,6 +781,10 @@ public class GolemsDontDiePlugin extends Plugin
 			detector.reset();
 			hiddenNpcs.clear();
 			lastGameCycle = -1;
+
+			// The tick counter restarts on the other side, so a deadline carried
+			// across would sit far ahead of it.
+			danceUntilTick = 0;
 
 			for (Golem golem : golems)
 			{

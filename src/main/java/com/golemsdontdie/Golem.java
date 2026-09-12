@@ -119,6 +119,13 @@ class Golem
 	@Getter
 	private boolean walking;
 
+	/** Dancing changes the pose only; the golem keeps walking and turning as normal. */
+	@Getter
+	@Setter
+	private boolean dancing;
+
+	private GolemDance danceMove;
+
 	/** Set when the golem is inside the loaded scene and should be drawn. */
 	@Getter
 	@Setter
@@ -345,12 +352,25 @@ class Golem
 		return dy >= 0 ? NORTH : SOUTH;
 	}
 
+	void nextDanceMove()
+	{
+		danceMove = GolemDance.random(random);
+	}
+
 	/** The animation this golem should be playing right now. -1 if it has none. */
 	int currentPoseAnimation()
 	{
 		if (isDying())
 		{
 			return GolemContent.GOLEM_DEATH_ANIMATION;
+		}
+		if (dancing)
+		{
+			if (danceMove == null)
+			{
+				nextDanceMove();
+			}
+			return danceMove.getAnimationId();
 		}
 		return walking ? snapshot.getWalkAnimation() : snapshot.getIdlePoseAnimation();
 	}
