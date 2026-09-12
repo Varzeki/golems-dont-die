@@ -54,6 +54,7 @@ class FakeGolem extends RuneLiteObjectController
 		this.baseModel = baseModel;
 		this.shared = shared;
 		this.animation = new AnimationController(client, -1);
+		this.animation.setOnFinished(this::poseFinished);
 
 		// A single-tile object is drawn correctly by the default radius; a bigger
 		// golem needs the tiles under its footprint drawn first or it will z-fight
@@ -156,6 +157,24 @@ class FakeGolem extends RuneLiteObjectController
 		{
 			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getPlane()));
 		}
+	}
+
+	/**
+	 * Set here rather than left to {@link #applyPose()}, which only acts when the
+	 * wanted animation changes: the next move may be the one that just finished, and
+	 * the golem would stop on its last frame.
+	 */
+	private void poseFinished(AnimationController controller)
+	{
+		if (!golem.isDancing())
+		{
+			controller.loop();
+			return;
+		}
+
+		golem.nextDanceMove();
+		loadedAnimationId = golem.currentPoseAnimation();
+		controller.setAnimation(shared.animationFor(loadedAnimationId));
 	}
 
 	/** Switches between the walk and idle loops as the simulation changes its mind. */

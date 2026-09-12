@@ -50,4 +50,36 @@ public interface GolemsDontDieConfig extends Config
 	{
 		return 25;
 	}
+
+	@ConfigSection(
+		name = "Dancing",
+		description = "Make golems play emotes as they wander",
+		position = 1,
+		closedByDefault = true
+	)
+	String dancingSection = "dancing";
+
+	@ConfigItem(
+		keyName = "alwaysDance",
+		name = "Always dance",
+		description = "Golems dance permanently",
+		section = dancingSection,
+		position = 0
+	)
+	default boolean alwaysDance()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnCraft",
+		name = "Dance when you craft a golem",
+		description = "Golems dance for a short while each time you finish a golem",
+		section = dancingSection,
+		position = 1
+	)
+	default boolean danceOnCraft()
+	{
+		return false;
+	}
 }
