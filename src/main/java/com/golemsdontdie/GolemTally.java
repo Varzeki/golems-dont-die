@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.config.ConfigManager;
 
 /**
- * How many golems the player has ever crafted, read from the game's own chat messages.
+ * How many golems the player has ever crafted, read from the game's own count.
  *
  * <p>This exists because the plugin's roster is not the same thing as the player's
  * history. Golems made before the plugin was installed were never taken over, and ones
@@ -22,10 +22,23 @@ import net.runelite.client.config.ConfigManager;
  * going backwards: golems crafted is a lifetime tally, and misreading some other line as
  * a smaller total would silently make the revive button offer too few golems.
  *
- * <p>The game reports the running total on every craft, so a stale count — from crafting
- * with the plugin disabled, or from a fresh install — corrects itself the next time a
- * golem is finished. Counting golem spawns instead was tried and dropped: on a shared
- * island it would tally other players' golems as the player's own.
+ * <p>There are two sources, and they report the same number. The game keeps the total
+ * in a varbit, {@link GolemContent#GOLEM_COUNT_VARBIT}, which the server sends with the
+ * rest of the player's variables at login — so it can simply be read, at startup or
+ * whenever the count moves. It also reports the total in a chat line on every craft,
+ * which is only useful while the plugin is watching.
+ *
+ * <p>Reading the variable is what makes the tally survive the plugin not being there.
+ * Golems crafted on mobile, or with the plugin disabled, or before it was installed,
+ * are all already counted by the time the player next logs in, and the gap the revive
+ * button offers to close is right immediately — rather than staying wrong until the
+ * player happens to craft another golem to produce a message. The chat line is kept as
+ * a backstop: it costs nothing, it does not depend on the varbit meaning what it
+ * appears to, and it is not capped at the 65,535 sixteen bits can hold.
+ *
+ * <p>Counting golem spawns instead was tried and dropped: on a shared island it would
+ * tally other players' golems as the player's own. The variable has the opposite
+ * property — it is per-player, so nobody else's crafting can touch it.
  */
 @Slf4j
 @Singleton
@@ -103,6 +116,22 @@ class GolemTally
 		}
 
 		return setTotal(found);
+	}
+
+	/**
+	 * Offers the game's own count, read from {@link GolemContent#GOLEM_COUNT_VARBIT}.
+	 *
+	 * <p>Everything awkward about reading a game variable is handled by refusing to go
+	 * backwards, which the tally does anyway. A variable read before the server has sent
+	 * it is 0. A count past what sixteen bits hold either pins at 65,535 or wraps to a
+	 * small number, and the chat line will have carried the real figure past that point
+	 * already. All three are lower than what is stored, and lower is ignored.
+	 *
+	 * @return true if the total changed, so the panel can be redrawn
+	 */
+	boolean observeCount(int count)
+	{
+		return setTotal(count);
 	}
 
 	/**

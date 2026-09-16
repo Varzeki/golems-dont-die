@@ -17,6 +17,7 @@ package com.golemsdontdie;
  *   <li>Rig compatibility and transport animations — {@code dev-tools/FramemapProbe.java}</li>
  *   <li>The island's own shortcuts — {@code dev-tools/WyrmscraigRecon.java}, turned into
  *       transport rows by {@code dev-tools/BuildWyrmscraigTransports.java}</li>
+ *   <li>Varbit layout and meaning — {@code dev-tools/VarbitRecon.java}</li>
  * </ul>
  *
  * <p>The shortcuts are not constants here because they are data, not identity: four
@@ -107,6 +108,36 @@ final class GolemContent
 	 */
 	static final int GOLEM_AMBIENT = 10;
 	static final int GOLEM_CONTRAST = 60;
+
+	/**
+	 * The game's own count of golems this player has crafted, ever.
+	 *
+	 * <p>Called {@code GOLEM_CRAFTING_COUNT} in RuneLite's generated {@code VarbitID},
+	 * but the cache does not name varbits and a name is not a promise, so it was read
+	 * the same way as everything else here: it is sixteen bits wide, bits 16 to 31 of
+	 * varp {@link #GOLEM_COUNT_VARP}, ceiling 65,535. Width is the argument. Two plinth
+	 * stations would need two bits; sixteen is a tally and nothing else.
+	 *
+	 * <p>The low half of that same varp holds the two stations' carving state, which is
+	 * what makes this Golem Crafting's own count rather than some other thing that
+	 * counts. No client script in the cache reads it, so it is server-set and
+	 * per-player: a golem another player crafts beside you cannot move it, and one the
+	 * player crafts on mobile arrives with the varps at the next login.
+	 *
+	 * <p>Harvested with {@code dev-tools/VarbitRecon.java}.
+	 *
+	 * @see GolemTally
+	 */
+	static final int GOLEM_COUNT_VARBIT = 15738;
+
+	/**
+	 * The varp {@link #GOLEM_COUNT_VARBIT} is packed into.
+	 *
+	 * <p>Worth naming because the client reports a varp-level change as its own event,
+	 * carrying the whole varp as the value — carving state and count together, which is
+	 * a number in the millions and not a count of anything.
+	 */
+	static final int GOLEM_COUNT_VARP = 5709;
 
 	/** Wyrmscraig, from the world map element at (2600, 2240). */
 	static final int WYRMSCRAIG_REGION = 10275;
