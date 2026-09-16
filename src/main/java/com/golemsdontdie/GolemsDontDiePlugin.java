@@ -25,6 +25,7 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.callback.RenderCallback;
 import net.runelite.client.callback.RenderCallbackManager;
@@ -177,6 +178,10 @@ public class GolemsDontDiePlugin extends Plugin
 
 		tally.load();
 
+		// Enabling the plugin mid-session skips the login the count would have arrived
+		// at, and the client is holding it either way.
+		clientThread.invokeLater(this::syncTally);
+
 		// All three panel callbacks arrive on the Swing thread and touch the roster, so
 		// each hops to the client thread — the list is owned there.
 		panel = new GolemListPanel(
@@ -260,6 +265,46 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 		if (tally.observe(event.getMessage()))
+		{
+			rosterChanged = true;
+		}
+	}
+
+	/**
+	 * Keeps the tally level with the game's own count of golems crafted.
+	 *
+	 * <p>This is the half of the tally that does not need the plugin to have been
+	 * running: the count arrives with the player's variables at login, so golems crafted
+	 * on mobile or with the plugin off are already counted by the time anyone looks.
+	 */
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		// A change can be reported against the varbit or against the varp holding it,
+		// so both are worth waking for — and neither event's value is read, because the
+		// varp's is the count with sixteen bits of carving state underneath it.
+		if (event.getVarbitId() == GolemContent.GOLEM_COUNT_VARBIT
+			|| event.getVarpId() == GolemContent.GOLEM_COUNT_VARP)
+		{
+			syncTally();
+		}
+	}
+
+	/**
+	 * Reads the game's count of golems crafted into the tally.
+	 *
+	 * <p>Safe to call whenever there is any chance the count has moved, including before
+	 * the server has sent it: an unsent variable reads 0, and the tally ignores anything
+	 * below what it already has.
+	 */
+	private void syncTally()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+
+		if (tally.observeCount(client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT)))
 		{
 			rosterChanged = true;
 		}
@@ -752,6 +797,9 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (state == GameState.LOGGED_IN)
 		{
+			// Belt and braces next to onVarbitChanged: whichever of the two sees the
+			// count first, the other is a no-op.
+			syncTally();
 			restorePending();
 			return;
 		}
