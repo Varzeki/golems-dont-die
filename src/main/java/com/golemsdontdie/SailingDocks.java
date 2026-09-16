@@ -176,10 +176,19 @@ class SailingDocks
 				string(row, DBTableID.SailingDock.COL_NICE_NAME),
 				integer(row, DBTableID.SailingDock.COL_LEVEL_REQUIRED, 1),
 				integer(row, DBTableID.SailingDock.COL_QUEST_REQUIRED, -1),
-				mooring, ocean != null, snapToShore(authored)));
+				mooring, ocean != null, quayside(integer(row, DBTableID.SailingDock.COL_DOCK_ID, -1), authored)));
 		}
 
-		log.debug("Loaded {} sailing docks of {} rows", docks.size(), rows.size());
+		// A quayside on an island the land fill never reached is land from now on, or a golem
+		// that sails there has nowhere to step off.
+		for (Dock dock : docks)
+		{
+			WorldPoint shore = dock.getShore();
+			mesh.admitDockFloor(shore.getX(), shore.getY(), shore.getPlane());
+		}
+
+		log.debug("Loaded {} sailing docks of {} rows; {} open to golems at Sailing level {}", docks.size(),
+			rows.size(), openDocks().size(), client.getRealSkillLevel(Skill.SAILING));
 
 		if (docks.isEmpty() && !rows.isEmpty())
 		{
@@ -332,6 +341,23 @@ class SailingDocks
 	/** Docking buoy positions, indexed by dock id. Read once from the jar. */
 	private final List<WorldPoint> buoys = new ArrayList<>();
 
+	/**
+	 * Gangplank positions, indexed the same way; the buoy's own tile where none was found.
+	 *
+	 * <p>The plank is where a person walks aboard, so it is a far better quayside than the
+	 * nearest land to the buoy — which can be across the water, or the wrong pier.
+	 */
+	private final List<WorldPoint> gangplanks = new ArrayList<>();
+
+	/**
+	 * Reads the shipped table: a count, then six shorts a dock.
+	 *
+	 * <p>The layout is {@code BuildDocks}': the buoy's tile, then the gangplank's, each as
+	 * x, y and plane. This read {@code int, short, short, byte} instead — four bytes skipped,
+	 * then three fields taken across the boundaries of the next ones — so every dock in the
+	 * game came out somewhere like 0,3038 on plane 12. Nothing snapped to water, no quayside
+	 * had land beside it, and no golem could board anywhere: sailing has never once happened.
+	 */
 	private void loadBuoys()
 	{
 		if (!buoys.isEmpty())
@@ -352,9 +378,14 @@ class SailingDocks
 				int count = data.readInt();
 				for (int i = 0; i < count; i++)
 				{
-					data.readInt();
-					buoys.add(new WorldPoint(data.readShort() & 0xFFFF,
-						data.readShort() & 0xFFFF, data.readByte()));
+					int buoyX = data.readShort() & 0xFFFF;
+					int buoyY = data.readShort() & 0xFFFF;
+					int buoyPlane = data.readShort() & 0xFFFF;
+					int plankX = data.readShort() & 0xFFFF;
+					int plankY = data.readShort() & 0xFFFF;
+					int plankPlane = data.readShort() & 0xFFFF;
+					buoys.add(new WorldPoint(buoyX, buoyY, buoyPlane));
+					gangplanks.add(new WorldPoint(plankX, plankY, plankPlane));
 				}
 				log.debug("Loaded {} docking buoys", buoys.size());
 			}
@@ -363,7 +394,26 @@ class SailingDocks
 		{
 			log.warn("Docking buoy table unreadable", e);
 			buoys.clear();
+			gangplanks.clear();
 		}
+	}
+
+	/**
+	 * Where a golem boards this dock: the gangplank if the harvest found one and a golem can
+	 * stand on it, otherwise the nearest land to the buoy.
+	 *
+	 * <p>A plank equal to its buoy means no plank was found within range — several docks,
+	 * Wyrmscraig's among them, are like that.
+	 */
+	private WorldPoint quayside(int dockId, WorldPoint buoy)
+	{
+		WorldPoint plank = dockId < gangplanks.size() ? gangplanks.get(dockId) : null;
+		if (plank != null && !plank.equals(buoy)
+			&& mesh.isLandWalkable(plank.getX(), plank.getY(), plank.getPlane()))
+		{
+			return plank;
+		}
+		return snapToShore(buoy);
 	}
 
 	private static final String BUOYS = "/docks.gz";
@@ -379,6 +429,7 @@ class SailingDocks
 	{
 		for (int radius = 0; radius <= SNAP_RADIUS; radius++)
 		{
+			WorldPoint pier = null;
 			for (int dx = -radius; dx <= radius; dx++)
 			{
 				for (int dy = -radius; dy <= radius; dy++)
@@ -394,7 +445,20 @@ class SailingDocks
 					{
 						return new WorldPoint(x, y, at.getPlane());
 					}
+					// Ground the land fill never reached is still ground. Most of Sailing's
+					// islands are like that — no transport table leads onto them — and a dock
+					// is itself the proof a player stands there. Taken only if nothing the
+					// fill knows is as close.
+					if (pier == null && mesh.isWalkable(x, y, at.getPlane())
+						&& !mesh.isOcean(x, y, at.getPlane()) && mesh.componentAt(x, y, at.getPlane()) != 0)
+					{
+						pier = new WorldPoint(x, y, at.getPlane());
+					}
 				}
+			}
+			if (pier != null)
+			{
+				return pier;
 			}
 		}
 		return at;

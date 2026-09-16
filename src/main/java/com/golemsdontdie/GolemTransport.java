@@ -116,6 +116,36 @@ final class GolemTransport
 		this.varpRequirements = varps;
 	}
 
+	/** A learned route that goes into an instance, or comes out of one. See {@link InstanceMap}. */
+	static final int INTO_INSTANCE = 1;
+	static final int OUT_OF_INSTANCE = 2;
+
+	/**
+	 * {@link #INTO_INSTANCE}, {@link #OUT_OF_INSTANCE}, or neither.
+	 *
+	 * <p>A golem through the pew is somewhere nobody outside the instance can see, and a
+	 * golem in the instance's copy of the island is not in the instance at all — both of which
+	 * look identical in coordinates, because an instance is its template's coordinates. This
+	 * is what tells them apart.
+	 */
+	@Getter
+	private int instanceFlags;
+
+	void setInstanceFlags(int flags)
+	{
+		this.instanceFlags = flags;
+	}
+
+	boolean entersInstance()
+	{
+		return (instanceFlags & INTO_INSTANCE) != 0;
+	}
+
+	boolean leavesInstance()
+	{
+		return (instanceFlags & OUT_OF_INSTANCE) != 0;
+	}
+
 	void setReverse(int index)
 	{
 		this.reverse = index;
@@ -124,6 +154,20 @@ final class GolemTransport
 	void setIndex(int index)
 	{
 		this.index = index;
+	}
+
+	/** Both ends of this journey as one number. Rows with the same key go the same way. */
+	long endpointKey()
+	{
+		return TransportNetwork.endpoints(getFromX(), getFromY(), getFromPlane(),
+			getToX(), getToY(), getToPlane());
+	}
+
+	/** The key of the journey that undoes this one. */
+	long reverseKey()
+	{
+		return TransportNetwork.endpoints(getToX(), getToY(), getToPlane(),
+			getFromX(), getFromY(), getFromPlane());
 	}
 
 	WorldPoint destination()
@@ -224,8 +268,8 @@ final class GolemTransport
 					// Going down is its own clip, not the ascent run backwards.
 					//
 					// Measured on Wyrmscraig, where the climb is two objects: the west
-					// approach plays the climbing loop and the east approach plays 740,
-					// HUMAN_CLIMBING_DOWN. Three independent reimplementations of the
+					// approach (62265) plays 740, HUMAN_CLIMBING_DOWN, and the east approach
+					// (62267) plays the climbing loop. Three independent reimplementations of the
 					// server use 740 for a descent too, so this is not a local quirk.
 					//
 					// Only the plane can say which way a climb goes, so this catches the

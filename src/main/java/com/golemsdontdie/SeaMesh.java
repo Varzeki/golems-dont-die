@@ -92,8 +92,65 @@ class SeaMesh
 	 * <p>Separate from {@link #route} so the caller can take the cheap answer on a render
 	 * frame and defer the expensive one.
 	 */
+	/**
+	 * Crossings between every pair of moorings, computed offline by
+	 * {@code dev-tools/probe/com/golemsdontdie/BuildSeaRoutes.java}.
+	 *
+	 * <p>The live search could not be relied on for them. Sampling forty pairs of ports, it
+	 * found no route for twenty-one — the ocean is one body of water, so every one of those was
+	 * the search running out of budget, not a real answer — and each failure took a quarter to
+	 * two fifths of a second on the client thread, then was remembered as unroutable for the
+	 * rest of the session. The search remains for a pair the table does not have.
+	 */
+	private static final String SHIPPED = "/sea-routes.gz";
+
+	private boolean shippedLoaded;
+
+	private void loadShipped()
+	{
+		if (shippedLoaded)
+		{
+			return;
+		}
+		shippedLoaded = true;
+		try (java.io.InputStream raw = SeaMesh.class.getResourceAsStream(SHIPPED))
+		{
+			if (raw == null)
+			{
+				log.warn("Shipped sea routes missing from the jar; crossings will be searched live");
+				return;
+			}
+			try (java.util.zip.GZIPInputStream gz = new java.util.zip.GZIPInputStream(raw);
+				 java.io.DataInputStream data = new java.io.DataInputStream(gz))
+			{
+				int count = data.readInt();
+				for (int i = 0; i < count; i++)
+				{
+					int legs = data.readShort() & 0xFFFF;
+					List<int[]> route = new ArrayList<>(legs);
+					for (int j = 0; j < legs; j++)
+					{
+						route.add(new int[]{data.readShort() & 0xFFFF, data.readShort() & 0xFFFF});
+					}
+					int[] first = route.get(0);
+					int[] last = route.get(route.size() - 1);
+					routes.put(key(first[0], first[1], last[0], last[1]), route);
+					List<int[]> back = new ArrayList<>(route);
+					Collections.reverse(back);
+					routes.put(key(last[0], last[1], first[0], first[1]), back);
+				}
+				log.debug("Loaded {} shipped sea routes", count);
+			}
+		}
+		catch (java.io.IOException | RuntimeException e)
+		{
+			log.warn("Shipped sea routes unreadable; crossings will be searched live", e);
+		}
+	}
+
 	List<int[]> cachedRoute(WorldPoint from, WorldPoint to)
 	{
+		loadShipped();
 		List<int[]> cached = routes.get(key(from, to));
 		return cached == null || cached.isEmpty() ? null : cached;
 	}
@@ -101,6 +158,7 @@ class SeaMesh
 	/** True if this pair has already been searched, successfully or not. */
 	boolean isSearched(WorldPoint from, WorldPoint to)
 	{
+		loadShipped();
 		return routes.containsKey(key(from, to));
 	}
 
@@ -114,6 +172,7 @@ class SeaMesh
 	 */
 	List<int[]> route(WorldPoint from, WorldPoint to)
 	{
+		loadShipped();
 		long key = key(from, to);
 		List<int[]> cached = routes.get(key);
 		if (cached != null)
@@ -253,8 +312,12 @@ class SeaMesh
 	/** Endpoint pair key. Direction matters: a route is reversed, not reused. */
 	private static long key(WorldPoint from, WorldPoint to)
 	{
-		return ((long) from.getX() << 45) ^ ((long) from.getY() << 30)
-			^ ((long) to.getX() << 15) ^ to.getY();
+		return key(from.getX(), from.getY(), to.getX(), to.getY());
+	}
+
+	private static long key(int fromX, int fromY, int toX, int toY)
+	{
+		return ((long) fromX << 45) ^ ((long) fromY << 30) ^ ((long) toX << 15) ^ toY;
 	}
 
 	private static long pack(int x, int y)

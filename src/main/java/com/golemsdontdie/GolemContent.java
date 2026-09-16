@@ -266,6 +266,22 @@ final class GolemContent
 	static final int RAFT_FRAMEMAP = 2486;
 
 	/**
+	 * The boat drawn under a golem at sea: the classic rowing boat NPC, "Boat".
+	 *
+	 * <p>Chosen by measuring models with {@code dev-tools/BoatRecon.java}, because the obvious
+	 * sources are not boats. Sailing's boat table lists crews — "Pirate", "Trader Crewmember"
+	 * — so a search of it for anything named like a vessel never found one, and golems sailed
+	 * on nothing. The NPCs RuneLite calls {@code SAILING_BOAT_SAIL01_*} are sails: models 58237
+	 * and 58238 are flat sheets a thousand units wide, 1,159 tall and 83 thick. This one's hull,
+	 * model 17556, is 144 wide, 94 tall and 384 long — a rowing boat three tiles long, which is
+	 * about the size of a golem's ride.
+	 */
+	static final int RAFT_NPC = 3834;
+
+	/** The boat's own standing animation, on its own rig. */
+	static final int RAFT_ANIM = 4756;
+
+	/**
 	 * Animations that belong to scenery, played on a copy of the object rather than on
 	 * the golem.
 	 *

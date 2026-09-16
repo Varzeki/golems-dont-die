@@ -27,7 +27,10 @@ class GolemStore
 	private static final String GOLEM_SEPARATOR = ";";
 	private static final String FIELD_SEPARATOR = ",";
 
-	/** Ten numbers plus the nickname. */
+	/**
+	 * Ten numbers plus the nickname. Two more are optional: whether the golem is in an
+	 * instance, and when it may next sail.
+	 */
 	private static final int FIELD_COUNT = 11;
 
 	/** Characters a nickname may not contain, because they are the separators. */
@@ -50,6 +53,8 @@ class GolemStore
 		int walk;
 		int run;
 		String nickname;
+		boolean inInstance;
+		long shoreLeaveUntil;
 	}
 
 	/** Encodes a live roster for the config store. */
@@ -59,7 +64,7 @@ class GolemStore
 		for (Golem golem : golems)
 		{
 			GolemSnapshot snapshot = golem.getSnapshot();
-			WorldPoint at = golem.currentTile();
+			WorldPoint at = golem.saveTile();
 			if (out.length() > 0)
 			{
 				out.append(GOLEM_SEPARATOR);
@@ -67,7 +72,7 @@ class GolemStore
 			out.append(snapshot.getNpcId()).append(FIELD_SEPARATOR)
 				.append(at.getX()).append(FIELD_SEPARATOR)
 				.append(at.getY()).append(FIELD_SEPARATOR)
-				.append(golem.getPlane()).append(FIELD_SEPARATOR)
+				.append(at.getPlane()).append(FIELD_SEPARATOR)
 				.append(golem.getOrientation()).append(FIELD_SEPARATOR)
 				.append(golem.getHome().getX()).append(FIELD_SEPARATOR)
 				.append(golem.getHome().getY()).append(FIELD_SEPARATOR)
@@ -79,7 +84,10 @@ class GolemStore
 				// problem than a save file that will not parse.
 				.append(golem.getNickname() == null
 					? ""
-					: golem.getNickname().replaceAll(ILLEGAL_IN_NICKNAME, ""));
+					: golem.getNickname().replaceAll(ILLEGAL_IN_NICKNAME, ""))
+				.append(FIELD_SEPARATOR).append(golem.isInInstance() ? 1 : 0)
+				// Real time, so a golem that landed just before logout is still ashore after it.
+				.append(FIELD_SEPARATOR).append(golem.getShoreLeaveUntil());
 		}
 		return out.toString();
 	}
@@ -101,7 +109,7 @@ class GolemStore
 			}
 			// -1 keeps a trailing empty nickname as a field rather than dropping it.
 			String[] fields = entry.split(FIELD_SEPARATOR, -1);
-			if (fields.length != FIELD_COUNT)
+			if (fields.length < FIELD_COUNT || fields.length > FIELD_COUNT + 2)
 			{
 				log.debug("Dropping malformed saved golem '{}'", entry);
 				continue;
@@ -121,6 +129,8 @@ class GolemStore
 				saved.run = Integer.parseInt(fields[9].trim());
 				String nickname = fields[10].trim();
 				saved.nickname = nickname.isEmpty() ? null : nickname;
+				saved.inInstance = fields.length > FIELD_COUNT && "1".equals(fields[FIELD_COUNT].trim());
+				saved.shoreLeaveUntil = fields.length > FIELD_COUNT + 1 ? Long.parseLong(fields[FIELD_COUNT + 1].trim()) : 0;
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -164,6 +174,8 @@ class GolemStore
 		long seed = ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
 		Golem golem = Golem.onTile(snapshot, home, seed, at);
 		golem.setNickname(saved.nickname);
+		golem.setInInstance(saved.inInstance);
+		golem.setShoreLeaveUntil(saved.shoreLeaveUntil);
 		return golem;
 	}
 }

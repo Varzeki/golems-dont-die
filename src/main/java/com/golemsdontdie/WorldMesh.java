@@ -49,6 +49,15 @@ class WorldMesh
 	private static final int COLLISION_BYTES = TILES_PER_PLANE * 2 / 8;
 	private static final int DERIVED_BYTES = TILES_PER_PLANE / 8;
 
+	/** Two bytes a tile: there are 14,288 components, which does not fit in one. */
+	private static final int COMPONENT_BYTES = TILES_PER_PLANE * 2;
+
+	/** Impossible as an entry count, so an old file is refused rather than misread. */
+	private static final int MAGIC = -0x60137;
+
+	/** 2 added the per-tile component map. */
+	private static final int VERSION = 2;
+
 	static final int FLAG_NORTH = 0;
 	static final int FLAG_EAST = 1;
 
@@ -67,6 +76,19 @@ class WorldMesh
 	 * and nothing else.
 	 */
 	private final Map<Long, byte[]> land = new HashMap<>();
+
+	/**
+	 * Which connected component each tile belongs to, two bytes per tile, 0 for none.
+	 *
+	 * <p>The one thing the mesh can say that no per-tile flag can: whether two tiles are
+	 * connected <b>to each other</b>. Everything else here answers "may a golem stand
+	 * there", which is a different and much weaker question — a sealed room is perfectly
+	 * good ground and a golem put in one is stuck in it forever.
+	 *
+	 * <p>{@code isolated} was the previous approximation and only ever caught components
+	 * under fifty tiles. Any larger sealed space passed it.
+	 */
+	private final Map<Long, byte[]> components = new HashMap<>();
 
 	private boolean loaded;
 
@@ -97,6 +119,22 @@ class WorldMesh
 			try (GZIPInputStream gz = new GZIPInputStream(raw);
 				 DataInputStream data = new DataInputStream(gz))
 			{
+				// A negative first field is the version marker. An entry count cannot be
+				// negative, so a file without one is the old format and is refused rather
+				// than read as though its component map were region ids.
+				int first = data.readInt();
+				if (first != MAGIC)
+				{
+					log.warn("World mesh is an old format; rebuild it with BuildWorldMesh");
+					return;
+				}
+				int version = data.readInt();
+				if (version != VERSION)
+				{
+					log.warn("World mesh is version {}, expected {}", version, VERSION);
+					return;
+				}
+
 				int entries = data.readInt();
 				for (int i = 0; i < entries; i++)
 				{
@@ -116,6 +154,10 @@ class WorldMesh
 					data.readFully(alone);
 					isolated.put(key, alone);
 
+					byte[] parts = new byte[COMPONENT_BYTES];
+					data.readFully(parts);
+					components.put(key, parts);
+
 					byte[] ground = new byte[DERIVED_BYTES];
 					data.readFully(ground);
 					land.put(key, ground);
@@ -130,6 +172,7 @@ class WorldMesh
 			ocean.clear();
 			isolated.clear();
 			land.clear();
+			components.clear();
 		}
 	}
 
@@ -167,6 +210,39 @@ class WorldMesh
 		return derived(isolated, x, y, plane);
 	}
 
+	/**
+	 * Which connected space this tile belongs to, or 0 if the mesh does not know.
+	 *
+	 * <p>Zero means "no answer" rather than "no component", and callers must treat it as
+	 * unknown. A tile outside the shipped regions, on ground the player has walked but the
+	 * mesh never covered, is a perfectly good place for a golem to be — refusing to move
+	 * there because the mesh is silent would shrink the world to the shipped file.
+	 */
+	int componentAt(int x, int y, int plane)
+	{
+		byte[] parts = components.get(key(regionIdOf(x, y), plane));
+		if (parts == null)
+		{
+			return 0;
+		}
+		int tile = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
+		return ((parts[tile * 2] & 0xff) << 8) | (parts[tile * 2 + 1] & 0xff);
+	}
+
+	/**
+	 * True if a golem standing at the first tile could walk to the second.
+	 *
+	 * <p>Unknown counts as yes. The mesh covers most of the game but not all of it, and the
+	 * live harvest covers ground the mesh never will — so a silent answer must not be read
+	 * as a refusal, or golems would be confined to the regions that happened to ship.
+	 */
+	boolean sameComponent(int fromX, int fromY, int toX, int toY, int plane)
+	{
+		int from = componentAt(fromX, fromY, plane);
+		int to = componentAt(toX, toY, plane);
+		return from == 0 || to == 0 || from == to;
+	}
+
 	/** True if something could stand here — the tile can be left in some direction. */
 	boolean isWalkable(int x, int y, int plane)
 	{
@@ -192,7 +268,79 @@ class WorldMesh
 	 */
 	boolean isLandWalkable(int x, int y, int plane)
 	{
-		return derived(land, x, y, plane) && isWalkable(x, y, plane);
+		if (!derived(land, x, y, plane)
+			&& (landComponents.isEmpty() && dockFloors.isEmpty()
+				|| !landComponents.contains(componentAt(x, y, plane)) && !dockFloors.contains(componentAt(x, y, plane))))
+		{
+			return false;
+		}
+		return isWalkable(x, y, plane);
+	}
+
+	/**
+	 * Floors counted as land because a dock stands on them.
+	 *
+	 * <p>Kept apart from the transport floors, which are replaced whenever a route is learned.
+	 * Sailing added islands no transport table has a row on, so the land fill never reached
+	 * them: twenty-two of the sixty-one docks had no land beside them at all, and a golem that
+	 * sailed there would have had nowhere to step off.
+	 */
+	private final java.util.Set<Integer> dockFloors = new java.util.HashSet<>();
+
+	/** Admits the floor under a dock's quayside, if it is a floor at all. */
+	void admitDockFloor(int x, int y, int plane)
+	{
+		if (x >= 6400 || isOcean(x, y, plane))
+		{
+			return;
+		}
+		int component = componentAt(x, y, plane);
+		if (component != 0)
+		{
+			dockFloors.add(component);
+		}
+	}
+
+	/**
+	 * Floors counted as land because a transport starts or ends on them, beyond what the
+	 * shipped land fill reached.
+	 *
+	 * <p>The fill is run offline from Lumbridge and every row of the tables it was given, so a
+	 * floor whose only way in is a ladder no table lists has collision, a component and every
+	 * wall in place — and no land bit, which made it somewhere no golem would ever go. That was
+	 * Wyrmscraig's ladder tops and the cathedral basement, and it is every place newer than the
+	 * tables. Any row the plugin holds is the same evidence the fill used: a player can stand at
+	 * each end. So the connected floor under each end is admitted, as the fill would have done.
+	 *
+	 * <p>Only the exact end tile, never a neighbour. A stepping stone's tile is blocked, and
+	 * snapping to the water beside it would admit a river as land.
+	 */
+	private final java.util.Set<Integer> landComponents = new java.util.HashSet<>();
+
+	/** Admits the floor under both ends of every transport. Replaces what was admitted before. */
+	void admitTransportEnds(java.util.List<GolemTransport> transports)
+	{
+		landComponents.clear();
+		for (GolemTransport t : transports)
+		{
+			admit(t.getFromX(), t.getFromY(), t.getFromPlane());
+			admit(t.getToX(), t.getToY(), t.getToPlane());
+		}
+		log.debug("{} floors admitted as land from transport ends", landComponents.size());
+	}
+
+	private void admit(int x, int y, int plane)
+	{
+		// Instances are rebuilt each visit; their coordinates name no lasting floor.
+		if (x >= 6400 || derived(land, x, y, plane) || isOcean(x, y, plane))
+		{
+			return;
+		}
+		int component = componentAt(x, y, plane);
+		if (component != 0)
+		{
+			landComponents.add(component);
+		}
 	}
 
 	private boolean flag(int x, int y, int plane, int which)

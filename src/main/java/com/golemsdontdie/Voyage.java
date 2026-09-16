@@ -51,7 +51,7 @@ class Voyage
 	 * @param from   the dock the golem is leaving
 	 * @param memory the golem's own memory, consulted and updated for the blocked port
 	 */
-	Itinerary depart(SailingDocks.Dock from, TransportMemory memory, int tick, Random random,
+	Itinerary depart(SailingDocks.Dock from, WorldPoint at, TransportMemory memory, int tick, Random random,
 		RoamContext context)
 	{
 		List<SailingDocks.Dock> open = docks.openDocks();
@@ -87,7 +87,7 @@ class Voyage
 		{
 			memory.setBlockedPort(from.getRowId());
 			log.debug("Golem taking the passage {} -> {}", from.getName(), to.getName());
-			return passage(from, to, tick);
+			return passage(from, to, at, tick);
 		}
 
 		boolean searched = sea.isSearched(from.getMooring(), to.getMooring());
@@ -122,6 +122,12 @@ class Voyage
 		// walk up to the quayside first.
 		List<int[]> ashore = new java.util.ArrayList<>(route);
 		ashore.add(new int[]{to.getShore().getX(), to.getShore().getY()});
+		// And it starts from where the golem is, on the quayside. Starting at the mooring put
+		// it on the water several tiles out the moment it decided to go.
+		if (at != null && (at.getX() != route.get(0)[0] || at.getY() != route.get(0)[1]))
+		{
+			ashore.add(0, new int[]{at.getX(), at.getY()});
+		}
 
 		// Paced per tile of water crossed, not per waypoint. The route is straightened,
 		// so its waypoints are corners rather than steps — counting them made a long
@@ -136,14 +142,10 @@ class Voyage
 	 * <p>Timed by straight-line distance so that a long passage still takes long enough to
 	 * be believable, and floored so a short one is not instant.
 	 */
-	private Itinerary passage(SailingDocks.Dock from, SailingDocks.Dock to, int tick)
+	private Itinerary passage(SailingDocks.Dock from, SailingDocks.Dock to, WorldPoint at, int tick)
 	{
 		WorldPoint a = from.getMooring();
 		WorldPoint b = to.getMooring();
-
-		List<int[]> ends = new java.util.ArrayList<>();
-		ends.add(new int[]{a.getX(), a.getY()});
-		ends.add(new int[]{to.getShore().getX(), to.getShore().getY()});
 
 		// Underground maps sit thousands of tiles from the surface they lie beneath, so
 		// the raw separation between a cave dock and a sea one is meaningless as a
@@ -151,8 +153,10 @@ class Voyage
 		int spread = Math.min(400,
 			Math.abs(a.getX() - b.getX()) + Math.abs(a.getY() - b.getY()));
 
-		return Itinerary.of(ends, to.getShore().getPlane(), tick, TICKS_PER_SEA_TILE,
-			Math.max(50, spread), true);
+		// Held at the quayside for the crossing and then put ashore, not walked between the two.
+		// As a two-point route the golem slid across six thousand tiles of map from the cave to
+		// the surface — the same fault a ladder into a dungeon had.
+		return Itinerary.passage(at != null ? at : from.getShore(), to.getShore(), tick, Math.max(50, spread));
 	}
 
 	/**

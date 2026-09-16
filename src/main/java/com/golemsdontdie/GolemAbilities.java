@@ -41,6 +41,9 @@ class GolemAbilities
 	@Inject
 	private Client client;
 
+	@Inject
+	private ObstacleKnowledge knowledge;
+
 	private static final Skill[] SKILLS = Skill.values();
 	private static final Quest[] QUESTS = Quest.values();
 
@@ -52,6 +55,20 @@ class GolemAbilities
 	 */
 	boolean canUse(GolemTransport transport)
 	{
+		// Can the golem be drawn doing this at all? Asked first, and separately from the
+		// requirements below, because it is a different question: not whether the golem is
+		// permitted through, but whether the plugin knows what using it looks like.
+		//
+		// The shipped animation for most obstacles is a guess made from the menu text, and
+		// measuring has overturned that guess on every obstacle anyone has stood in front
+		// of. So a golem routes around anything unproven rather than performing an
+		// invented animation on it, and the set it may use grows as the player is seen
+		// using obstacles themselves. See ObstacleKnowledge.
+		if (!knowledge.isUnlocked(transport))
+		{
+			return false;
+		}
+
 		if (transport.isUnconditional())
 		{
 			return true;

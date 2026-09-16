@@ -77,6 +77,17 @@ class IslandMemory
 	private static final int BITS_PER_REGION = REGION_SIZE * REGION_SIZE * FLAGS_PER_TILE;
 	private static final int WORDS_PER_REGION = BITS_PER_REGION / Long.SIZE;
 
+	/**
+	 * Tiles at the edge of the loaded scene that are never harvested.
+	 *
+	 * <p>The client fills a border of the scene's collision with "blocked" whatever is really
+	 * there. Harvesting only ever added open edges once, so the border did no harm; once a
+	 * harvest cleared what it re-read — needed so a shut door stops counting as open — every
+	 * harvest wrote a band of false walls wherever the edge of the scene happened to be. The
+	 * plinth ended up boxed into two hundred tiles of its own island.
+	 */
+	private static final int SCENE_MARGIN = 6;
+
 	/** Blocked for standing on: an object, a wall filling the tile, or bad ground. */
 	private static final int UNWALKABLE = CollisionDataFlag.BLOCK_MOVEMENT_FULL
 		| CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
@@ -91,6 +102,33 @@ class IslandMemory
 
 	/** Regions harvested this session, so a reload is not redone every scene change. */
 	private final Set<Long> harvested = new HashSet<>();
+
+	/**
+	 * Which tiles of a harvested region have actually been read from a scene, one bit a
+	 * tile, by the same key as {@link #regions}. A region with no entry here is fully known —
+	 * the shipped island map, or a save from before this was kept.
+	 *
+	 * <p>A region is 64 tiles square and a scene rarely shows all of one. Its unread tiles
+	 * were zeros, and zeros read as walls — which then stood in front of the shipped mesh for
+	 * the whole region. Golems walking the cave, on ground the mesh knows perfectly well, were
+	 * rescued off it because a glimpse of the basement next door had claimed the region.
+	 * Unread tiles now fall back to the mesh as if the region had never been seen.
+	 */
+	private final Map<Long, long[]> seen = new HashMap<>();
+
+	private static final int TILE_WORDS = REGION_SIZE * REGION_SIZE / Long.SIZE;
+
+	private static void markSeen(long[] mask, int rx, int ry)
+	{
+		int tile = ry * REGION_SIZE + rx;
+		mask[tile >> 6] |= 1L << (tile & 63);
+	}
+
+	private static boolean isSeen(long[] mask, int rx, int ry)
+	{
+		int tile = ry * REGION_SIZE + rx;
+		return (mask[tile >> 6] >>> (tile & 63) & 1L) != 0L;
+	}
 
 	/**
 	 * The region the first golem was seen in. Everything the island is taken to be
@@ -149,7 +187,14 @@ class IslandMemory
 					long key = key(regionId, plane);
 					if (regions.containsKey(key))
 					{
-						// Already known from a live scene, which is the better source.
+						// Already known from a live scene, which is the better source — for the
+						// tiles that scene showed. Any it did not are filled from the shipped map,
+						// which makes the region whole.
+						long[] mask = seen.remove(key);
+						if (mask != null)
+						{
+							fillUnseen(regions.get(key), toWords(packed), mask);
+						}
 						continue;
 					}
 					regions.put(key, toWords(packed));
@@ -167,6 +212,27 @@ class IslandMemory
 			// A missing or corrupt baseline is survivable — golems fall back to
 			// roaming only what the player has walked.
 			log.warn("Bundled island map unreadable", e);
+		}
+	}
+
+	/** Copies both edges of every tile the mask has not seen from {@code source} into {@code target}. */
+	private static void fillUnseen(long[] target, long[] source, long[] mask)
+	{
+		for (int ry = 0; ry < REGION_SIZE; ry++)
+		{
+			for (int rx = 0; rx < REGION_SIZE; rx++)
+			{
+				if (isSeen(mask, rx, ry))
+				{
+					continue;
+				}
+				for (int flag = 0; flag < FLAGS_PER_TILE; flag++)
+				{
+					int bit = bitIndex(rx, ry, flag);
+					long one = 1L << (bit & 63);
+					target[bit >> 6] = (target[bit >> 6] & ~one) | (source[bit >> 6] & one);
+				}
+			}
 		}
 	}
 
@@ -248,7 +314,22 @@ class IslandMemory
 				return true;
 			}
 		}
-		return false;
+		return alsoIsland != null && alsoIsland.test(regionId);
+	}
+
+	/**
+	 * Regions beyond the nine around the plinth that golems can get to and so need mapping:
+	 * wherever a transport from the island leads. Set by the plugin, which has the network.
+	 *
+	 * <p>The cathedral's basement is under the island but in another region, reached only
+	 * by a staircase the player taught. Its ground was never harvested, the shipped mesh
+	 * knows nothing of it, and golems that went down found nowhere to walk.
+	 */
+	private java.util.function.IntPredicate alsoIsland;
+
+	void setAlsoIsland(java.util.function.IntPredicate alsoIsland)
+	{
+		this.alsoIsland = alsoIsland;
 	}
 
 	/**
@@ -299,6 +380,12 @@ class IslandMemory
 			return;
 		}
 
+		if (wv.isInstance())
+		{
+			harvestInstance(wv, plane, flags);
+			return;
+		}
+
 		int baseX = wv.getBaseX();
 		int baseY = wv.getBaseY();
 
@@ -310,7 +397,12 @@ class IslandMemory
 				continue;
 			}
 
+			if (!regions.containsKey(key))
+			{
+				seen.put(key, new long[TILE_WORDS]);
+			}
 			long[] bits = regions.computeIfAbsent(key, k -> new long[WORDS_PER_REGION]);
+			long[] seenHere = seen.get(key);
 			int regionBaseX = (regionId >> 8) << 6;
 			int regionBaseY = (regionId & 0xFF) << 6;
 			int tilesSeen = 0;
@@ -321,16 +413,40 @@ class IslandMemory
 				{
 					int sceneX = regionBaseX + rx - baseX;
 					int sceneY = regionBaseY + ry - baseY;
-					if (sceneX < 0 || sceneY < 0
-						|| sceneX >= Constants.SCENE_SIZE || sceneY >= Constants.SCENE_SIZE
+					if (sceneX < SCENE_MARGIN || sceneY < SCENE_MARGIN
+						|| sceneX >= Constants.SCENE_SIZE - SCENE_MARGIN
+						|| sceneY >= Constants.SCENE_SIZE - SCENE_MARGIN
 						|| sceneX >= flags.length || sceneY >= flags[sceneX].length)
 					{
 						continue;
 					}
 
 					tilesSeen++;
+
+					// Cleared before being set. A harvest only ever added open edges, so a
+					// door recorded open stayed open in memory after it was shut, and golems
+					// walked straight through it.
+					// An edge is only rewritten where the tile it leads to is inside the
+					// harvested area too; beyond that the scene's border would answer.
+					boolean northKnown = sceneY + 1 < Constants.SCENE_SIZE - SCENE_MARGIN;
+					boolean eastKnown = sceneX + 1 < Constants.SCENE_SIZE - SCENE_MARGIN;
+					// A tile on the far edge of the harvest has an edge nobody could read, and
+					// counting it seen would make that edge a wall. Left unseen, the mesh answers.
+					if (seenHere != null && northKnown && eastKnown)
+					{
+						markSeen(seenHere, rx, ry);
+					}
 					int here = flags[sceneX][sceneY];
-					if ((here & UNWALKABLE) != 0)
+					boolean blocked = (here & UNWALKABLE) != 0;
+					if (northKnown || blocked)
+					{
+						clear(bits, rx, ry, FLAG_NORTH);
+					}
+					if (eastKnown || blocked)
+					{
+						clear(bits, rx, ry, FLAG_EAST);
+					}
+					if (blocked)
 					{
 						continue;
 					}
@@ -339,12 +455,12 @@ class IslandMemory
 					// destination tile being unstandable. The destination may be outside
 					// the scene at a region edge, in which case leave the bit clear and
 					// let the neighbouring region's harvest fill it in later.
-					if ((here & CollisionDataFlag.BLOCK_MOVEMENT_NORTH) == 0
+					if (northKnown && (here & CollisionDataFlag.BLOCK_MOVEMENT_NORTH) == 0
 						&& standable(flags, sceneX, sceneY + 1))
 					{
 						set(bits, rx, ry, FLAG_NORTH);
 					}
-					if ((here & CollisionDataFlag.BLOCK_MOVEMENT_EAST) == 0
+					if (eastKnown && (here & CollisionDataFlag.BLOCK_MOVEMENT_EAST) == 0
 						&& standable(flags, sceneX + 1, sceneY))
 					{
 						set(bits, rx, ry, FLAG_EAST);
@@ -365,9 +481,94 @@ class IslandMemory
 			if (tilesSeen == REGION_SIZE * REGION_SIZE)
 			{
 				harvested.add(key);
+				seen.remove(key);
 				log.debug("Harvested island region {} plane {}", regionId, plane);
 			}
 		}
+	}
+
+	/**
+	 * Records an instance's ground under its template's coordinates.
+	 *
+	 * <p>Golems in an instance are simulated in the template, so that is where they need to
+	 * know what is walkable. The template room in the world is sealed off — nothing leads
+	 * into it on foot, which is exactly why golems that wandered in were stuck — so the only
+	 * way to learn its floor is from an instance built on it.
+	 *
+	 * <p>An edge is only recorded where both tiles come from the same template, side by side.
+	 * Chunks are stitched together as the instance is built, and two tiles next to each
+	 * other in the instance need not be next to each other in the world.
+	 */
+	private void harvestInstance(WorldView wv, int plane, int[][] flags)
+	{
+		int edgeX = Math.min(flags.length, wv.getSizeX()) - SCENE_MARGIN;
+		for (int sceneX = SCENE_MARGIN; sceneX < edgeX; sceneX++)
+		{
+			int edgeY = Math.min(flags[sceneX].length, wv.getSizeY()) - SCENE_MARGIN;
+			for (int sceneY = SCENE_MARGIN; sceneY < edgeY; sceneY++)
+			{
+				int[] here = template(wv, plane, sceneX, sceneY);
+				if (here == null)
+				{
+					continue;
+				}
+				long key = key(regionIdOf(here[0], here[1]), here[2]);
+				if (!regions.containsKey(key))
+				{
+					seen.put(key, new long[TILE_WORDS]);
+				}
+				long[] bits = regions.computeIfAbsent(key, k -> new long[WORDS_PER_REGION]);
+				int rx = here[0] & REGION_MASK;
+				int ry = here[1] & REGION_MASK;
+				long[] seenHere = seen.get(key);
+				if (seenHere != null)
+				{
+					markSeen(seenHere, rx, ry);
+				}
+				boolean northKnown = sceneY + 1 < edgeY;
+				boolean eastKnown = sceneX + 1 < edgeX;
+				boolean blocked = (flags[sceneX][sceneY] & UNWALKABLE) != 0;
+				if (northKnown || blocked)
+				{
+					clear(bits, rx, ry, FLAG_NORTH);
+				}
+				if (eastKnown || blocked)
+				{
+					clear(bits, rx, ry, FLAG_EAST);
+				}
+				if (blocked)
+				{
+					continue;
+				}
+				int[] north = template(wv, plane, sceneX, sceneY + 1);
+				if (northKnown && (flags[sceneX][sceneY] & CollisionDataFlag.BLOCK_MOVEMENT_NORTH) == 0
+					&& standable(flags, sceneX, sceneY + 1)
+					&& north != null && north[0] == here[0] && north[1] == here[1] + 1 && north[2] == here[2])
+				{
+					set(bits, rx, ry, FLAG_NORTH);
+				}
+				int[] east = template(wv, plane, sceneX + 1, sceneY);
+				if (eastKnown && (flags[sceneX][sceneY] & CollisionDataFlag.BLOCK_MOVEMENT_EAST) == 0
+					&& standable(flags, sceneX + 1, sceneY)
+					&& east != null && east[0] == here[0] + 1 && east[1] == here[1] && east[2] == here[2])
+				{
+					set(bits, rx, ry, FLAG_EAST);
+				}
+			}
+		}
+		dirty = true;
+	}
+
+	/** {x, y, plane} of the template tile under a scene tile, or null. Unrotated chunks only. */
+	private static int[] template(WorldView wv, int plane, int sceneX, int sceneY)
+	{
+		int data = InstanceMap.chunkAt(wv, plane, sceneX, sceneY);
+		if (data <= 0 || InstanceMap.rotation(data) != 0)
+		{
+			return null;
+		}
+		return new int[]{InstanceMap.templateChunkX(data) * 8 + (sceneX & 7),
+			InstanceMap.templateChunkY(data) * 8 + (sceneY & 7), InstanceMap.templatePlane(data)};
 	}
 
 	private static boolean standable(int[][] flags, int sceneX, int sceneY)
@@ -479,8 +680,21 @@ class IslandMemory
 	 */
 	private boolean get(int x, int y, int plane, int flag)
 	{
-		long[] bits = regions.get(key(regionIdOf(x, y), plane));
-		if (bits != null)
+		// The client does not block the open sea either — boats sail it — so a harvest reads
+		// it as open ground, and the shipped island map, itself a harvest, lists the water off
+		// the cathedral as walkable. Golems strolled out across it. The mesh's ocean bit marks
+		// exactly that sea and nothing a player can stand on, so it overrules every source.
+		int toX = flag == FLAG_EAST ? x + 1 : x;
+		int toY = flag == FLAG_NORTH ? y + 1 : y;
+		if (worldMesh.isOcean(x, y, plane) || worldMesh.isOcean(toX, toY, plane))
+		{
+			return false;
+		}
+
+		long key = key(regionIdOf(x, y), plane);
+		long[] bits = regions.get(key);
+		long[] mask = bits == null ? null : seen.get(key);
+		if (bits != null && (mask == null || isSeen(mask, x & REGION_MASK, y & REGION_MASK)))
 		{
 			int bit = bitIndex(x & REGION_MASK, y & REGION_MASK, flag);
 			return (bits[bit >> 6] >>> (bit & 63) & 1L) != 0L;
@@ -507,6 +721,30 @@ class IslandMemory
 		return worldMesh.isLandWalkable(x, y, plane)
 			&& worldMesh.isLandWalkable(x + 1, y, plane)
 			&& worldMesh.east(x, y, plane);
+	}
+
+	private static void clear(long[] bits, int rx, int ry, int flag)
+	{
+		int bit = bitIndex(rx, ry, flag);
+		bits[bit >> 6] &= ~(1L << (bit & 63));
+	}
+
+	/**
+	 * Something that changes passability was added or removed — a door opening or
+	 * shutting — so its region is read again from the scene on the next harvest.
+	 *
+	 * <p>A region was harvested once a session and then trusted. A door is exactly the
+	 * thing that makes that wrong: open when the region was read, shut a minute later, and
+	 * golems walking through a closed door because memory still said it was open.
+	 */
+	void passabilityChanged(WorldPoint at)
+	{
+		if (at == null || !withinIsland(at.getRegionID()))
+		{
+			return;
+		}
+		harvested.remove(key(at.getRegionID(), at.getPlane()));
+		pendingHarvest = true;
 	}
 
 	private static void set(long[] bits, int rx, int ry, int flag)
@@ -559,6 +797,17 @@ class IslandMemory
 						data.writeLong(word);
 					}
 				}
+				// Which tiles of each partly harvested region were read, after the regions so
+				// that a save without this section still loads.
+				data.writeInt(seen.size());
+				for (Map.Entry<Long, long[]> entry : seen.entrySet())
+				{
+					data.writeLong(entry.getKey());
+					for (long word : entry.getValue())
+					{
+						data.writeLong(word);
+					}
+				}
 			}
 			dirty = false;
 			return Base64.getEncoder().encodeToString(out.toByteArray());
@@ -575,6 +824,7 @@ class IslandMemory
 	{
 		regions.clear();
 		harvested.clear();
+		seen.clear();
 		anchorRegionId = -1;
 		dirty = false;
 
@@ -600,7 +850,60 @@ class IslandMemory
 				// Deliberately not added to `harvested`: a restored region is re-scanned
 				// once when it next loads, so map edits by Jagex heal themselves.
 			}
-			log.debug("Loaded island map: anchor {}, {} region-planes", anchorRegionId, count);
+
+			boolean masked;
+			try
+			{
+				int masks = data.readInt();
+				for (int i = 0; i < masks; i++)
+				{
+					long key = data.readLong();
+					long[] words = new long[TILE_WORDS];
+					for (int w = 0; w < TILE_WORDS; w++)
+					{
+						words[w] = data.readLong();
+					}
+					seen.put(key, words);
+				}
+				masked = true;
+			}
+			catch (java.io.EOFException e)
+			{
+				masked = false;
+			}
+
+			// A save from before seen tiles were kept cannot tell a wall from a tile it never
+			// read. The best guess it allows: a tile with an open edge was read, and a tile with
+			// none is left to the mesh, which calls water and walls blocked all the same. That
+			// keeps ground only a harvest knows, like the cathedral basement, which dropping the
+			// save would lose until the player went back down. Island regions have the shipped
+			// map filled in under the guess when it loads.
+			if (!masked)
+			{
+				for (Map.Entry<Long, long[]> entry : regions.entrySet())
+				{
+					long[] words = entry.getValue();
+					long[] mask = new long[TILE_WORDS];
+					for (int ry = 0; ry < REGION_SIZE; ry++)
+					{
+						for (int rx = 0; rx < REGION_SIZE; rx++)
+						{
+							for (int flag = 0; flag < FLAGS_PER_TILE; flag++)
+							{
+								int bit = bitIndex(rx, ry, flag);
+								if ((words[bit >> 6] >>> (bit & 63) & 1L) != 0L)
+								{
+									markSeen(mask, rx, ry);
+								}
+							}
+						}
+					}
+					seen.put(entry.getKey(), mask);
+				}
+				dirty = true;
+			}
+			log.debug("Loaded island map: anchor {}, {} region-planes, {} partly read", anchorRegionId,
+				regions.size(), seen.size());
 		}
 		catch (IOException | RuntimeException e)
 		{
@@ -615,6 +918,7 @@ class IslandMemory
 	{
 		regions.clear();
 		harvested.clear();
+		seen.clear();
 		anchorRegionId = -1;
 		dirty = true;
 	}

@@ -3,7 +3,9 @@ package com.golemsdontdie;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Random;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -67,17 +69,24 @@ class GolemPathfinder
 	 */
 	Deque<int[]> wanderPath(int startX, int startY, int plane, RoamBounds bounds, Random random)
 	{
-		for (int attempt = 0; attempt < DESTINATION_ATTEMPTS; attempt++)
+		// Attempts are spent on searches, not on samples. A sample that lands on a wall costs
+		// nothing to reject, and counting it as an attempt meant a golem in a cramped room —
+		// the cathedral, where most of the window is walls — ran out of tries before it had
+		// searched once, and stood re-planning for ten seconds before walking anywhere.
+		int searched = 0;
+		for (int sampled = 0; sampled < DESTINATION_ATTEMPTS * 8 && searched < DESTINATION_ATTEMPTS; sampled++)
 		{
 			int[] target = bounds.sample(random);
 			if (target == null || (target[0] == startX && target[1] == startY))
 			{
 				continue;
 			}
-			if (!bounds.contains(target[0], target[1]) || !memory.isKnownWalkable(target[0], target[1], plane))
+			if (!bounds.contains(target[0], target[1]) || !memory.isKnownWalkable(target[0], target[1], plane)
+				|| bounds.avoids(target[0], target[1]))
 			{
 				continue;
 			}
+			searched++;
 
 			Deque<int[]> path = findPath(startX, startY, plane, target[0], target[1], bounds);
 			if (!path.isEmpty())
@@ -161,17 +170,110 @@ class GolemPathfinder
 		return result;
 	}
 
-	private static long pack(int x, int y)
+	/**
+	 * Every tile that can be walked to from a start, breadth first, up to a budget.
+	 *
+	 * <p>Returned as each tile reached mapped to the tile it was reached from, in the order
+	 * reached — so the far end of the map is the far end of the flood, and the walk to any
+	 * tile in it is read back from {@link #pathFrom} without searching again. One of these
+	 * answers every "can the golem get there" a plan asks, where a search per question spent
+	 * its budget on the first and had nothing left for the rest.
+	 */
+	java.util.LinkedHashMap<Long, Long> flood(int startX, int startY, int plane, int budget)
+	{
+		java.util.LinkedHashMap<Long, Long> cameFrom = new java.util.LinkedHashMap<>();
+		Deque<Long> queue = new ArrayDeque<>();
+		long start = pack(startX, startY);
+		cameFrom.put(start, start);
+		queue.add(start);
+
+		while (!queue.isEmpty() && cameFrom.size() < budget)
+		{
+			long current = queue.poll();
+			int cx = unpackX(current);
+			int cy = unpackY(current);
+			for (int d = 0; d < DX.length; d++)
+			{
+				int nx = cx + DX[d];
+				int ny = cy + DY[d];
+				long next = pack(nx, ny);
+				if (cameFrom.containsKey(next)
+					|| !memory.isKnownWalkable(nx, ny, plane)
+					|| !memory.canStep(cx, cy, plane, DX[d], DY[d]))
+				{
+					continue;
+				}
+				cameFrom.put(next, current);
+				queue.add(next);
+			}
+		}
+		return cameFrom;
+	}
+
+	/**
+	 * The walk from a flood's start to a tile it reached, excluding the start.
+	 *
+	 * @return the tiles in order, empty if the goal is the start, null if it was not reached
+	 */
+	static Deque<int[]> pathFrom(Map<Long, Long> cameFrom, int startX, int startY, int goalX, int goalY)
+	{
+		long start = pack(startX, startY);
+		long goal = pack(goalX, goalY);
+		if (!cameFrom.containsKey(goal))
+		{
+			return null;
+		}
+		Deque<int[]> result = new ArrayDeque<>();
+		for (long at = goal; at != start; at = cameFrom.get(at))
+		{
+			result.addFirst(new int[]{unpackX(at), unpackY(at)});
+		}
+		return result;
+	}
+
+	/**
+	 * How many tiles can be walked to from here, counting up to a limit.
+	 *
+	 * <p>Stops at the limit, because the answer that matters is only whether a space is
+	 * small; an open field and a whole continent are the same thing to a golem deciding
+	 * how long to stay.
+	 */
+	int areaSize(int x, int y, int plane, int limit)
+	{
+		Set<Long> seen = new HashSet<>();
+		Deque<Long> queue = new ArrayDeque<>();
+		long start = pack(x, y);
+		seen.add(start);
+		queue.add(start);
+		while (!queue.isEmpty() && seen.size() < limit)
+		{
+			long current = queue.poll();
+			int cx = unpackX(current);
+			int cy = unpackY(current);
+			for (int d = 0; d < DX.length; d++)
+			{
+				long next = pack(cx + DX[d], cy + DY[d]);
+				if (!seen.contains(next) && memory.canStep(cx, cy, plane, DX[d], DY[d]))
+				{
+					seen.add(next);
+					queue.add(next);
+				}
+			}
+		}
+		return seen.size();
+	}
+
+	static long pack(int x, int y)
 	{
 		return ((long) x << 32) | (y & 0xFFFFFFFFL);
 	}
 
-	private static int unpackX(long packed)
+	static int unpackX(long packed)
 	{
 		return (int) (packed >> 32);
 	}
 
-	private static int unpackY(long packed)
+	static int unpackY(long packed)
 	{
 		return (int) packed;
 	}

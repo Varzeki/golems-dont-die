@@ -64,11 +64,15 @@ public class BuildWyrmscraigTransports
 	 */
 	private static final Object[][] SHORTCUTS = {
 		// The rock climb is two objects, not one. Recon found 62267 and both directions
-		// were built from it; the measurement journal shows a player approaching from the
-		// east at (2554, 2209) clicks 62265 instead and plays the descent. The optional
-		// trailing {objectId, x, y} names that far-side object and the origin tile that
-		// uses it, so the downhill row stops claiming to be the uphill one.
-		{62267, 2553, 2209, 0, "Climb", "Rocks", 0, 62265, 2554, 2209},
+		// were built from it. The optional trailing {objectId, x, y} names the other object
+		// and the origin tile that uses it.
+		//
+		// That tile was first recorded as the east end, (2554, 2209), and it is the west.
+		// Every sighting since — five, from both sides — has a player at (2550, 2209)
+		// clicking 62265 and playing 740, and a player at (2554, 2209) clicking 62267.
+		// The ids being swapped in the table left golems with two rows for each direction,
+		// one per id, and the cooldown barred only one of them.
+		{62267, 2553, 2209, 0, "Climb", "Rocks", 0, 62265, 2550, 2209},
 		{62262, 2565, 2219, 0, "Cross", "Slippery basalt stepping stone", 0},
 		{62261, 2614, 2248, 0, "Cross", "Extra slippery basalt stepping stone", 0},
 		{62260, 2584, 2282, 0, "Cross", "Basalt stepping stone", 0},
@@ -111,7 +115,13 @@ public class BuildWyrmscraigTransports
 	private static final Object[][] MEASURED_PAIRS = {
 		// Enter Cave from the surface, Exit Cave back out. Three ticks each way, one clip
 		// (2796) rather than the human climbing set.
-		{62219, 2534, 2204, 0, 2564, 8630, 0, 3},
+		//
+		// The surface end was 2534, 2204 here and that was simply wrong — a transcription
+		// slip against this block's own comment above, which says the measurement gives
+		// (2530, 2205). Four later observations agree with the comment: two entries and
+		// two exits, all at 2530, 2205. It showed up as the highlight sitting a few tiles
+		// to the side of the cave mouth.
+		{62219, 2530, 2205, 0, 2564, 8630, 0, 3},
 	};
 
 	private static final Map<Integer, byte[][]> regions = new HashMap<>();

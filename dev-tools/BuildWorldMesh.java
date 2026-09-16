@@ -60,6 +60,12 @@ public class BuildWorldMesh
 	/** A component with fewer tiles than this is somewhere a golem must never be left. */
 	private static final int ISOLATED_BELOW = 50;
 
+	/** Impossible as an entry count, so an old reader fails loudly on a new file. */
+	private static final int MAGIC = -0x60137;
+
+	/** 2 added the per-tile component map. */
+	private static final int VERSION = 2;
+
 	/** Open water off Wyrmscraig's west shore — the seed for the ocean fill. */
 	private static final int SEA_X = 2530, SEA_Y = 2240;
 
@@ -95,7 +101,26 @@ public class BuildWorldMesh
 	private static int[] regionKeys;
 	private static Map<Integer, Integer> regionIndex = new HashMap<>();
 
-	public static void main(String[] args) throws IOException
+	/**
+	 * Which connected component each walkable tile belongs to, or 0 for none.
+	 *
+	 * <p>The build has always worked these out and then thrown the identity away, keeping
+	 * one bit — "is this component smaller than fifty tiles". That bit cannot answer the
+	 * question the plugin actually needs to ask, which is whether two tiles are connected
+	 * <i>to each other</i>. Without it, a golem could be relocated into any sealed room
+	 * large enough to escape the fifty-tile test, and then spend the session being hauled
+	 * out of it by the watchdog.
+	 *
+	 * <p>Sealing the game's doors made that worse rather than better: it raised the
+	 * component count from 12,901 to 14,288, so there are now over a thousand more distinct
+	 * spaces and the same single bit to describe all of them.
+	 */
+	private static int[] componentOf;
+
+	/** Component ids in use, so the reader knows how wide the field has to be. */
+	private static int componentCount;
+
+	public static void main(String[] args) throws Exception
 	{
 		if (args.length < 2)
 		{
@@ -105,6 +130,12 @@ public class BuildWorldMesh
 
 		readCollisionMap(new File(args[0]));
 		System.out.println("collision map: " + regions.size() + " regions");
+
+		// Doors are shut, as far as the shipped mesh is concerned. See sealDoors.
+		if (args.length > 5)
+		{
+			sealDoors(new File(args[4]), new File(args[5]));
+		}
 
 		order();
 
@@ -550,6 +581,8 @@ public class BuildWorldMesh
 	{
 		BitSet seen = new BitSet();
 		BitSet isolated = new BitSet();
+		componentOf = new int[regionIndex.size() * MAX_PLANES * TILES_PER_PLANE];
+		componentCount = 0;
 		int components = 0;
 		int small = 0;
 
@@ -581,8 +614,13 @@ public class BuildWorldMesh
 							continue;
 						}
 
-						List<int[]> component = component(x, y, p, seen);
+						// Ids start at one so that zero can mean "no component", which is
+						// what every unwalkable tile and every tile outside the kept
+						// regions is.
+						componentCount++;
+						List<int[]> component = component(x, y, p, seen, componentCount);
 						components++;
+
 						if (component.size() < ISOLATED_BELOW)
 						{
 							small++;
@@ -600,15 +638,18 @@ public class BuildWorldMesh
 		System.out.println("components: " + components + " total, " + small + " under "
 			+ ISOLATED_BELOW + " tiles");
 		System.out.println("isolated tiles: " + isolated.cardinality());
+		System.out.println("component ids:  " + componentCount
+			+ (componentCount > 65535 ? "  (TOO MANY FOR 16 BITS)" : ""));
 		return isolated;
 	}
 
 	/** One connected component, collected and marked seen. */
-	private static List<int[]> component(int seedX, int seedY, int plane, BitSet seen)
+	private static List<int[]> component(int seedX, int seedY, int plane, BitSet seen, int id)
 	{
 		List<int[]> out = new ArrayList<>();
 		Deque<int[]> queue = new ArrayDeque<>();
 		seen.set(index(seedX, seedY, plane));
+		stamp(seedX, seedY, plane, id);
 		queue.add(new int[]{seedX, seedY, plane});
 
 		while (!queue.isEmpty())
@@ -634,6 +675,7 @@ public class BuildWorldMesh
 							continue;
 						}
 						seen.set(idx);
+						stamp(nx, ny, more[2], id);
 						queue.add(new int[]{nx, ny, more[2]});
 					}
 				}
@@ -650,10 +692,29 @@ public class BuildWorldMesh
 					continue;
 				}
 				seen.set(idx);
+				stamp(nx, ny, at[2], id);
 				queue.add(new int[]{nx, ny, at[2]});
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * Records which component a tile belongs to.
+	 *
+	 * <p>Called as the walk marks each tile seen rather than afterwards from the list it
+	 * returns, because that list is deliberately bounded: past fifty tiles the isolation
+	 * test already has its answer and stops collecting. Stamping from the list gave ids to
+	 * the first fifty tiles of every component in the game and left the rest at zero, which
+	 * looked convincing and was worthless — the mainland came out as a fifty-tile pocket.
+	 */
+	private static void stamp(int x, int y, int plane, int id)
+	{
+		int at = index(x, y, plane);
+		if (at >= 0 && at < componentOf.length)
+		{
+			componentOf[at] = id;
+		}
 	}
 
 	// ------------------------------------------------------------------ writing
@@ -663,6 +724,11 @@ public class BuildWorldMesh
 	 *
 	 * <p>Same shape as the island map so the plugin's reader barely changes — count, then
 	 * region, plane and payload per entry.
+	 *
+	 * <p>Prefixed with a negative magic number and a version, because the format grew a
+	 * component map and an older reader would otherwise take the new first field for an
+	 * entry count and quietly produce nonsense. A negative count is impossible, so a stale
+	 * jar reads zero entries and says so instead.
 	 */
 	private static void write(File out, Set<Integer> keep, BitSet ocean, BitSet isolated,
 		BitSet land) throws IOException
@@ -682,6 +748,8 @@ public class BuildWorldMesh
 		try (DataOutputStream d = new DataOutputStream(
 			new GZIPOutputStream(new FileOutputStream(out))))
 		{
+			d.writeInt(MAGIC);
+			d.writeInt(VERSION);
 			d.writeInt(entries);
 			for (int region : new TreeMap<>(toMap(keep)).keySet())
 			{
@@ -704,6 +772,11 @@ public class BuildWorldMesh
 					byte[] oceanBits = new byte[TILES_PER_PLANE / 8];
 					byte[] isolatedBits = new byte[TILES_PER_PLANE / 8];
 					byte[] landBits = new byte[TILES_PER_PLANE / 8];
+
+					// Two bytes a tile rather than one bit. It is by far the largest part
+					// of the file and also the most compressible: a region is usually one
+					// component throughout, so it deflates to almost nothing.
+					byte[] componentBytes = new byte[TILES_PER_PLANE * 2];
 					for (int dy = 0; dy < REGION_SIZE; dy++)
 					{
 						for (int dx = 0; dx < REGION_SIZE; dx++)
@@ -726,10 +799,15 @@ public class BuildWorldMesh
 							{
 								landBits[bit >> 3] |= (byte) (1 << (bit & 7));
 							}
+
+							int component = idx < componentOf.length ? componentOf[idx] : 0;
+							componentBytes[bit * 2] = (byte) (component >>> 8);
+							componentBytes[bit * 2 + 1] = (byte) component;
 						}
 					}
 					d.write(oceanBits);
 					d.write(isolatedBits);
+					d.write(componentBytes);
 
 					// Reached by the land fill, which walks from Lumbridge and every
 					// transport endpoint. Shoreline edges are blocked in the source map,
@@ -825,6 +903,190 @@ public class BuildWorldMesh
 			return south(x, y, z) && west(x, y - 1, z) && west(x, y, z) && south(x - 1, y, z);
 		}
 		return false;
+	}
+
+	/**
+	 * Marks every door and gate in the game as shut.
+	 *
+	 * <p>Shortest Path's collision map lets you walk through a door, because a player can
+	 * open one and its whole purpose is to route players. A golem cannot: opening a door
+	 * changes an object every other player in the world can see, and these golems exist on
+	 * one client and must never touch anything shared. Left as it was, the mesh told golems
+	 * that every building in the game was open ground, and they drifted through shut doors
+	 * and materialised inside sealed rooms that the watchdog then spent the session hauling
+	 * them out of.
+	 *
+	 * <p>Sealing here rather than at the pathfinder is deliberate, because it happens before
+	 * the reachability pass: a room whose only way in is a door now genuinely cannot be
+	 * reached, so it is pruned along with every other unreachable interior and no golem is
+	 * ever placed in one.
+	 *
+	 * <p>Golems standing in a loaded scene are unaffected and still walk through doors that
+	 * are actually open. {@code IslandMemory} harvests live collision from every region the
+	 * player visits and takes precedence over this file wherever the two disagree — so the
+	 * shipped answer is the cautious one used at a distance, and the real one is used up
+	 * close.
+	 */
+	private static void sealDoors(File cacheDir, File xtea) throws Exception
+	{
+		int sealed = 0;
+
+		try (net.runelite.cache.fs.Store store = new net.runelite.cache.fs.Store(cacheDir))
+		{
+			store.load();
+
+			net.runelite.cache.ObjectManager objects = new net.runelite.cache.ObjectManager(store);
+			objects.load();
+
+			// Only things that actually open. A wall you cannot interact with is already
+			// solid in the collision map and needs nothing done to it.
+			java.util.Set<Integer> doors = new HashSet<>();
+			for (net.runelite.cache.definitions.ObjectDefinition def : objects.getObjects())
+			{
+				net.runelite.cache.EntityOpsDefinition ops = def.getOps();
+				if (ops == null || ops.getOps() == null)
+				{
+					continue;
+				}
+				for (net.runelite.cache.EntityOpsDefinition.Op op : ops.getOps())
+				{
+					String text = op == null || op.text == null ? "" : op.text.toLowerCase();
+					if (text.startsWith("open") || text.startsWith("close")
+						|| text.startsWith("pick-lock") || text.startsWith("unlock"))
+					{
+						doors.add(def.getId());
+						break;
+					}
+				}
+			}
+
+			net.runelite.cache.util.XteaKeyManager keys =
+				new net.runelite.cache.util.XteaKeyManager();
+			try (java.io.FileInputStream in = new java.io.FileInputStream(xtea))
+			{
+				keys.loadKeys(in);
+			}
+
+			net.runelite.cache.region.RegionLoader loader =
+				new net.runelite.cache.region.RegionLoader(store, keys);
+			loader.loadRegions();
+
+			for (net.runelite.cache.region.Region region : loader.getRegions())
+			{
+				for (net.runelite.cache.region.Location loc : region.getLocations())
+				{
+					// Solid scenery is deliberately NOT blocked here, and the attempt is
+					// worth recording because it looked obviously right.
+					//
+					// The Mad Angel's chamber is reachable in this mesh and is not reachable
+					// in the game: its only entrance is a church pew that puts you in an
+					// instance, so golems walked into a static copy no player can enter. The
+					// fix seemed to be to mark solid objects impassable from the cache, using
+					// interactType as the test.
+					//
+					// interactType is about whether an object can be clicked, not whether it
+					// blocks movement. Blocking on it sealed 38,622 tiles, and among them were
+					// the inside of every cathedral and the ground the Wyrmscraig stile stands
+					// on — so golems stopped being able to reach a door they had been taught,
+					// and an obstacle became permanently unusable because its own tile was
+					// solid. One unreachable room became hundreds.
+					//
+					// The real test is the blocking mask together with the object's own
+					// clipping flags, and it wants checking against known-passable scenery
+					// before it goes anywhere near the shipped mesh.
+					// Types 0-3 are the four wall orientations and 9 is a diagonal wall.
+					// Anything else is scenery and is not a door however it is named.
+					int type = loc.getType();
+					if (type > 3 && type != 9)
+					{
+						continue;
+					}
+					if (!doors.contains(loc.getId()))
+					{
+						continue;
+					}
+
+					int x = loc.getPosition().getX();
+					int y = loc.getPosition().getY();
+					int z = loc.getPosition().getZ();
+
+					// A wall sits on one edge of its tile, named by the orientation. Each
+					// edge is one bit on one of the two tiles it separates: the north bit
+					// of the tile south of it, or the east bit of the tile west of it.
+					switch (loc.getOrientation())
+					{
+						case 0:
+							sealed += clear(x - 1, y, z, FLAG_EAST);
+							break;
+						case 1:
+							sealed += clear(x, y, z, FLAG_NORTH);
+							break;
+						case 2:
+							sealed += clear(x, y, z, FLAG_EAST);
+							break;
+						default:
+							sealed += clear(x, y - 1, z, FLAG_NORTH);
+							break;
+					}
+				}
+			}
+
+			System.out.println("doors:         " + doors.size() + " kinds, "
+				+ sealed + " edges sealed");
+		}
+	}
+
+	/**
+	 * Blocks every tile a solid object stands on.
+	 *
+	 * <p>All four edges of each tile, which is what "you cannot be here" means in a
+	 * two-bit-per-tile map: nothing may enter it from any side.
+	 */
+	private static int block(net.runelite.cache.region.Location loc,
+		net.runelite.cache.definitions.ObjectDefinition def)
+	{
+		int sizeX = def.getSizeX();
+		int sizeY = def.getSizeY();
+		if ((loc.getOrientation() & 1) == 1)
+		{
+			int swap = sizeX;
+			sizeX = sizeY;
+			sizeY = swap;
+		}
+
+		int x = loc.getPosition().getX();
+		int y = loc.getPosition().getY();
+		int z = loc.getPosition().getZ();
+		int count = 0;
+
+		for (int dx = 0; dx < Math.max(1, sizeX); dx++)
+		{
+			for (int dy = 0; dy < Math.max(1, sizeY); dy++)
+			{
+				count += clear(x + dx, y + dy, z, FLAG_NORTH);
+				count += clear(x + dx, y + dy, z, FLAG_EAST);
+				count += clear(x + dx, y + dy - 1, z, FLAG_NORTH);
+				count += clear(x + dx - 1, y + dy, z, FLAG_EAST);
+			}
+		}
+		return count;
+	}
+
+	/** Blocks one edge. Returns 1 if it was open, so the caller can count. */
+	private static int clear(int x, int y, int z, int which)
+	{
+		byte[][] region = regions.get(key(x / REGION_SIZE, y / REGION_SIZE));
+		if (region == null || z < 0 || z >= MAX_PLANES || region[z] == null)
+		{
+			return 0;
+		}
+		int bit = ((y & (REGION_SIZE - 1)) * REGION_SIZE + (x & (REGION_SIZE - 1))) * 2 + which;
+		if ((region[z][bit >> 3] >>> (bit & 7) & 1) == 0)
+		{
+			return 0;
+		}
+		region[z][bit >> 3] &= (byte) ~(1 << (bit & 7));
+		return 1;
 	}
 
 	private static boolean flag(int x, int y, int z, int which)

@@ -50,4 +50,81 @@ public interface GolemsDontDieConfig extends Config
 	{
 		return 25;
 	}
+
+	@ConfigSection(
+		name = "Obstacles",
+		description = "How golems learn to use shortcuts",
+		position = 1,
+		closedByDefault = true
+	)
+	String obstaclesSection = "obstacles";
+
+	@ConfigItem(
+		keyName = "learnObstacles",
+		name = "Learn from your play",
+		description = "Golems only use shortcuts whose animation is known. Watching you use "
+			+ "one teaches them how, and unlocks it permanently.",
+		section = obstaclesSection,
+		position = 0
+	)
+	default boolean learnObstacles()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "sendObstacleTelemetry",
+		name = "Send obstacle telemetry",
+		description = "Share which animation each shortcut plays, so a future update can "
+			+ "ship them for everyone. Sends only the object, its animation and how long it "
+			+ "took — never your name, world, location or anything identifying. Needs a "
+			+ "collection URL below; nothing is sent without one.",
+		section = obstaclesSection,
+		position = 1
+	)
+	default boolean sendObstacleTelemetry()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "telemetryEndpoint",
+		name = "Collection URL",
+		description = "Where to send obstacle telemetry. Blank means nothing is ever sent.",
+		section = obstaclesSection,
+		position = 2
+	)
+	default String telemetryEndpoint()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "highlightObstacles",
+		name = "Highlight nearby obstacles",
+		description = "Outlines shortcuts around you by how well golems know them. "
+			+ "Green: seen you use this one. Orange: golems will use it, inferred from "
+			+ "similar objects elsewhere — using it once confirms it. Red: no animation "
+			+ "data, so golems route around it.",
+		section = obstaclesSection,
+		position = 3
+	)
+	default boolean highlightObstacles()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "logGolemState",
+		name = "Log golem state (developer)",
+		description = "Records what every visible golem is doing, every tick, into the same "
+			+ "journal as your own obstacle use — so the two can be compared directly. "
+			+ "Very verbose; for diagnosing a specific problem, not for ordinary play.",
+		section = obstaclesSection,
+		position = 4
+	)
+	default boolean logGolemState()
+	{
+		return false;
+	}
 }

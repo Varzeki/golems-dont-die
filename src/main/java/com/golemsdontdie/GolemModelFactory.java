@@ -129,6 +129,26 @@ class GolemModelFactory
 	 * <p>Used to pace a golem through a shortcut. Guessing that instead is what had golems
 	 * scaling a cliff in two thirds of a second.
 	 */
+	/**
+	 * True if this animation is built to repeat.
+	 *
+	 * <p>{@code frameStep} is how many frames the client winds back when a clip reaches its
+	 * end: a positive value loops, and -1 runs once and stops. The distinction is not
+	 * cosmetic and cannot be guessed from the name — {@code human_climbing} (737) does not
+	 * loop while {@code human_climbing_loop} (4435) does, and a stepping-stone hop (741)
+	 * never does however long the obstacle takes.
+	 *
+	 * <p>It decides whether a clip may be stretched to fill a duration. Stretching a
+	 * one-shot makes the golem restart it partway through and drift across at the wrong
+	 * rate, which is exactly what a hop looked like; refusing to stretch a loop makes a
+	 * climb finish in a fraction of the time it should.
+	 */
+	boolean loops(int animationId)
+	{
+		Animation animation = animationFor(animationId);
+		return animation != null && animation.getFrameStep() > 0;
+	}
+
 	int animationCycles(int animationId)
 	{
 		Animation animation = animationFor(animationId);
@@ -137,25 +157,42 @@ class GolemModelFactory
 			return 0;
 		}
 
-		int duration = animation.getDuration();
-		if (duration > 0)
-		{
-			return duration;
-		}
-
-		// Some clips report no duration; their frame lengths still add up to one.
+		// Frame lengths, summed. Not getDuration().
+		//
+		// getDuration() is a frame *count* — RuneLite's own javadoc says "how many frames
+		// the animation lasts" — and reading it as a length in cycles made every clip in
+		// the plugin four or five times shorter than it is. A stepping-stone hop came out
+		// at 8 cycles against its real 38, so golems crossed the gap in a quarter of a
+		// tick. Every attempt to fix the pacing was tuning around this.
+		//
+		// The frame lengths are in client cycles and are the authority.
 		int[] frames = animation.getFrameLengths();
-		if (frames == null)
+		if (frames == null || frames.length == 0)
 		{
 			return 0;
 		}
+
 		int total = 0;
 		for (int length : frames)
 		{
 			total += length;
 		}
-		return total;
+		return Math.min(total, MAX_CLIP_CYCLES);
 	}
+
+	/**
+	 * The longest a clip is allowed to claim to be, in client cycles.
+	 *
+	 * <p>Some sequences end on a frame held for an absurd length of time, as a way of
+	 * saying "stay like this until told otherwise" — {@code agilityarena_handholds_middle}
+	 * reports 20,056 cycles, which is six and a half minutes, and
+	 * {@code agilty_shortcut_enter_hole} reports 2,060.
+	 *
+	 * <p>Taken at face value those become the length of a traversal, and a golem that used
+	 * one would stand frozen inside the obstacle for minutes. Twenty ticks is longer than
+	 * any real traversal in the game and far shorter than any of these.
+	 */
+	private static final int MAX_CLIP_CYCLES = 600;
 
 	/**
 	 * Drops the shared models and animations. Called when the plugin stops, so a

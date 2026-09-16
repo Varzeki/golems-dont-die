@@ -1,0 +1,11 @@
+# Origin	Destination	menuOption menuTarget objectID	Skills	Items	Quests	Varbits	VarPlayers	Duration	Display info
+# Wyrmscraig's ladders and staircases, from this project's own recordings of them being used.
+# BuildWyrmscraigTransports derives shortcuts from collision and cannot see where a ladder leads, so these
+# ends are the tiles a player was measured standing on before and after each climb (the plugin's learned
+# routes), kept in a file of their own so regenerating wyrmscraig_transports.tsv does not drop them.
+2575 2253 0	2575 2253 1	Climb-up Ladder 52614						2
+2575 2253 1	2575 2253 0	Climb-down Ladder 52620						2
+2585 2264 0	2585 2261 1	Climb-up Staircase 52635
+2585 2261 1	2585 2264 0	Climb-down Staircase 52636
+2541 2214 0	2575 8657 0	Climb-down Staircase 62254
+2575 8657 0	2540 2214 0	Climb-up Staircase 62255

@@ -62,9 +62,25 @@ final class Itinerary
 	@Getter
 	private final boolean voyage;
 
+	/**
+	 * Where a transport at the end of the walk puts the golem, or null for a plain route.
+	 *
+	 * <p>Kept apart from the waypoints on purpose. The landing used to be the last waypoint,
+	 * and a ladder into a dungeon joins two tiles some six thousand apart — so that distance
+	 * was walked, a tick a tile. One ladder took an hour, the golem slid across the map
+	 * between the two ends the whole time, and a golem that reached a dungeon had barely got
+	 * down its first ladder before the session was over. The walk is the waypoints; using
+	 * the transport is a wait at the end of them; then the golem is at the landing.
+	 */
+	private final WorldPoint landing;
+
+	/** The transport that ends the route, or null. Taken on arrival, not when planned. */
+	private final GolemTransport transport;
+
 	private Itinerary(int[] xs, int[] ys, int[] reached, int length, int plane,
-		int startTick, int duration, boolean voyage)
+		int startTick, int duration, boolean voyage, WorldPoint landing, GolemTransport transport)
 	{
+		this.transport = transport;
 		this.xs = xs;
 		this.ys = ys;
 		this.reached = reached;
@@ -73,6 +89,7 @@ final class Itinerary
 		this.startTick = startTick;
 		this.duration = duration;
 		this.voyage = voyage;
+		this.landing = landing;
 	}
 
 	/** Plans a walking route, one tick per tile. */
@@ -117,7 +134,39 @@ final class Itinerary
 		}
 
 		return new Itinerary(xs, ys, reached, travelled, plane, startTick,
-			Math.max(1, travelled * ticksPerTile + extra), voyage);
+			Math.max(1, travelled * ticksPerTile + extra), voyage, null, null);
+	}
+
+	/**
+	 * Plans a walk to a transport's origin, then the transport.
+	 *
+	 * <p>The walk takes a tick a tile; the golem then stands at the origin for as long as the
+	 * transport takes, and is at its landing once the route is finished.
+	 *
+	 * @param walk tiles to the transport's origin, the golem's own tile first
+	 */
+	static Itinerary thenTransport(List<int[]> walk, int plane, int startTick, GolemTransport transport)
+	{
+		Itinerary route = of(walk, plane, startTick, 1, 0, false);
+		if (route == null)
+		{
+			return null;
+		}
+		return new Itinerary(route.xs, route.ys, route.reached, route.length, plane, startTick,
+			route.length + Math.max(1, transport.getDuration()), false, transport.destination(), transport);
+	}
+
+	/**
+	 * A crossing with no drawn route: the golem waits where it is, then is at the landing.
+	 *
+	 * <p>A voyage, so it survives being watched like any other; nothing is interpolated.
+	 */
+	static Itinerary passage(WorldPoint from, WorldPoint landing, int startTick, int ticks)
+	{
+		int[] xs = {from.getX()};
+		int[] ys = {from.getY()};
+		return new Itinerary(xs, ys, new int[]{0}, 0, from.getPlane(), startTick, Math.max(1, ticks), true,
+			landing, null);
 	}
 
 	/**
@@ -132,15 +181,28 @@ final class Itinerary
 	 */
 	int[] fineAt(int tick)
 	{
-		if (length <= 0 || duration <= 0)
+		if (landing != null && isFinished(tick))
 		{
-			return fine(xs[0], ys[0]);
+			return fine(landing.getX(), landing.getY());
 		}
+		return along(travelledAt(tick));
+	}
 
+	/** Tiles along the waypoints the golem has covered by this tick. */
+	private int travelledAt(int tick)
+	{
 		int elapsed = Math.min(Math.max(0, tick - startTick), duration);
-		// How far along the route the golem should be, in tiles.
-		int travelled = (int) ((long) elapsed * length / duration);
+		if (landing != null)
+		{
+			// A tick a tile, then standing at the transport until it is used.
+			return Math.min(elapsed, length);
+		}
+		return length <= 0 || duration <= 0 ? 0 : (int) ((long) elapsed * length / duration);
+	}
 
+	/** The position a given distance along the waypoints, in fine units. */
+	private int[] along(int travelled)
+	{
 		int segment = segmentFor(travelled);
 		if (segment >= xs.length - 1)
 		{
@@ -191,7 +253,19 @@ final class Itinerary
 	WorldPoint positionAt(int tick)
 	{
 		int[] at = fineAt(tick);
-		return new WorldPoint(at[0] / Golem.TILE, at[1] / Golem.TILE, plane);
+		return new WorldPoint(at[0] / Golem.TILE, at[1] / Golem.TILE, planeAt(tick));
+	}
+
+	/**
+	 * The plane the golem is on at this tick.
+	 *
+	 * <p>The walk's plane until a transport has put it somewhere else. Reading the
+	 * destination's plane instead had a golem walking to a ladder already upstairs, and one
+	 * promoted into view on the way was snapped onto the floor above.
+	 */
+	int planeAt(int tick)
+	{
+		return landing != null && isFinished(tick) ? landing.getPlane() : plane;
 	}
 
 	/**
@@ -206,8 +280,7 @@ final class Itinerary
 		{
 			return new int[]{0, 0};
 		}
-		int elapsed = Math.min(Math.max(0, tick - startTick), duration);
-		int segment = segmentFor((int) ((long) elapsed * length / duration));
+		int segment = segmentFor(travelledAt(tick));
 		if (segment >= xs.length - 1)
 		{
 			segment = Math.max(0, xs.length - 2);
@@ -224,9 +297,28 @@ final class Itinerary
 		return tick - startTick >= duration;
 	}
 
+	/** Where the golem ends up: the landing of a transport, or the last waypoint. */
 	WorldPoint destination()
 	{
+		return landing != null ? landing : walkEnd();
+	}
+
+	/** The last waypoint: the origin of a transport, or the destination of a plain route. */
+	WorldPoint walkEnd()
+	{
 		return new WorldPoint(xs[xs.length - 1], ys[ys.length - 1], plane);
+	}
+
+	/** True if this route ends by taking a transport rather than on its last tile. */
+	boolean endsInTransport()
+	{
+		return landing != null;
+	}
+
+	/** The transport this route ends in, or null. */
+	GolemTransport transport()
+	{
+		return transport;
 	}
 
 	int waypoints()
@@ -245,8 +337,7 @@ final class Itinerary
 	 */
 	Itinerary reversed(int tick, int newStartTick)
 	{
-		int elapsed = Math.min(Math.max(0, tick - startTick), duration);
-		int at = segmentFor(length <= 0 ? 0 : (int) ((long) elapsed * length / duration));
+		int at = segmentFor(travelledAt(tick));
 		if (at < 1)
 		{
 			return null;
@@ -259,8 +350,8 @@ final class Itinerary
 		}
 
 		// Same pace it came in at, which is what the route's own length over its duration
-		// says — no need to be told again.
-		int ticksPerTile = Math.max(1, duration / Math.max(1, length));
+		// says — no need to be told again. A walk to a transport went at a tick a tile.
+		int ticksPerTile = landing != null ? 1 : Math.max(1, duration / Math.max(1, length));
 		return of(back, plane, newStartTick, ticksPerTile, 0, voyage);
 	}
 

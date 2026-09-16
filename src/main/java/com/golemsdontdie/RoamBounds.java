@@ -33,12 +33,28 @@ class RoamBounds
 	private final int centreX;
 	private final int centreY;
 
+	/** Destinations to pass over — a crowded tile — or null. Never blocks walking through. */
+	private final java.util.function.BiPredicate<Integer, Integer> avoid;
+
 	RoamBounds(IslandMemory memory, int plane, int centreX, int centreY)
+	{
+		this(memory, plane, centreX, centreY, null);
+	}
+
+	RoamBounds(IslandMemory memory, int plane, int centreX, int centreY,
+		java.util.function.BiPredicate<Integer, Integer> avoid)
 	{
 		this.memory = memory;
 		this.plane = plane;
 		this.centreX = centreX;
 		this.centreY = centreY;
+		this.avoid = avoid;
+	}
+
+	/** True if this tile should not be chosen as somewhere to go. */
+	boolean avoids(int worldX, int worldY)
+	{
+		return avoid != null && avoid.test(worldX, worldY);
 	}
 
 	/** True if a golem may enter this world tile. */

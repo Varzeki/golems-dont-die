@@ -47,6 +47,18 @@ class FakeGolem extends RuneLiteObjectController
 	/** Which animation ID the controller currently holds, to avoid resetting it every frame. */
 	private int loadedAnimationId = Integer.MIN_VALUE;
 
+	/**
+	 * Where each drawn frame of a traversal is reported, or null.
+	 *
+	 * <p>Here rather than in the simulation because this is what is actually on screen:
+	 * the position after the renderer has copied it, and the keyframe the controller is
+	 * really on, which is not necessarily the one the simulation asked for.
+	 */
+	private java.util.function.Consumer<String> trace;
+
+	/** Whether the last traced frame was mid-traversal. */
+	private boolean wasTraversing;
+
 	FakeGolem(Client client, Golem golem, Model baseModel, GolemModelFactory shared)
 	{
 		this.client = client;
@@ -66,6 +78,11 @@ class FakeGolem extends RuneLiteObjectController
 		applyPose();
 	}
 
+	void setTrace(java.util.function.Consumer<String> trace)
+	{
+		this.trace = trace;
+	}
+
 	/**
 	 * Called by the client once per frame while registered.
 	 *
@@ -78,12 +95,48 @@ class FakeGolem extends RuneLiteObjectController
 	{
 		syncTransform();
 		applyPose();
-		animation.tick(ticksSinceLastFrame);
+
+		// A recording drives its own keyframes, so the client's clock must not also
+		// advance them — that was the drift.
+		if (golem.getMotionFrame() < 0)
+		{
+			animation.tick(ticksSinceLastFrame);
+		}
+
+		// One frame past the end as well, so the landing is on record. A door teleports on
+		// the frame its transition ends, and stopping the trace there left every door's
+		// last logged position halfway across.
+		boolean traversing = golem.inTransition();
+		boolean landed = wasTraversing && !traversing;
+		wasTraversing = traversing;
+		if (trace != null && (traversing || landed))
+		{
+			Animation playing = animation.getAnimation();
+			trace.accept("fine=" + golem.getFineX() + "," + golem.getFineY()
+				+ " drawn=" + getX() + "," + getY()
+				+ " orient=" + golem.getOrientation()
+				+ " anim=" + loadedAnimationId
+				+ " keyframe=" + (playing == null ? -1 : animation.getFrame())
+				+ " keyframes=" + (playing == null ? -1 : playing.getNumFrames())
+				+ " motionFrame=" + golem.getMotionFrame());
+		}
+	}
+
+	/** The client cycle this golem was last asked for a model, which is when it was drawn. */
+	private int lastDrawnCycle = -1;
+
+	int getLastDrawnCycle()
+	{
+		return lastDrawnCycle;
 	}
 
 	@Override
 	public Model getModel()
 	{
+		// Only asked for when the client actually draws the object. Recorded so that a golem
+		// registered but not drawn — culled, or one too many on a crowded tile — shows in the
+		// journal rather than only as flicker on screen.
+		lastDrawnCycle = client.getGameCycle();
 		if (animation.getAnimation() == null)
 		{
 			return baseModel;
@@ -140,13 +193,15 @@ class FakeGolem extends RuneLiteObjectController
 			return;
 		}
 
-		int localX = golem.getFineX() - wv.getBaseX() * TILE;
-		int localY = golem.getFineY() - wv.getBaseY() * TILE;
+		// Drawn where the golem appears to the player, which inside an instance is not where
+		// it is simulated. See Golem.setDrawOffset.
+		int localX = golem.getDrawFineX() - wv.getBaseX() * TILE;
+		int localY = golem.getDrawFineY() - wv.getBaseY() * TILE;
 
 		setX(localX);
 		setY(localY);
 		setWorldView(wv.getId());
-		setLevel(golem.getPlane());
+		setLevel(golem.getDrawPlane());
 		setOrientation(golem.getOrientation());
 
 		// Ground height has to be re-read as the golem moves, not just when it is
@@ -157,7 +212,7 @@ class FakeGolem extends RuneLiteObjectController
 			// Terrain height, plus whatever the golem is doing above it. Mid-jump that is
 			// an arc, so a stepping-stone hop leaves the ground instead of sliding across
 			// the water at ankle height.
-			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getPlane())
+			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getDrawPlane())
 				- golem.jumpArc());
 		}
 	}
@@ -166,12 +221,29 @@ class FakeGolem extends RuneLiteObjectController
 	private void applyPose()
 	{
 		int wanted = golem.currentPoseAnimation();
-		if (wanted == loadedAnimationId && animation.getAnimation() != null)
+		if (wanted != loadedAnimationId || animation.getAnimation() == null)
 		{
-			return;
+			loadedAnimationId = wanted;
+			animation.setAnimation(shared.animationFor(wanted));
 		}
 
-		loadedAnimationId = wanted;
-		animation.setAnimation(shared.animationFor(wanted));
+		// While performing a recording, the keyframe is the player's own, set directly.
+		//
+		// Earlier versions advanced the clip by the number of cycles the recording had
+		// run, at the clip's authored speed. That is not how the player's clip runs: on a
+		// basalt stone the player holds the first keyframe for about twenty-five cycles
+		// and then goes through the other seven during the jump, where the authored clip
+		// is done in forty. So golems finished hopping before they had left the ground.
+		// The recording now carries which keyframe the player was on at every sample, and
+		// that is simply what is drawn.
+		//
+		// Never past the last keyframe: a one-shot that completes is nulled by the
+		// controller, and the next frame would load it again and play it twice.
+		int frame = golem.getMotionFrame();
+		Animation loaded = animation.getAnimation();
+		if (frame >= 0 && loaded != null && loaded.getNumFrames() > 0)
+		{
+			animation.setFrame(Math.min(frame, loaded.getNumFrames() - 1));
+		}
 	}
 }

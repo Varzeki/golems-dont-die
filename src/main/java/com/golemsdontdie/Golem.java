@@ -184,6 +184,34 @@ class Golem
 		return tick - progressTick > STUCK_TICKS;
 	}
 
+	/** When this golem may next sail, in real time; 0 if it may now. For the save. */
+	long getShoreLeaveUntil()
+	{
+		return transportMemory.getShoreLeaveUntil();
+	}
+
+	void setShoreLeaveUntil(long until)
+	{
+		transportMemory.setShoreLeaveUntil(until);
+	}
+
+	/** True while the golem is on a crossing: afloat, or waiting out a passage. */
+	boolean isSailing(int tick)
+	{
+		return itinerary != null && itinerary.isVoyage() && !itinerary.isFinished(tick);
+	}
+
+	/**
+	 * Where to write this golem down in a save: its landfall if it is on a crossing.
+	 *
+	 * <p>Its current tile at sea is water, and a golem restored onto water is moved to the
+	 * nearest land — which from mid-ocean is wherever that happens to be.
+	 */
+	WorldPoint saveTile()
+	{
+		return itinerary != null && itinerary.isVoyage() ? itinerary.destination() : currentTile();
+	}
+
 	/** Clears the watchdog after the golem has been moved somewhere it can walk. */
 	void noteUnstuck(int tick)
 	{
@@ -342,6 +370,47 @@ class Golem
 	@Setter
 	private String nickname;
 
+	/**
+	 * True while the golem is inside an instance — through the pew, in the Mad Angel's room.
+	 *
+	 * <p>Golems are simulated in an instance's template, which is ordinary world coordinates:
+	 * the room behind the cathedral pew is a real, sealed place on the island, and the
+	 * instance is a copy of it and everything around it. Coordinates alone could not say
+	 * whether a golem standing there is in the instance, so golems in the sealed room were
+	 * drawn from the cathedral, and every golem on the island near the cathedral was drawn
+	 * inside the player's instance. A golem is in the instance from the moment a transport
+	 * into one lands it until one out of it does.
+	 */
+	@Getter
+	@Setter
+	private boolean inInstance;
+
+	/** What a transport in progress will make {@link #inInstance} when it lands: 1, 0, or -1 for no change. */
+	private int landingInstance = -1;
+
+	/** Applies a transport's instance change as the golem arrives. */
+	private void landInInstance()
+	{
+		if (landingInstance >= 0)
+		{
+			inInstance = landingInstance == 1;
+			landingInstance = -1;
+		}
+	}
+
+	/** Applies the instance change of a transport already arrived through, for a golem out of view. */
+	private void noteInstance(GolemTransport transport)
+	{
+		if (transport.entersInstance())
+		{
+			inInstance = true;
+		}
+		else if (transport.leavesInstance())
+		{
+			inInstance = false;
+		}
+	}
+
 	/** Stable identity for the side panel and the save file, assigned on creation. */
 	@Getter
 	private final long id;
@@ -441,6 +510,10 @@ class Golem
 				return true;
 			}
 
+			if (itinerary != null && itinerary.isFinished(context.getTick()) && itinerary.transport() != null)
+			{
+				noteInstance(itinerary.transport());
+			}
 			WorldPoint resolved = itinerary != null
 				? itinerary.positionAt(context.getTick())
 				: currentTile();
@@ -484,7 +557,7 @@ class Golem
 
 		this.fineX = at[0];
 		this.fineY = at[1];
-		this.plane = itinerary.destination().getPlane();
+		this.plane = itinerary.planeAt(tick);
 
 		// A crossing shows the walk cycle: the golem is standing on a moving boat, and a
 		// golem playing its idle while the sea goes past reads as scenery.
@@ -502,7 +575,7 @@ class Golem
 			// which is what stepping off a boat is.
 			if (wasVoyage)
 			{
-				transportMemory.beginShoreLeaveOnArrival(tick);
+				transportMemory.beginShoreLeaveOnArrival(tick, tick, random);
 				RoamPlanner planner = context.getPlanner();
 				if (planner != null)
 				{
@@ -512,7 +585,14 @@ class Golem
 		}
 	}
 
-	void advanceFar(RoamContext context, RoamPlanner planner)
+	/**
+	 * @param mayPlan false once this frame's planning is spent. A golem whose route has run
+	 *                out then stands where it arrived and plans on a later frame — a frame's
+	 *                delay nobody can see, where a thousand golems arriving together could
+	 *                otherwise all search in the same one.
+	 * @return true if a route was planned
+	 */
+	boolean advanceFar(RoamContext context, RoamPlanner planner, boolean mayPlan)
 	{
 		int tick = context.getTick();
 
@@ -527,17 +607,38 @@ class Golem
 			int[] at = itinerary.fineAt(tick);
 			this.fineX = at[0];
 			this.fineY = at[1];
-			this.plane = itinerary.destination().getPlane();
-			return;
+			this.plane = itinerary.planeAt(tick);
+			return false;
 		}
 
+		if (itinerary != null && itinerary.transport() != null)
+		{
+			noteInstance(itinerary.transport());
+		}
 		WorldPoint at = itinerary == null ? currentTile() : itinerary.destination();
 		this.fineX = at.getX() * TILE + TILE / 2;
 		this.fineY = at.getY() * TILE + TILE / 2;
 		this.plane = at.getPlane();
+		if (!mayPlan)
+		{
+			return false;
+		}
 
 		itinerary = planner.plan(at, tick, random, transportMemory, context);
+		if (itinerary == null)
+		{
+			// Nowhere found: stand a moment before looking again. See RoamPlanner.idle.
+			itinerary = RoamPlanner.idle(at, tick, random, farFailures++);
+		}
+		else
+		{
+			farFailures = 0;
+		}
+		return true;
 	}
+
+	/** Plans in a row that found nowhere to go, which lengthens the pause before the next. */
+	private int farFailures;
 
 	/**
 	 * Puts the golem down somewhere else entirely — the far end of a ladder, a dock it
@@ -559,6 +660,10 @@ class Golem
 		this.fineY = to.getY() * TILE + TILE / 2;
 
 		path.clear();
+		gaitWalk = -1;
+		gaitIdle = -1;
+		gaitFinish = -1;
+		motion = null;
 		stepping = false;
 		stepElapsed = 0;
 		walking = false;
@@ -646,6 +751,13 @@ class Golem
 					{
 						return searched;
 					}
+					// Standing where it cannot walk off, and nothing fresh to take: go back the
+					// way it came rather than wait here for the watchdog.
+					if (!context.getMemory().isKnownWalkable(fineX / TILE, fineY / TILE, plane)
+						&& takeWayOut(context, true))
+					{
+						return searched;
+					}
 
 					if (!context.isMayPath())
 					{
@@ -665,11 +777,40 @@ class Golem
 						// difference between a golem that is briefly hemmed in and one
 						// that is permanently trapped is only how many times this happens.
 						failedSearches++;
+						// Twice in a row with nowhere to walk is a dead end, not bad luck — but on
+						// ground it can stand on, only a fresh way out is taken. Going back the
+						// way it came from a room is how golems ping-ponged up and down the
+						// tower ladder a hundred and sixty times: the room at the bottom was shut
+						// in, so was the floor at the top, and each sent them to the other.
+						if (failedSearches >= 2 && takeWayOut(context, false))
+						{
+							failedSearches = 0;
+							return searched;
+						}
 						dwellRemaining = DWELL_MIN + random.nextInt(DWELL_SPREAD);
 						return searched;
 					}
 					failedSearches = 0;
 					continue;
+				}
+
+				// Checked again at the moment of stepping, not only when the path was planned.
+				// A door that was open when the golem chose its route can be shut by the time
+				// it gets there, and a path is a promise about the past. A climb is exempt: it
+				// walks up a cliff face that was never walkable to begin with.
+				int[] next = path.peek();
+				int fromX = fineX / TILE;
+				int fromY = fineY / TILE;
+				int stepX = next[0] - fromX;
+				int stepY = next[1] - fromY;
+				if (gaitWalk == -1 && Math.abs(stepX) <= 1 && Math.abs(stepY) <= 1
+					&& (stepX != 0 || stepY != 0)
+					&& !context.getMemory().canStep(fromX, fromY, plane, stepX, stepY))
+				{
+					path.clear();
+					walking = false;
+					dwellRemaining = DWELL_MIN;
+					return searched;
 				}
 				beginStep(path.poll());
 			}
@@ -691,6 +832,18 @@ class Golem
 			if (stepElapsed >= CYCLES_PER_TILE)
 			{
 				stepping = false;
+
+				// A climb ends the moment its last tile is reached, before anything else
+				// gets to look at this golem. Leaving the gait on would have it walking
+				// around the world in a climbing pose, and rolling for a new transport
+				// mid-obstacle would abandon the one it is halfway up.
+				if (gaitWalk != -1 && path.isEmpty())
+				{
+					endClimb();
+					walking = false;
+					dwellRemaining = DWELL_MIN + random.nextInt(DWELL_SPREAD);
+					return searched;
+				}
 
 				// A tile has just been entered, which is the one moment a transport roll
 				// may happen. Rolling per frame instead would make the behaviour depend on
@@ -815,7 +968,8 @@ class Golem
 				for (GolemTransport transport : network.from(x, y))
 				{
 					if (transport.getFromPlane() != plane
-						|| transportMemory.onCooldown(transport.getIndex(), context.getTick())
+						|| transportMemory.onCooldown(transport, context.getTick())
+						|| context.crowded(transport.getToX(), transport.getToY(), transport.getToPlane())
 						|| !arrivesSomewhereKnown(transport, context)
 						|| !context.getAbilities().canUse(transport))
 					{
@@ -870,6 +1024,82 @@ class Golem
 		return false;
 	}
 
+	/** The shortest wait before going back, however small the space beyond. About fifteen seconds. */
+	private static final int MIN_COOLDOWN_TICKS = 25;
+
+	/**
+	 * How long before a golem may go back the way a transport just took it, scaled by how
+	 * much room there is on the far side.
+	 *
+	 * <p>The full wait is right for open ground: a golem through a door into a town should
+	 * explore it rather than turn round. Behind the stile is a pen of a few dozen tiles, and
+	 * two minutes there was long enough for the golems arriving to outnumber the ones
+	 * leaving — it filled until it could not be drawn. The wait shrinks with the space, down
+	 * to a floor that still stops a golem stepping straight back.
+	 *
+	 * <p>Unwalkable landings keep the full wait. A stepping stone is not a small space, it is
+	 * the middle of a crossing, and shortening its cooldown would send golems back to the
+	 * bank they just left.
+	 */
+	private int cooldownFor(GolemTransport transport, RoamContext context)
+	{
+		int x = transport.getToX();
+		int y = transport.getToY();
+		int toPlane = transport.getToPlane();
+		if (!context.getMemory().isKnownWalkable(x, y, toPlane))
+		{
+			return TransportMemory.COOLDOWN_TICKS;
+		}
+		float share = Math.min(1f, context.enclosedArea(x, y, toPlane) / (float) RoamContext.OPEN_AREA);
+		return Math.max(MIN_COOLDOWN_TICKS, Math.round(TransportMemory.COOLDOWN_TICKS * share));
+	}
+
+	/**
+	 * Leaves a dead end by whatever starts here, even the way the golem just came.
+	 *
+	 * <p>The cooldown on a transport's reverse exists to stop a golem pacing through a door
+	 * for the fun of it. At the top of a ladder with no floor to walk on, that same cooldown
+	 * was the only thing keeping the golem there — it could not wander, could not go back
+	 * down, and stood re-planning until the watchdog lifted it to the plinth. A fresh way
+	 * out is still preferred; the way back is the fallback, not the choice.
+	 *
+	 * @return true if a transport was taken
+	 */
+	private boolean takeWayOut(RoamContext context, boolean evenBack)
+	{
+		TransportNetwork network = context.getTransports();
+		if (network == null)
+		{
+			return false;
+		}
+		GolemTransport back = null;
+		for (GolemTransport transport : network.from(fineX / TILE, fineY / TILE))
+		{
+			if (transport.getFromPlane() != plane
+				|| !arrivesSomewhereKnown(transport, context)
+				|| !context.getAbilities().canUse(transport))
+			{
+				continue;
+			}
+			if (!transportMemory.onCooldown(transport, context.getTick()))
+			{
+				take(transport, context);
+				return true;
+			}
+			if (back == null)
+			{
+				back = transport;
+			}
+		}
+		if (back == null || !evenBack)
+		{
+			return false;
+		}
+		note(context, "dead end: taking the way back");
+		take(back, context);
+		return true;
+	}
+
 	/**
 	 * True if the far end of a transport is ground the golem could actually walk on.
 	 *
@@ -896,7 +1126,18 @@ class Golem
 		// destination that is itself a transport origin is accepted even though the map
 		// says nothing may stand on it: the network is asserting otherwise, and the golem
 		// can always hop off again.
-		return context.getTransports().hasOrigin(transport.getToX(), transport.getToY());
+		//
+		// But only if that transport goes on somewhere. A stone whose only way off is back to
+		// the stone the golem came from is not the middle of a crossing, it is a dead end with
+		// a hop at each side: the extra-slippery crossing lands on tiles the game blocks, and
+		// golems hopped back and forth across it forty times each, never getting off.
+		//
+		// And "goes on somewhere" means eventually reaches ground, followed hop by hop: one hop
+		// ahead passed every stone of a crossing that never reached a bank. See
+		// TransportNetwork.leadsToGround.
+		return context.getTransports().leadsToGround(transport.getToX(), transport.getToY(), transport.getToPlane(),
+			transport.getFromX(), transport.getFromY(), transport.getFromPlane(), TransportNetwork.CHAIN_HOPS,
+			context.getAbilities()::canUse, context.getMemory()::isKnownWalkable);
 	}
 
 	/**
@@ -952,7 +1193,7 @@ class Golem
 		GolemTransport transport = queuedTransport;
 		queuedTransport = null;
 
-		if (transportMemory.onCooldown(transport.getIndex(), context.getTick())
+		if (transportMemory.onCooldown(transport, context.getTick())
 			|| !context.getAbilities().canUse(transport))
 		{
 			return false;
@@ -976,12 +1217,43 @@ class Golem
 	 */
 	private void take(GolemTransport transport, RoamContext context)
 	{
-		transportMemory.used(transport.getIndex(), transport, context.getTick());
+		transportMemory.used(transport, context.getTick(), cooldownFor(transport, context));
+		// On landing, not now: a golem climbing into the pew is still in the cathedral while it climbs.
+		landingInstance = transport.entersInstance() ? 1 : transport.leavesInstance() ? 0 : -1;
+
+		// Logged before anything else can return. A row with no animation used to relocate
+		// the golem above this line, so every staircase a golem took left no trace and the
+		// journal read as though golems never used staircases at all.
+		note(context, "transport obj=" + transport.getObjectId()
+			+ " to=" + transport.getToX() + "," + transport.getToY() + ","
+			+ transport.getToPlane()
+			+ " arch=" + transport.getArchetype()
+			+ " dur=" + transport.getDuration());
+
+		// A recording beats anything reconstructed, and that includes the silent case. A
+		// staircase plays nothing but still has a shape — the player stands on it for a
+		// moment and then is gone — and relocating on the spot skipped straight past it.
+		//
+		// A plane change can be performed from a recording as long as the recording barely
+		// moves: a ladder animates and then puts you on another floor, so its value is in
+		// the timing. A recording that does travel cannot cross planes, because its offsets
+		// would slide the golem across a floor it is no longer on.
+		MotionCurve recorded = context.getKnowledge() == null ? null
+			: context.getKnowledge().curveFor(transport);
+		boolean samePlane = transport.getFromPlane() == transport.getToPlane();
+		if (recorded != null && !recorded.isEmpty() && (samePlane || recorded.reach() < TILE))
+		{
+			beginRecordedMotion(transport, recorded);
+			note(context, "performing " + recorded);
+			return;
+		}
 
 		int animation = transport.animation();
 		if (animation < 0 || animation == snapshot.getWalkAnimation())
 		{
+			note(context, "relocated without animation");
 			relocate(transport.destination());
+			landInInstance();
 			return;
 		}
 
@@ -998,7 +1270,11 @@ class Golem
 		//
 		// A fixed length made a cliff take the same two thirds of a second as stepping
 		// through a door, which is why golems scaled shortcuts faster than a player can.
-		int[] clips = transport.animations();
+		// What the player was seen doing beats what was shipped, which beats the guess the
+		// archetype makes from the menu text.
+		int[] clips = context.getKnowledge() == null
+			? transport.animations()
+			: context.getKnowledge().clipsFor(transport);
 		phaseClips = clips;
 		phaseCycles = new int[clips.length];
 
@@ -1028,12 +1304,66 @@ class Golem
 		// agree closely — a cathedral door measured one tick against a 30-cycle clip, the
 		// cave three ticks against 96 — so little is lost by preferring the row, and what
 		// is gained is that two climbs of different heights take different lengths of time.
-		int measuredTicks = MeasuredShortcuts.ticksFor(transport.getObjectId());
+		int measuredTicks = context.getKnowledge() == null
+			? MeasuredShortcuts.ticksFor(transport.getObjectId())
+			: context.getKnowledge().ticksFor(transport);
 		int authored = transport.getDuration() * CYCLES_PER_TICK;
-		int wanted = measuredTicks > 0 ? measuredTicks * CYCLES_PER_TICK
-			: authored > 0 ? authored
-			: total;
+		// What decides whether this is walked or performed is how long it takes and how far
+		// it goes — not whether its clip loops.
+		//
+		// The loop test was wrong in both directions and measurement proved it:
+		// human_climbing (737) is a one-shot and yet is the walk animation of a climb,
+		// while hole_squeeze (3835) loops and is not walked at all. Loop-ness is a property
+		// of the clip, not of the movement.
+		//
+		// Duration does separate them. Where the cache states an obstacle's time, stepping
+		// stones read one or two ticks and log balances and slopes read six to eight — the
+		// short ones are a single action, the long ones are several tiles of walking.
+		int obstacleTicks = measuredTicks > 0 ? measuredTicks
+			: context.getObstacles() != null
+				&& context.getObstacles().ticksFor(transport.getObjectId()) > 0
+				? context.getObstacles().ticksFor(transport.getObjectId())
+				: transport.getDuration();
+
+		// Whether a clip may be stretched is still the clip's own business — a one-shot
+		// restarted halfway through looks broken however long the obstacle takes.
+		int stretchIndex = phaseCycles.length > 2 ? 1 : phaseCycles.length - 1;
+		boolean stretchable = total == 0 || stretchIndex < 0
+			|| context.getModels() == null
+			|| context.getModels().loops(clips[stretchIndex]);
+
+		int wanted;
+		if (!stretchable)
+		{
+			wanted = total;
+		}
+		else
+		{
+			wanted = measuredTicks > 0 ? measuredTicks * CYCLES_PER_TICK
+				: authored > 0 ? authored
+				: total;
+		}
 		wanted = Math.max(TRANSITION_MIN_CYCLES, wanted);
+
+		note(context, "clips=" + java.util.Arrays.toString(clips) + " total=" + total
+			+ " wanted=" + wanted + " measured=" + measuredTicks + " authored=" + authored
+			+ " obstacleTicks=" + obstacleTicks + " stretchable=" + stretchable
+			+ " delay=" + (context.getKnowledge() == null ? -1
+				: context.getKnowledge().moveDelayFor(transport))
+			+ " span=" + (context.getKnowledge() == null ? -1
+				: context.getKnowledge().moveSpanFor(transport))
+			+ " at=" + (fineX / TILE) + "," + (fineY / TILE));
+
+		// Several ticks over several tiles is a walk, whatever the clip does.
+		if (obstacleTicks >= WALKED_TICKS && total > 0)
+		{
+			if (beginClimb(transport, clips, context))
+			{
+				note(context, "climbing as a walk");
+				return;
+			}
+			note(context, "walk refused: plane or span");
+		}
 
 		if (phaseCycles.length > 0 && total != wanted)
 		{
@@ -1061,6 +1391,58 @@ class Golem
 		int span = Math.abs(transport.getToX() - transport.getFromX())
 			+ Math.abs(transport.getToY() - transport.getFromY());
 		transitionGlide = transport.getFromPlane() == transport.getToPlane() && span <= 8;
+
+		// Movement is whole game ticks — the server moves you over a number of them — while
+		// the clip is whatever length it was drawn at. The measured hop covers its gap in
+		// one tick under a clip of nearly one and a third.
+		// The measured window wins: how long the golem stands still, then how long it
+		// moves. Both come from watching the player and are the structure a traversal has
+		// that a single duration cannot express.
+		int learnedDelay = context.getKnowledge() == null ? 0
+			: context.getKnowledge().moveDelayFor(transport);
+		int learnedSpan = context.getKnowledge() == null ? 0
+			: context.getKnowledge().moveSpanFor(transport);
+
+		if (learnedSpan > 0)
+		{
+			// Never longer than the clip.
+			//
+			// A chained crossing recorded a 72-cycle span for a 38-cycle hop, and a window
+			// wider than the transition meant the golem only ever completed part of its
+			// glide before the transition ended and dropped it at the far side. That is the
+			// jump-in-place-then-teleport: it was gliding, just never far enough to see.
+			// Which direction the player last crossed decided whether the figure was sane,
+			// which is why it changed depending on the way they went.
+			int moveCycles = Math.max(1, Math.min(learnedSpan, total));
+
+			// The movement has to finish with the animation, and the observed delay is
+			// otherwise taken as given.
+			//
+			// It is right, and an earlier version of this distrusted it and clamped it to
+			// the first half of the clip — which broke the cathedral door. That door
+			// measures a 30-cycle delay against a 30-cycle clip, because the player plays
+			// the whole animation and *then* teleports, arriving in a standing pose. Forced
+			// to halfway, the golem teleported mid-animation instead.
+			//
+			// What actually caused the double jump was the tail, not the delay. A hop's
+			// window ran to cycle 45 against a 38-cycle clip, and a one-shot clip that
+			// completes inside a longer transition is nulled by the animation controller and
+			// then set again by the renderer — restarting the jump while the golem was still
+			// in the air. Ending the movement with the clip removes the overrun and the
+			// restart together.
+			int latest = Math.max(0, total - moveCycles);
+			transitionGlideDelay = Math.min(learnedDelay, latest);
+			transitionGlideCycles = moveCycles;
+			transitionCycles = total;
+			transitionTotal = transitionCycles;
+		}
+		else
+		{
+			int movementTicks = Math.max(1, measuredTicks > 0 ? measuredTicks
+				: transport.getDuration() > 0 ? transport.getDuration() : 1);
+			transitionGlideDelay = 0;
+			transitionGlideCycles = Math.min(total, movementTicks * CYCLES_PER_TICK);
+		}
 
 		if (transitionGlide)
 		{
@@ -1100,8 +1482,150 @@ class Golem
 		return claimed;
 	}
 
+	/**
+	 * Walks the golem through an obstacle wearing the obstacle's gait.
+	 *
+	 * <p>This is how the game does it: the climb is ordinary tile-by-tile movement with the
+	 * player's walk and idle animations swapped for climbing ones. The loop clip is the
+	 * walk cycle, so it repeats once per tile of its own accord and needs no stretching —
+	 * a three-tile scramble takes three ticks and an eight-tile one takes eight, without
+	 * anybody choosing a duration.
+	 *
+	 * <p>Only for obstacles that stay on one plane and cover ground the golem can be drawn
+	 * crossing. A ladder goes somewhere else entirely and is still a transition.
+	 *
+	 * @return true if the golem is now climbing, false to fall back to a played clip
+	 */
+	private boolean beginClimb(GolemTransport transport, int[] clips, RoamContext context)
+	{
+		if (transport.getFromPlane() != transport.getToPlane())
+		{
+			return false;
+		}
+
+		int span = Math.max(Math.abs(transport.getToX() - fineX / TILE),
+			Math.abs(transport.getToY() - fineY / TILE));
+		if (span < 1 || span > CLIMB_MAX_TILES)
+		{
+			return false;
+		}
+
+		path.clear();
+		int x = fineX / TILE;
+		int y = fineY / TILE;
+		while (x != transport.getToX() || y != transport.getToY())
+		{
+			x += Integer.signum(transport.getToX() - x);
+			y += Integer.signum(transport.getToY() - y);
+			path.add(new int[]{x, y});
+		}
+
+		// Three clips is ready, loop, merge — the idle, the walk, and a one-shot on
+		// arrival. Fewer than three and the one clip is the walk.
+		gaitWalk = clips.length > 2 ? clips[1] : clips[clips.length - 1];
+		gaitIdle = clips.length > 2 ? clips[0] : gaitWalk;
+		gaitFinish = clips.length > 2 ? clips[2] : -1;
+		gaitFinishCycles = gaitFinish == -1 || context.getModels() == null ? 0
+			: context.getModels().animationCycles(gaitFinish);
+
+		transitionCycles = 0;
+		transitionAnimation = -1;
+		beginStep(path.poll());
+		return true;
+	}
+
+	/** Clears the climbing gait, playing the step-off if the obstacle had one. */
+	private void endClimb()
+	{
+		gaitWalk = -1;
+		gaitIdle = -1;
+
+		if (gaitFinish != -1)
+		{
+			transitionAnimation = gaitFinish;
+			transitionTotal = Math.max(TRANSITION_MIN_CYCLES, gaitFinishCycles);
+			transitionCycles = transitionTotal;
+			phaseClips = new int[0];
+			phaseCycles = new int[0];
+			phaseRemaining = transitionTotal;
+			transitionGlide = false;
+			transitionDestination = null;
+			gaitFinish = -1;
+		}
+	}
+
+	/** Tiles a golem will climb across rather than be carried over. */
+	private static final int CLIMB_MAX_TILES = 12;
+
+	/**
+	 * Ticks above which a traversal is walked rather than performed.
+	 *
+	 * <p>Four. The cache's own durations cluster either side of it — one and two ticks for
+	 * stepping stones and broken walls, six to eight for log balances, slopes and crevices
+	 * — and nothing in the sample sits on the boundary.
+	 */
+	private static final int WALKED_TICKS = 4;
+
+	/**
+	 * Where to draw the golem relative to where it is, in fine units, and on which plane.
+	 *
+	 * <p>Zero everywhere but an instance. A golem that has gone into a boss room is simulated
+	 * at the room's template — the fixed place in the world the instance is copied from,
+	 * which is the only address the room keeps between visits — and the player standing in
+	 * the instance sees that same template somewhere else entirely. The plugin works out the
+	 * difference each frame and the golem is drawn there.
+	 */
+	private int drawOffsetX;
+	private int drawOffsetY;
+	private int drawPlane = -1;
+
+	void setDrawOffset(int x, int y, int plane)
+	{
+		drawOffsetX = x;
+		drawOffsetY = y;
+		drawPlane = plane;
+	}
+
+	int getDrawFineX()
+	{
+		return fineX + drawOffsetX;
+	}
+
+	int getDrawFineY()
+	{
+		return fineY + drawOffsetY;
+	}
+
+	int getDrawPlane()
+	{
+		return drawPlane >= 0 ? drawPlane : plane;
+	}
+
+	/** Steps begun so far, so each can be checked exactly once from outside. */
+	private int stepSerial;
+	private boolean stepClimbing;
+
+	int getStepSerial()
+	{
+		return stepSerial;
+	}
+
+	/** The most recent step as {fromX, fromY, toX, toY} in tiles. */
+	int[] lastStep()
+	{
+		return new int[]{stepFromX / TILE, stepFromY / TILE, stepToX / TILE, stepToY / TILE};
+	}
+
+	/** True if the most recent step was part of a climb, which crosses unwalkable ground by design. */
+	boolean lastStepClimbing()
+	{
+		return stepClimbing;
+	}
+
 	private void beginStep(int[] tile)
 	{
+		stepSerial++;
+		stepClimbing = gaitWalk != -1;
 		stepFromX = fineX;
 		stepFromY = fineY;
 		stepToX = tile[0] * TILE + TILE / 2;
@@ -1133,7 +1657,8 @@ class Golem
 		int tileY = fineY / TILE;
 		path.clear();
 		path.addAll(context.getPathfinder().wanderPath(tileX, tileY, plane,
-			new RoamBounds(context.getMemory(), plane, tileX, tileY), random));
+			new RoamBounds(context.getMemory(), plane, tileX, tileY,
+				(x, y) -> context.crowded(x, y, plane)), random));
 	}
 
 	/** Eases the heading toward where the golem is walking, the short way round. */
@@ -1179,6 +1704,124 @@ class Golem
 		return (int) (1024 + Math.round(Math.atan2(dx, dy) / Math.PI * 1024)) & 2047;
 	}
 
+	/**
+	 * Performs a traversal exactly as it was observed.
+	 *
+	 * <p>No delay, span, stretch or walked-versus-glided decision is taken. The recording
+	 * holds the position at every other cycle and the animation at every point it changed,
+	 * and both are simply read back.
+	 */
+	private void beginRecordedMotion(GolemTransport transport, MotionCurve recorded)
+	{
+		path.clear();
+		stepping = false;
+		walking = false;
+		gaitWalk = -1;
+		gaitIdle = -1;
+		gaitFinish = -1;
+
+		motion = recorded;
+		transitionTotal = Math.max(1, recorded.cycles());
+		transitionCycles = transitionTotal;
+		transitionGlide = false;
+		transitionGlideDelay = 0;
+		transitionGlideCycles = 0;
+		phaseClips = new int[0];
+		phaseCycles = new int[0];
+		phase = 0;
+		transitionDestination = transport.destination();
+		int opening = recorded.animationAt(0);
+		transitionAnimation = opening != -1 ? opening : snapshot.getIdlePoseAnimation();
+
+		// The axis and the distance, both in fine units from exactly where the golem is.
+		//
+		// These used to be worked out from the golem's *tile* while the offsets were added
+		// to its exact position, so whatever fraction of a tile it happened to be standing
+		// off centre was added on top of the distance. The golem slid past the far side by
+		// that much and the arrival snapped it back — which is precisely what it looked
+		// like. Tiles and fine units cannot be mixed halfway through a calculation.
+		motionFrame = recorded.frameAt(0);
+		motionFromX = fineX;
+		motionFromY = fineY;
+
+		float dx = transport.getToX() * TILE + TILE / 2f - fineX;
+		float dy = transport.getToY() * TILE + TILE / 2f - fineY;
+		float needed = (float) Math.sqrt(dx * dx + dy * dy);
+		motionAxisX = needed < 1f ? 0f : dx / needed;
+		motionAxisY = needed < 1f ? 1f : dy / needed;
+
+		// The recording covered whatever distance the player covered; this golem may have
+		// a different one to cross. Scale the forward part so it arrives exactly.
+		int reach = recorded.reach();
+		motionScale = reach <= TILE / 2 || needed < 1f ? 1f : needed / reach;
+
+		// Face the way it is about to go, immediately. A golem still turning as a recording
+		// starts performs the whole thing at the wrong angle.
+		//
+		// Turned by however the player was facing relative to the way they went. Climbing
+		// down the rockslide the player faces the rock and moves away from it; a golem that
+		// faced its direction of travel climbed down outwards, off the cliff. Only for a
+		// traversal that goes somewhere — a ladder has no direction to be relative to.
+		int heading = headingFor(Math.round(dx), Math.round(dy));
+		targetOrientation = recorded.hasFacing() && needed >= TILE / 2f
+			? (heading + recorded.facing()) & 2047
+			: heading;
+		orientation = targetOrientation;
+	}
+
+	/** Where the recording started from, in fine units. */
+	private int motionFromX;
+	private int motionFromY;
+
+	/** Forward scaling, so a recording made from one tile away still lands correctly. */
+	private float motionScale = 1f;
+
+	/**
+	 * Which frame the recording says the animation should be on, or -1.
+	 *
+	 * <p>Read by the renderer so the animation and the movement share one clock. Without
+	 * it the clip advances at the rate the client happens to be drawing at while the
+	 * position advances on the simulation's cycle count, and the two drift apart — which
+	 * looks like the animation skipping even when the recording is perfect.
+	 */
+	@Getter
+	private int motionFrame = -1;
+
+	/** Reports a decision to the journal, if one is listening. */
+	private void note(RoamContext context, String what)
+	{
+		if (context != null && context.getJournal() != null)
+		{
+			context.getJournal().accept(this, what);
+		}
+	}
+
+	/**
+	 * Everything about this golem's current state, for the developer journal.
+	 *
+	 * <p>Deliberately one flat line per golem per tick. Working out why a golem did
+	 * something has meant reading its position, its animation, its path and its intention
+	 * together, and reconstructing those from separate debug lines after the fact is what
+	 * has made several of these bugs take three attempts instead of one.
+	 */
+	String debugState()
+	{
+		return "tile=" + (fineX / TILE) + "," + (fineY / TILE) + "," + plane
+			+ " fine=" + fineX + "," + fineY
+			+ " orient=" + orientation + "/" + targetOrientation
+			+ " anim=" + currentPoseAnimation()
+			+ " tier=" + tier
+			+ (walking ? " walking" : "")
+			+ (stepping ? " stepping" : "")
+			+ (transitionCycles > 0 ? " transit=" + transitionCycles + "/" + transitionTotal
+				+ (transitionGlide ? " glide=" + transitionGlideCycles : "") : "")
+			+ (gaitWalk != -1 ? " climbing gait=" + gaitWalk + "/" + gaitIdle : "")
+			+ (motion != null ? " performing" : "")
+			+ " path=" + path.size()
+			+ (itinerary != null ? " itinerary" : "")
+			+ (dwellRemaining > 0 ? " dwell=" + dwellRemaining : "");
+	}
+
 	/** The animation this golem should be playing right now. -1 if it has none. */
 	int currentPoseAnimation()
 	{
@@ -1190,8 +1833,37 @@ class Golem
 		{
 			return transitionAnimation;
 		}
+		if (gaitWalk != -1)
+		{
+			return walking ? gaitWalk : gaitIdle;
+		}
 		return walking ? snapshot.getWalkAnimation() : snapshot.getIdlePoseAnimation();
 	}
+
+	/**
+	 * The gait a golem climbs with, replacing its own for the length of the obstacle.
+	 *
+	 * <p>A long climb is not a long animation. The game does not play a climbing clip for
+	 * eight ticks; it swaps the player's base animation set — the idle and the walk — and
+	 * then walks them up the cliff a tile at a time, so the walk cycle happens to be a
+	 * climb. That is why {@code human_climbing_loop} loops at all: it is a walk animation,
+	 * and walk animations repeat once per tile.
+	 *
+	 * <p>Modelling it as a clip stretched across a duration was wrong in a way that could
+	 * not be tuned out. Too short and the golem finished climbing in a fraction of a
+	 * second; too long and it restarted the animation halfway up while sliding. Both were
+	 * symptoms of animating something that should have been walking.
+	 *
+	 * <p>-1 when the golem is using its own gait, which is nearly always.
+	 */
+	private int gaitWalk = -1;
+	private int gaitIdle = -1;
+
+	/** Played once on arrival, or -1. The step-off at the top of a climb. */
+	private int gaitFinish = -1;
+
+	/** Its length, measured when the climb began while the models were to hand. */
+	private int gaitFinishCycles;
 
 	// ------------------------------------------------------- using a transport
 
@@ -1204,6 +1876,51 @@ class Golem
 	 * machinery the walk cycle already uses.
 	 */
 	private int transitionAnimation = -1;
+
+	/**
+	 * Cycles of the transition the golem is actually moving for.
+	 *
+	 * <p>Movement and animation are separate and do not last the same length of time. A
+	 * stepping-stone hop was measured at 20ms resolution: the player covers the gap in
+	 * <b>30 cycles — exactly one game tick — while the clip runs for 38</b>, so the last
+	 * eight animate in place as they settle.
+	 *
+	 * <p>Gliding across the whole clip instead, which is what this used to do, means the
+	 * golem is still drifting when it should have landed and never holds the end of the
+	 * animation. That is the part of a hop that looks wrong without being obviously wrong.
+	 */
+	private int transitionGlideCycles;
+
+	/**
+	 * Cycles the golem holds still at the start of a traversal before moving.
+	 *
+	 * <p>Measured, not assumed. Four consecutive basalt hops each held for 33 cycles and
+	 * then crossed in 12 — and the game's own script for the same kind of obstacle uses a
+	 * 12-cycle movement window inside a longer action, which is the same shape arrived at
+	 * from the other direction.
+	 *
+	 * <p>This is the part of a traversal that was never recorded. Without it the golem
+	 * begins sliding on the animation's first frame, which no amount of adjusting the total
+	 * duration can disguise.
+	 */
+	private int transitionGlideDelay;
+
+	/**
+	 * The recorded motion being performed, or null when none was available.
+	 *
+	 * <p>While this is set nothing about the traversal is being calculated. Position comes
+	 * from the recording and so does the animation, which is the whole point: the shapes
+	 * that kept fighting each other — a hop's wind-up, a climb's steady rise, a door's
+	 * animate-then-teleport — are all just different recordings.
+	 */
+	private MotionCurve motion;
+
+	/** The unit vector toward this traversal's destination, for orienting the recording. */
+	private float motionAxisX;
+	private float motionAxisY;
+
+	/** Scratch for the curve's offset, to avoid allocating one every cycle per golem. */
+	private final int[] motionOffset = new int[2];
 
 	/** Cycles left of the transition, after which the golem arrives at the far end. */
 	private int transitionCycles;
@@ -1236,7 +1953,11 @@ class Golem
 	/** True while the golem is mid-obstacle and should not be walking or pathing. */
 	boolean inTransition()
 	{
-		return transitionCycles > 0;
+		// A climb is walked rather than played, so it has no transition cycles at all —
+		// but it is every bit as much "mid-obstacle" as a hop is. Without this the
+		// watchdog sees a golem standing on a cliff face, calls that unwalkable ground,
+		// and relocates it off the rocks halfway up.
+		return transitionCycles > 0 || gaitWalk != -1;
 	}
 
 	/**
@@ -1252,6 +1973,34 @@ class Golem
 		}
 
 		transitionCycles -= cycles;
+
+		if (motion != null)
+		{
+			int elapsed = transitionTotal - transitionCycles;
+			int beforeX = fineX;
+			int beforeY = fineY;
+			motion.offsetAt(elapsed, motionAxisX, motionAxisY, motionScale, motionOffset);
+			fineX = motionFromX + motionOffset[0];
+			fineY = motionFromY + motionOffset[1];
+
+			// Between clips — before the first starts, or after the last has ended — the
+			// golem is itself: idle, or walking if the recording is moving it. This used to
+			// keep whatever was last set, which before the first clip was nothing at all, so
+			// golems stood in their bare model waiting to hop; and after the stile's climb
+			// they stepped off still frozen in its final frame.
+			int playing = motion.animationAt(elapsed);
+			transitionAnimation = playing != -1 ? playing
+				: fineX != beforeX || fineY != beforeY ? snapshot.getWalkAnimation()
+				: snapshot.getIdlePoseAnimation();
+			motionFrame = motion.frameAt(elapsed);
+
+			if (transitionCycles > 0)
+			{
+				return true;
+			}
+			motion = null;
+			motionFrame = -1;
+		}
 
 		// Step through the clip set as each phase runs out, so the golem takes hold,
 		// hauls itself up and steps off rather than looping one clip for the whole
@@ -1272,7 +2021,11 @@ class Golem
 			// animation attached, which is exactly what it was.
 			if (transitionGlide)
 			{
-				float done = 1f - (transitionCycles / (float) transitionTotal);
+				// Against the movement window, not the whole transition, so the golem
+				// arrives when it should and holds still for the rest of the clip.
+				int window = transitionGlideCycles > 0 ? transitionGlideCycles : transitionTotal;
+				int elapsed = transitionTotal - transitionCycles - transitionGlideDelay;
+				float done = elapsed <= 0 ? 0f : Math.min(1f, elapsed / (float) window);
 				fineX = transitionFromX + Math.round((transitionToX - transitionFromX) * done);
 				fineY = transitionFromY + Math.round((transitionToY - transitionFromY) * done);
 			}
@@ -1282,6 +2035,7 @@ class Golem
 		transitionCycles = 0;
 		transitionAnimation = -1;
 		transitionGlide = false;
+		motion = null;
 		phaseClips = new int[0];
 		phaseCycles = new int[0];
 		phase = 0;
@@ -1289,6 +2043,7 @@ class Golem
 		{
 			relocate(transitionDestination);
 			transitionDestination = null;
+			landInInstance();
 		}
 		return false;
 	}
@@ -1322,7 +2077,29 @@ class Golem
 		{
 			return 0;
 		}
-		float done = 1f - (transitionCycles / (float) transitionTotal);
+
+		// You can only be in the air while you are moving.
+		//
+		// This used to arc across the whole transition, which was harmless while movement
+		// filled it and wrong the moment it did not. A cathedral door holds still for
+		// thirty cycles and then teleports, so the golem rose into the air and hung there
+		// for the entire animation without going anywhere.
+		int window = transitionGlideCycles > 0 ? transitionGlideCycles : transitionTotal;
+		int elapsed = transitionTotal - transitionCycles - transitionGlideDelay;
+		if (elapsed <= 0 || elapsed >= window)
+		{
+			return 0;
+		}
+
+		// And only for a leap. A door's single tile is a step through a doorway; lifting
+		// the golem off the ground for it is not a jump, it is a hover.
+		if (Math.abs(transitionToX - transitionFromX)
+			+ Math.abs(transitionToY - transitionFromY) <= TILE)
+		{
+			return 0;
+		}
+
+		float done = elapsed / (float) window;
 		// 4t(1-t) peaks at 1 when t is a half, and is zero at both ends.
 		return Math.round(JUMP_ARC_HEIGHT * 4f * done * (1f - done));
 	}
