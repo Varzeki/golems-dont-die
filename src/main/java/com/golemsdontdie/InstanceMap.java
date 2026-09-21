@@ -9,16 +9,11 @@ import net.runelite.api.coords.WorldPoint;
  * Between an instance and the fixed place in the world it is copied from.
  *
  * <p>An instance — a boss room behind a church pew — is built fresh on every visit, in
- * coordinates that mean nothing the next time. What does stay the same is its template: the
- * static copy of the room elsewhere in the world, which the instance is assembled from in
- * eight-tile chunks. So everything golems keep about an instance is kept in template
- * coordinates. A route through the pew leads to the template room, golems wander the
- * template room, and when the player is standing in an instance built from it, golems in
- * the template are drawn in the instance.
+ * coordinates that mean nothing next time. Its template, the static copy elsewhere assembled from
+ * in eight-tile chunks, does stay put, so all a golem keeps about an instance is in template
+ * coordinates: golems wander the template room and are drawn in whichever instance is loaded.
  *
- * <p>Only unrotated chunks are mapped. The game can rotate a chunk as it builds an instance;
- * doing so turns walls and headings as well as positions, and that is left for when an
- * instance is found that needs it.
+ * <p>Only unrotated chunks are mapped; rotation turns walls and headings as well as positions.
  */
 final class InstanceMap
 {
@@ -28,10 +23,7 @@ final class InstanceMap
 	{
 	}
 
-	/**
-	 * The template tile a tile of the loaded instance was copied from; the tile itself
-	 * outside an instance; null if it is in no chunk or a rotated one.
-	 */
+	/** The template of a loaded instance tile; the tile itself outside one; null if rotated. */
 	static WorldPoint templateOf(WorldView wv, WorldPoint tile)
 	{
 		if (tile == null || wv == null || !wv.isInstance())

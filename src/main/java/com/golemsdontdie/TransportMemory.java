@@ -6,53 +6,25 @@ import lombok.Setter;
 /**
  * What one golem has used recently, so it does not pace back and forth through a door.
  *
- * <p>Per golem, not global — two golems meeting at the same ladder should both be able to
- * take it. That costs a handful of longs each, which at a thousand golems is still nothing
- * next to the models they share.
+ * <p>Per golem, not global — two golems meeting at the same ladder should both be able to take
+ * it. Transport cooldowns are not saved: they stop a golem visibly oscillating over the next
+ * minute or two, and after a logout there is none left to interrupt. Shore leave is the exception
+ * on both counts, saved and in real time, because a golem restored at a port it has just landed
+ * at should not sail straight back out.
  *
- * <p>Transport cooldowns are not saved. They exist to stop a golem visibly oscillating over
- * the next minute or two; after a logout there is no oscillation left to interrupt. They are
- * measured in game ticks, so they advance with the simulation.
- *
- * <p>Shore leave is the exception on both counts: it is saved with the golem and measured in
- * real time, because a golem restored at a port it has just landed at should not sail straight
- * back out.
- *
- * <h2>Why endpoints and not row numbers</h2>
- *
- * <p>This used to remember which rows had been used, by index, and bar each row's
- * resolved reverse. Every part of that could come apart without anything looking wrong:
- *
- * <ul>
- *   <li>Two rows can go the same way. The rockslide had a shipped row and a learned route
- *       with identical ends under different object ids; the reverse lookup found one, the
- *       cooldown barred it, and the golem walked straight back through the other. Half of
- *       all uses of that rockslide were a golem immediately undoing the last one.</li>
- *   <li>Learned rows are renumbered whenever what was learned changes.</li>
- * </ul>
- *
- * <p>What a golem must not do is go back the way it came, and that is a statement about
- * tiles. Keyed on the endpoints, a duplicate row, a renumbered row and a row filed under the
- * wrong object all bar each other, because they are the same journey.
+ * <p>Endpoints, not row numbers: two rows can go the same way — the rockslide had a shipped row
+ * and a learned route with identical ends under different object ids — and learned rows are
+ * renumbered whenever what was learned changes. Going back the way it came is about tiles.
  */
 final class TransportMemory
 {
-	/**
-	 * How many recent journeys to remember. Small on purpose: this stops a golem shuffling
-	 * in a doorway, not a golem revisiting a ladder half an hour later.
-	 */
+	/** How many recent journeys to remember. Small: this stops shuffling in a doorway, no more. */
 	private static final int HISTORY = 8;
 
 	/** Ticks a used transport, and its reverse, stay barred. Roughly two minutes. */
 	static final int COOLDOWN_TICKS = 200;
 
-	/**
-	 * Least time ashore before a golem may sail again: three minutes.
-	 *
-	 * <p>Long enough to walk off the dock and look round a small island, or get well away from
-	 * the quayside on the mainland, before it thinks about boats again. Saved with the golem, so
-	 * a restart does not let one straight back on.
-	 */
+	/** Least time ashore before a golem may sail again: three minutes, saved with the golem. */
 	private static final long SHORE_LEAVE_MILLIS = 3 * 60_000L;
 
 	/** Up to this much more, at random, so a boatload of golems landing together does not all leave together. */
@@ -60,13 +32,7 @@ final class TransportMemory
 
 	private static final long MILLIS_PER_TICK = 600;
 
-	/**
-	 * The clock shore leave is measured on.
-	 *
-	 * <p>Real time rather than game ticks, because it is saved with the golem and has to mean
-	 * the same thing next session: the tick count is the client's, and starts again. The
-	 * roaming simulation replaces it with its own simulated time.
-	 */
+	/** The clock shore leave is measured on: real time, because it is saved with the golem. */
 	static java.util.function.LongSupplier clock = System::currentTimeMillis;
 
 	/** Ring of recently travelled endpoint pairs, and when each expires. */
@@ -75,43 +41,145 @@ final class TransportMemory
 	private int next;
 
 	/**
-	 * The port this golem last sailed from, or -1.
-	 *
-	 * <p>State rather than a timer, and deliberately one field. A golem may not sail
-	 * straight back where it came from, but from its next port onward home is reachable
-	 * again — so a golem tours rather than commuting, and there is nothing to tune.
+	 * Ring of recently used obstacles: {objectId, fromX, fromY, toX, toY, plane}, with expiry.
+	 * Endpoints alone were not enough: over a broken cart one way was 2879,2950 to 2876,2952 and
+	 * back was 2876,2952 to 2880,2952, so the way back was never barred.
 	 */
+	private final int[][] usedObstacles = new int[HISTORY][];
+	private final int[] usedObstacleExpiry = new int[HISTORY];
+	private int nextObstacle;
+
+	/** How near a used obstacle's ends another use of the same object has to start to count as it. */
+	private static final int SAME_OBSTACLE_TILES = 2;
+
+	/**
+	 * The longest move, in tiles, that counts as crossing one obstacle, and so barred by object and
+	 * place. A glider or fairy ring is one object id with a dozen destinations from one spot, and
+	 * barring the object stranded golems at a glider platform a thousand times.
+	 */
+	private static final int OBSTACLE_REACH = 8;
+
+	private static boolean isCrossing(int fromX, int fromY, int toX, int toY)
+	{
+		return Math.max(Math.abs(toX - fromX), Math.abs(toY - fromY)) <= OBSTACLE_REACH;
+	}
+
+	/** The port this golem last sailed from, or -1: reachable again from the next, so it tours. */
 	@Getter
 	@Setter
 	private int blockedPort = -1;
+
+	/**
+	 * The port this golem has decided to sail to and is waiting at a dock for, or -1. The distance
+	 * field for a port not sailed to lately is built in the background, and deciding afresh each
+	 * time meant golems walked to the end of the dock and away again.
+	 */
+	@Getter
+	private int pendingPort = -1;
+
+	/** The dock the golem is waiting at for {@link #pendingPort}, or -1. */
+	@Getter
+	private int pendingFrom = -1;
+
+	/** The last tick it waits there. */
+	@Getter
+	private int pendingUntil;
+
+	/** How long a golem waits at a dock for a crossing being worked out: about twenty seconds. */
+	static final int PENDING_WAIT_TICKS = 32;
+
+	/** Waits at this dock for a crossing to that port, from now if it was not already. */
+	void holdPending(int fromDock, int port, int tick)
+	{
+		if (pendingPort != port || pendingFrom != fromDock)
+		{
+			pendingPort = port;
+			pendingFrom = fromDock;
+			pendingUntil = tick + PENDING_WAIT_TICKS;
+		}
+	}
+
+	void clearPending()
+	{
+		pendingPort = -1;
+		pendingFrom = -1;
+	}
 
 	/** When this golem may next sail, on {@link #clock}; 0 if it may now. Saved with the golem. */
 	@Getter
 	@Setter
 	private long shoreLeaveUntil;
 
-	/**
-	 * Records a use, barring both this journey and the one that undoes it.
-	 *
-	 * <p>Barring the reverse is the point. Barring only what was just used leaves a golem
-	 * free to take the matching row straight back, which is the same oscillation seen from
-	 * the other side.
-	 */
+	/** Records a use, barring both this journey and the one that undoes it, which is the same. */
 	void used(GolemTransport transport, int tick)
 	{
 		used(transport, tick, COOLDOWN_TICKS);
 	}
 
 	/**
-	 * As {@link #used(GolemTransport, int)}, barred for a given number of ticks.
-	 *
-	 * <p>Shorter where the far side is small: two minutes is a sensible wait before walking
-	 * back through a door into a town, and a very long one to spend in a sheep pen.
+	 * As {@link #used(GolemTransport, int)}, barred for a given number of ticks. Shorter where the
+	 * far side is small: two minutes is sensible before a town, very long in a sheep pen.
 	 */
+	/**
+	 * How long a golem walks after using a shortcut before it looks for another. Three minutes.
+	 *
+	 * <p>Not a cooldown on the shortcut but on the habit: Meiyerditch gave a golem a shortcut in
+	 * reach on every decision, and a year of roaming left a third of all golems there. Stepping off
+	 * somewhere it cannot walk is exempt.
+	 */
+	static final int TRANSPORT_REST_TICKS = 300;
+
+	private int restUntil = Integer.MIN_VALUE;
+
+	/** True if the golem has used a shortcut lately and is walking for a while. */
+	boolean restingFromTransports(int tick)
+	{
+		return tick < restUntil;
+	}
+
 	void used(GolemTransport transport, int tick, int cooldownTicks)
 	{
+		restUntil = tick + TRANSPORT_REST_TICKS;
 		remember(transport.endpointKey(), tick, cooldownTicks);
 		remember(transport.reverseKey(), tick, cooldownTicks);
+		journeys[nextJourney] = new int[]{transport.getFromX(), transport.getFromY(), transport.getFromPlane(),
+			transport.getToX(), transport.getToY(), transport.getToPlane()};
+		journeyExpiry[nextJourney] = tick + cooldownTicks;
+		nextJourney = (nextJourney + 1) % HISTORY;
+		if (transport.getFromPlane() == transport.getToPlane()
+			&& isCrossing(transport.getFromX(), transport.getFromY(), transport.getToX(), transport.getToY()))
+		{
+			usedObstacles[nextObstacle] = new int[]{transport.getObjectId(), transport.getFromX(), transport.getFromY(),
+				transport.getToX(), transport.getToY(), transport.getFromPlane()};
+			usedObstacleExpiry[nextObstacle] = tick + cooldownTicks;
+			nextObstacle = (nextObstacle + 1) % HISTORY;
+		}
+	}
+
+	/**
+	 * Recent journeys by their ends, {fromX, fromY, fromPlane, toX, toY, toPlane}, to recognise a way
+	 * back that is not the exact reverse: down into a cave and back up are often two objects whose
+	 * ends are a tile apart, and golems went down and up every few seconds.
+	 */
+	private final int[][] journeys = new int[HISTORY][];
+	private final int[] journeyExpiry = new int[HISTORY];
+	private int nextJourney;
+
+	/** True if this transport undoes a recent journey: starts where it ended and ends where it started. */
+	private boolean undoesRecentJourney(GolemTransport transport, int tick)
+	{
+		for (int i = 0; i < HISTORY; i++)
+		{
+			int[] j = journeys[i];
+			if (j != null && journeyExpiry[i] > tick
+				&& transport.getFromPlane() == j[5] && transport.getToPlane() == j[2]
+				&& near(transport.getFromX(), transport.getFromY(), j[3], j[4])
+				&& near(transport.getToX(), transport.getToY(), j[0], j[1]))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void remember(long key, int tick, int cooldownTicks)
@@ -132,16 +200,51 @@ final class TransportMemory
 				return true;
 			}
 		}
+		// A way back that is not the exact reverse. Short hops on one floor go to the rule below.
+		if ((transport.getFromPlane() != transport.getToPlane()
+			|| !isCrossing(transport.getFromX(), transport.getFromY(), transport.getToX(), transport.getToY()))
+			&& undoesRecentJourney(transport, tick))
+		{
+			return true;
+		}
+
+		// The same obstacle, at or beside either end of a recent use: over the cart and back again.
+		for (int i = 0; i < HISTORY; i++)
+		{
+			int[] used = usedObstacles[i];
+			if (used == null || usedObstacleExpiry[i] <= tick || used[0] != transport.getObjectId()
+				|| used[5] != transport.getFromPlane() || transport.getToPlane() != transport.getFromPlane()
+				|| !isCrossing(transport.getFromX(), transport.getFromY(), transport.getToX(), transport.getToY()))
+			{
+				continue;
+			}
+			if (near(transport.getFromX(), transport.getFromY(), used[1], used[2])
+				|| near(transport.getFromX(), transport.getFromY(), used[3], used[4]))
+			{
+				// Not the next stone of a crossing: a hop carrying on the same way is the same obstacle.
+				int lastX = used[3] - used[1];
+				int lastY = used[4] - used[2];
+				int nextX = transport.getToX() - transport.getFromX();
+				int nextY = transport.getToY() - transport.getFromY();
+				if (lastX * nextX + lastY * nextY > 0)
+				{
+					continue;
+				}
+				return true;
+			}
+		}
 		return false;
 	}
 
+	private static boolean near(int x, int y, int otherX, int otherY)
+	{
+		return Math.max(Math.abs(x - otherX), Math.abs(y - otherY)) <= SAME_OBSTACLE_TILES;
+	}
+
 	/**
-	 * Bars sea travel for a while after the golem steps off a boat.
-	 *
-	 * <p>Takes the tick the golem <em>arrives</em>, not the tick it sets out, because a
-	 * crossing is planned up front and the whole voyage happens between the two. Shore
-	 * leave then runs from the landing, which is what stops a golem reaching a port and
-	 * immediately leaving it again — otherwise no golem is ever seen anywhere but at sea.
+	 * Bars sea travel for a while after the golem steps off a boat. Takes the tick the golem
+	 * <em>arrives</em>, not the tick it sets out: a crossing is planned up front, so shore leave
+	 * would otherwise be spent at sea.
 	 */
 	void beginShoreLeaveOnArrival(int arrivalTick, int nowTick, java.util.Random random)
 	{

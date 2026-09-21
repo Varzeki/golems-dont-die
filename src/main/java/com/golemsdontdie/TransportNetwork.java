@@ -17,14 +17,10 @@ import net.runelite.api.Skill;
 /**
  * Every transport a golem could use, indexed by the tile you use it from.
  *
- * <p>Loaded once from {@code /transports.gz}, which is generated offline from Shortest
- * Path's tables by {@code dev-tools/BuildTransports.java}. Shipping it rather than
- * discovering it means golems can use a ladder on the other side of the world that the
- * player has never stood next to — the same reason the island map is shipped.
- *
- * <p>The index is by origin tile, because that is the only question ever asked of it: a
- * golem that has just stepped onto a tile wants to know what it could do from here and
- * from the handful of tiles around it. Nothing iterates the whole table at runtime.
+ * <p>Loaded once from {@code /transports.gz}, generated offline from Shortest Path's tables by
+ * {@code dev-tools/BuildTransports.java}; shipping it means golems can use a ladder the player
+ * has never stood next to, as with the island map. Indexed by origin tile, the only question
+ * asked of it.
  */
 @Slf4j
 @Singleton
@@ -52,12 +48,8 @@ class TransportNetwork
 	private static Map<String, Quest> questsByName;
 
 	/**
-	 * Reads the bundled table.
-	 *
-	 * <p>A missing or corrupt resource is survivable and deliberately not fatal: golems
-	 * fall back to walking, which is exactly the behaviour of the version before this one.
-	 * A plugin that refused to load because an optional table was unreadable would be a
-	 * worse outcome than golems that stay on the island.
+	 * Reads the bundled table. A missing or corrupt resource is deliberately not fatal: golems
+	 * fall back to walking rather than the plugin refusing to load.
 	 */
 	void load()
 	{
@@ -96,6 +88,10 @@ class TransportNetwork
 			for (GolemTransport t : transports)
 			{
 				shippedByEndpoints.putIfAbsent(t.endpointKey(), t);
+				if (t.getObjectId() > 0)
+				{
+					shippedObjects.add(t.getObjectId());
+				}
 			}
 			link();
 			log.debug("Loaded {} transports across {} origin tiles",
@@ -110,14 +106,9 @@ class TransportNetwork
 	}
 
 	/**
-	 * Transports usable from exactly this tile. Never null, never a copy.
-	 *
-	 * <p>Returns the network's own list rather than building one. A golem scans the tiles
-	 * around it every time it enters one, and with a few hundred golems near a town that
-	 * is a great many short-lived lists a second — which is precisely the kind of
-	 * allocation churn that made this plugin stutter before.
-	 *
-	 * <p>The lists are immutable and shared. Callers must not modify them.
+	 * Transports usable from exactly this tile. Never null, never a copy: golems scan the tiles
+	 * around them on every step, which near a town would be hundreds of lists a second. The lists
+	 * are immutable and shared.
 	 */
 	List<GolemTransport> from(int x, int y)
 	{
@@ -126,43 +117,39 @@ class TransportNetwork
 	}
 
 	/**
-	 * Adds routes the player has demonstrated, replacing any added before.
-	 *
-	 * <p>These are ordinary transports once they are in — a golem cannot tell the
-	 * difference between a row that shipped and a row somebody earned by walking through
-	 * an obstacle twice. The two are kept apart only so that re-learning replaces rather
-	 * than accumulates.
-	 *
-	 * <p>Archetype is {@code NONE} on purpose. What the golem plays comes from
-	 * {@link ObstacleKnowledge} by object id, which for a learned route is the animation
-	 * observed at the same moment as the destination — better than any archetype guess.
+	 * Adds routes the player has demonstrated, replacing any added before; they are kept apart
+	 * only so re-learning replaces rather than accumulates. Archetype is {@code NONE} on purpose:
+	 * what the golem plays comes from {@link ObstacleKnowledge} by object id.
 	 */
 	void setLearnedRoutes(java.util.List<int[]> routes)
 	{
 		if (!learned.isEmpty())
 		{
-			transports.removeAll(learned);
+			// Learned rows are always the tail, numbered from shippedCount. removeAll searched the
+			// learned list for each of thirteen thousand rows, on every obstacle the player used.
+			transports.subList(shippedCount, transports.size()).clear();
 			learned.clear();
 		}
 
 		suppressed.clear();
+		// One row per journey. Two saved routes can drift onto the same ends as they are merged.
+		java.util.Set<Long> journeys = new java.util.HashSet<>();
 		for (int[] r : routes)
 		{
-			// A learned route that goes exactly where a shipped row goes replaces it rather
-			// than sitting beside it.
-			//
-			// Beside it, the golem had two rows for one journey: possibly under different
-			// object ids, as on the rockslide where the table had the ids the wrong way
-			// round, and so with different animations depending on which it happened to
-			// roll. What was watched is the better authority on the object; the table is
-			// the better authority on what the journey requires, so those carry over.
+			if (!journeys.add(endpoints(r[1], r[2], r[3], r[4], r[5], r[6])))
+			{
+				continue;
+			}
+			// A learned route going exactly where a shipped row goes replaces it: two rows for one
+			// journey can carry different object ids, as on the rockslide. What was watched is the
+			// better authority on the object, the table on the journey's requirements.
 			GolemTransport twin = shippedByEndpoints.get(
 				endpoints(r[1], r[2], r[3], r[4], r[5], r[6]));
 			GolemTransport route;
 			if (twin == null)
 			{
-				// The observed duration, not a placeholder. A learned row that claimed one
-				// tick undercut the shipped row it was meant to improve on.
+				// The observed duration, not a placeholder: a learned row claiming one tick
+				// undercut the shipped row it was meant to improve on.
 				route = new GolemTransport(r[1], r[2], r[3], r[4], r[5], r[6],
 					r.length > 7 ? r[7] : 1, GolemTransport.ARCHETYPE_NONE, r[0],
 					NO_REQUIREMENT, NO_REQUIREMENT, NO_REQUIREMENT, NO_REQUIREMENT);
@@ -180,17 +167,9 @@ class TransportNetwork
 		}
 		transports.addAll(learned);
 
-		// Indices are assigned once and never move.
-		//
-		// This used to re-index the whole table every time a route was learned, which is
-		// on every sighting — and a transport's index is the key its cooldown is stored
-		// under. Renumbering silently voided every cooldown in the game, so nothing
-		// stopped a golem taking again the obstacle it had just come through. It ping-ponged
-		// between the two cathedral doors, drifting sideways as it alternated between their
-		// two rows, and opened the door three or four times before getting anywhere.
-		//
-		// Shipped rows keep the indices they were given at load. Learned rows are numbered
-		// above them, so adding or replacing one cannot disturb anything already in flight.
+		// Indices are assigned once and never move: an index is the key a cooldown is stored
+		// under, so re-indexing on every sighting voided every cooldown and golems ping-ponged
+		// between the two cathedral doors. Learned rows are numbered above the shipped ones.
 		for (int i = 0; i < learned.size(); i++)
 		{
 			learned.get(i).setIndex(shippedCount + i);
@@ -214,19 +193,15 @@ class TransportNetwork
 		byOrigin.replaceAll((k, v) -> Collections.unmodifiableList(v));
 		indexChunks();
 
-		// And learned rows need their reverse resolved like any other, or a golem has
-		// nothing to put on cooldown when it comes back the other way.
+		// Learned rows need their reverse resolved like any other, or a golem has nothing to
+		// put on cooldown coming back.
 		link();
 
 		log.debug("Transport network: {} rows including {} learned", transports.size(),
 			learned.size());
 	}
 
-	/**
-	 * How many rows shipped, fixed once at load.
-	 *
-	 * <p>The boundary between indices that must never change and indices that may.
-	 */
+	/** How many rows shipped, fixed at load: the boundary between fixed and movable indices. */
 	private int shippedCount;
 
 	private final List<GolemTransport> learned = new ArrayList<>();
@@ -241,13 +216,22 @@ class TransportNetwork
 	private static final int[] NO_REQUIREMENT = new int[0];
 
 	/**
-	 * The archetype this object is given wherever it appears, or -1 if it appears nowhere.
-	 *
-	 * <p>Keyed by object rather than by tile, because the highlight overlay works from the
-	 * obstacle index — which knows where every obstacle in the game stands but nothing
-	 * about where any of them lead — and still needs to say whether the plugin has an
-	 * animation for that kind of thing.
+	 * The archetype this object is given wherever it appears, or -1. Keyed by object rather than
+	 * tile because the highlight overlay works from the obstacle index, which knows where
+	 * obstacles stand but not where they lead.
 	 */
+	/**
+	 * True if the shipped tables have a row for this object. Shipped rows only:
+	 * {@link #archetypeFor} counts learned rows too, so a tree that slipped through once passed
+	 * the obstacle test for good.
+	 */
+	boolean isShippedObstacle(int objectId)
+	{
+		return shippedObjects.contains(objectId);
+	}
+
+	private final java.util.Set<Integer> shippedObjects = new java.util.HashSet<>();
+
 	int archetypeFor(int objectId)
 	{
 		Integer found = archetypeByObject.get(objectId);
@@ -255,15 +239,39 @@ class TransportNetwork
 	}
 
 	/**
-	 * Every transport, for callers that need to sweep the whole table.
-	 *
-	 * <p>Immutable and shared, like {@link #from}. Sweeping thirteen thousand rows is the
-	 * cheaper way to answer "what is near me" once the radius gets large: the tile-by-tile
-	 * lookup costs the square of the radius, and passes this one at about sixty tiles.
+	 * Every transport, for callers that sweep the whole table. Immutable and shared, like
+	 * {@link #from}: sweeping thirteen thousand rows beats the tile-by-tile lookup, which costs
+	 * the square of the radius, from about sixty tiles out.
 	 */
 	List<GolemTransport> all()
 	{
 		return Collections.unmodifiableList(transports);
+	}
+
+	/** True unless a learned route has replaced this row; suppressed rows stay in {@link #all}. */
+	boolean isOffered(GolemTransport transport)
+	{
+		return !suppressed.contains(transport);
+	}
+
+	/** How far a hop from a stepping stone can go, in tiles. */
+	private static final int STONE_HOP = 4;
+
+	/**
+	 * True if a short hop on the same floor starts on this tile: a stepping stone or the like,
+	 * which a golem leaves by the next hop rather than by stepping off.
+	 */
+	boolean isStone(int x, int y, int plane)
+	{
+		for (GolemTransport t : from(x, y))
+		{
+			if (t.getFromPlane() == plane && t.getToPlane() == plane
+				&& Math.max(Math.abs(t.getToX() - x), Math.abs(t.getToY() - y)) <= STONE_HOP)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** True if any transport starts on this tile — the cheap test, and the common one. */
@@ -282,6 +290,14 @@ class TransportNetwork
 		return transports.size();
 	}
 
+	/** Goes up whenever the table changes, so anything built from it knows to build again. */
+	private int revision;
+
+	int revision()
+	{
+		return revision;
+	}
+
 	// ------------------------------------------------------------------ indexing
 
 	private void index()
@@ -293,20 +309,68 @@ class TransportNetwork
 			byOrigin.computeIfAbsent(pack(t.getFromX(), t.getFromY()),
 				k -> new ArrayList<>()).add(t);
 
-			// Highest archetype wins where an object appears under several. In practice
-			// they agree; where they do not, the classified one is more informative than
-			// the unclassified one and ARCHETYPE_NONE is zero.
+			// Highest archetype wins where an object appears under several: they normally agree, and
+			// the classified one is more informative, ARCHETYPE_NONE being zero.
 			if (t.getObjectId() > 0)
 			{
 				archetypeByObject.merge(t.getObjectId(), t.getArchetype(), Math::max);
 			}
 		}
 
-		// Made immutable once built. These lists are handed straight out to every golem
-		// that walks past, so nothing may modify them — and saying so in the type is
-		// better than saying so in a comment nobody reads.
+		// Made immutable once built: these lists are handed straight out to every golem that
+		// walks past.
 		byOrigin.replaceAll((k, v) -> Collections.unmodifiableList(v));
 		indexChunks();
+	}
+
+	/**
+	 * Wyrmscraig and everywhere its own transports lead: the regions a golem stays in when its
+	 * ambition is restricted.
+	 *
+	 * <p>The island's regions, then — repeatedly, until nothing new turns up — the region every
+	 * transport starting in the area lands in, which picks up caves and the floors above ladders
+	 * without a list. The region either side of each landing is allowed too, a floor rarely
+	 * fitting one region, but does not seed further transports, which leaks along coasts.
+	 */
+	java.util.Set<Integer> homeRegions()
+	{
+		java.util.Set<Integer> seeds = new java.util.HashSet<>();
+		for (int region : GolemContent.ISLAND_REGIONS)
+		{
+			seeds.add(region);
+		}
+		boolean grew = true;
+		while (grew)
+		{
+			grew = false;
+			for (GolemTransport t : transports)
+			{
+				if (!suppressed.contains(t) && t.getToX() < 6400
+					&& seeds.contains(regionOf(t.getFromX(), t.getFromY()))
+					&& seeds.add(regionOf(t.getToX(), t.getToY())))
+				{
+					grew = true;
+				}
+			}
+		}
+		// Not around the island itself: its nine regions cover it, and a margin reached the next
+		// island's dock.
+		java.util.Set<Integer> home = new java.util.HashSet<>(seeds);
+		for (int region : seeds)
+		{
+			if (java.util.Arrays.stream(GolemContent.ISLAND_REGIONS).anyMatch(r -> r == region))
+			{
+				continue;
+			}
+			for (int dx = -1; dx <= 1; dx++)
+			{
+				for (int dy = -1; dy <= 1; dy++)
+				{
+					home.add((((region >> 8) + dx) << 8) | ((region & 0xFF) + dy));
+				}
+			}
+		}
+		return home;
 	}
 
 	/** Hops a chain of transports is followed looking for somewhere to stand. */
@@ -319,14 +383,9 @@ class TransportNetwork
 	}
 
 	/**
-	 * True if a golem on this tile, having arrived from {@code came}, can get to walkable
-	 * ground by transports without going straight back the way it came.
-	 *
-	 * <p>Followed for several hops, because a crossing is a chain. The test this replaces
-	 * looked one hop ahead — another transport starts on this stone — and a stepping-stone
-	 * crossing in the shipped table passed it on every stone while no stone led to a bank a
-	 * golem could stand on. Golems that stepped on hopped between the two middle stones about
-	 * two thousand times an hour, out of view where nobody could see it.
+	 * True if a golem on this tile, having arrived from {@code came}, can reach walkable ground by
+	 * transports without going straight back. Followed for several hops, because a crossing is a
+	 * chain: looking one hop ahead passed on every stone of a crossing where none led to a bank.
 	 */
 	boolean leadsToGround(int x, int y, int plane, int cameX, int cameY, int camePlane, int hops,
 		java.util.function.Predicate<GolemTransport> usable, Ground ground)
@@ -376,11 +435,8 @@ class TransportNetwork
 
 	/**
 	 * Adds every offered transport starting within {@code radius} tiles of a tile, on any plane.
-	 *
-	 * <p>The planner used to find transports by probing random tiles for an origin. Two dozen
-	 * probes in a box of nine thousand tiles finds a town's cluster of rows, and almost never
-	 * the one ladder at the end of a dungeon corridor — so a golem that went down into a
-	 * dungeon rarely found the next way on and never got deeper than the first floor.
+	 * The planner used to probe random tiles for an origin: two dozen probes in nine thousand
+	 * tiles find a town's cluster but almost never the one ladder at the end of a corridor.
 	 */
 	void near(int x, int y, int radius, List<GolemTransport> out)
 	{
@@ -405,14 +461,13 @@ class TransportNetwork
 	}
 
 	/**
-	 * Pairs each transport with the one that undoes it.
-	 *
-	 * <p>Two-way connections are authored as two rows, so the reverse of a row is the row
-	 * whose origin and destination are this one's swapped. Matching them here turns §11's
+	 * Pairs each transport with the one that undoes it: two-way connections are authored as two
+	 * rows, so a row's reverse is the one with its endpoints swapped. Turns §11's
 	 * no-immediate-reversal rule into an integer comparison.
 	 */
 	private void link()
 	{
+		revision++;
 		rebuildReachedRegions();
 
 		Map<Long, Integer> byEndpoints = new HashMap<>();
@@ -464,9 +519,8 @@ class TransportNetwork
 			}
 			catch (IllegalArgumentException e)
 			{
-				// A skill this client does not know about — a new one, or a typo upstream.
-				// Dropping the clause makes the transport easier, never harder, which is
-				// the safe direction for something purely cosmetic.
+				// A skill this client does not know. Dropping the clause makes the transport easier,
+				// never harder, the safe direction here.
 				log.debug("Unknown skill requirement: {}", clause);
 			}
 		}
@@ -504,11 +558,9 @@ class TransportNetwork
 	}
 
 	/**
-	 * {@code "4070=0;10032>0;4560&2"} to triples of (id, operator, value).
-	 *
-	 * <p>The {@code @} form is a real-time countdown in wall-clock minutes. A golem has
-	 * nothing to countdown, so those clauses are kept and simply never satisfied — see
-	 * {@link GolemAbilities}.
+	 * {@code "4070=0;10032>0;4560&2"} to triples of (id, operator, value). The {@code @} form is a
+	 * real-time countdown in wall-clock minutes; a golem has nothing to count down, so those
+	 * clauses are kept and never satisfied — see {@link GolemAbilities}.
 	 */
 	private static int[] parseConditions(String spec)
 	{
@@ -575,10 +627,8 @@ class TransportNetwork
 		return out;
 	}
 
-	/**
-	 * Regions a transport from the island, or any learned route, leads into — with the
-	 * regions around each, since an arrival rarely stays in the one region it lands in.
-	 */
+	/** Regions the island's transports and learned routes lead into, with the regions around
+	 * each, since an arrival rarely stays in the region it lands in. */
 	private final java.util.Set<Integer> reachedRegions = new java.util.HashSet<>();
 
 	/** True if golems can get into this region by transport, so its ground is worth mapping. */
@@ -601,7 +651,7 @@ class TransportNetwork
 			{
 				continue;
 			}
-			if (!island.contains(regionOf(t.getFromX(), t.getFromY())) && !learned.contains(t))
+			if (!island.contains(regionOf(t.getFromX(), t.getFromY())) && t.getIndex() < shippedCount)
 			{
 				continue;
 			}

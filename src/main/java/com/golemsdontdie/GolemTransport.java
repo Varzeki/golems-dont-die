@@ -4,24 +4,18 @@ import lombok.Getter;
 import net.runelite.api.coords.WorldPoint;
 
 /**
- * One way of getting from one tile to another that is not walking.
+ * One way of getting from one tile to another that is not walking: a door, a ladder, a stile,
+ * a ferry.
  *
- * <p>A door, a ladder, a stile, a ferry. These come from Shortest Path's transport
- * tables, reduced offline by {@code dev-tools/BuildTransports.java} to the rows a golem
- * could plausibly use — which is most of them, because most of the network is scenery you
- * interact with rather than items you carry.
- *
- * <p>Immutable and shared. There are around thirteen thousand of these and every golem
- * sees the same set, so they are built once at startup and never copied.
- *
- * <p>Requirements are kept as parsed arrays rather than re-read strings: a golem tests
- * these when it considers a transport, and a golem considers a transport every time it
- * enters a tile near one.
+ * <p>From Shortest Path's tables, reduced offline by {@code dev-tools/BuildTransports.java} to
+ * the rows a golem could use, which is most of them. Immutable and shared: ~13,000 rows, one set
+ * for every golem, built once at startup. Requirements are parsed arrays, not strings, because a
+ * golem tests them on every tile it enters near a transport.
  */
 final class GolemTransport
 {
-	// Archetypes. Written by BuildTransports; the numbering is a file format, so append
-	// only — changing an existing value silently remaps every row in the shipped resource.
+	// Archetypes. Written by BuildTransports; the numbering is a file format, so append only —
+	// changing a value silently remaps every row in the shipped resource.
 	static final int ARCHETYPE_NONE = 0;
 	static final int ARCHETYPE_DOOR = 1;
 	static final int ARCHETYPE_LADDER = 2;
@@ -57,11 +51,9 @@ final class GolemTransport
 	private final int archetype;
 
 	/**
-	 * The scene object this transport is, or -1.
-	 *
-	 * <p>Read from the menu column offline — the tables spell it as "Cross Gangplank
-	 * 12164". It is what lets the plugin find the object's own model and animation, since
-	 * {@code ObjectComposition} exposes no model ids at runtime.
+	 * The scene object this transport is, or -1, read from the menu column offline ("Cross
+	 * Gangplank 12164"). It finds the object's model and animation, which
+	 * {@code ObjectComposition} does not expose at runtime.
 	 */
 	@Getter
 	private final int objectId;
@@ -77,22 +69,16 @@ final class GolemTransport
 	private final int[] varpRequirements;
 
 	/**
-	 * Index of the row that undoes this one, or -1.
-	 *
-	 * <p>Resolved once when the network is built. A golem that has just come through a
-	 * door should not immediately go back through it, and finding the reverse by searching
-	 * on each decision would be a scan of thirteen thousand rows per golem per tile.
+	 * Index of the row that undoes this one, or -1. Resolved once when the network is built,
+	 * because searching per decision would scan 13,000 rows per golem per tile.
 	 */
 	@Getter
 	private int reverse = -1;
 
 	/**
-	 * This row's own index in the network.
-	 *
-	 * <p>Carried on the row rather than looked up. Cooldowns are keyed by index and are
-	 * tested for every candidate transport every time a golem enters a tile, so asking the
-	 * network to find the index would be a linear scan of the whole table on the hottest
-	 * path in the plugin.
+	 * This row's own index in the network, carried rather than looked up: cooldowns are keyed by
+	 * index and tested for every candidate on every tile a golem enters, so a lookup would scan
+	 * the whole table on the hottest path here.
 	 */
 	@Getter
 	private int index = -1;
@@ -121,12 +107,9 @@ final class GolemTransport
 	static final int OUT_OF_INSTANCE = 2;
 
 	/**
-	 * {@link #INTO_INSTANCE}, {@link #OUT_OF_INSTANCE}, or neither.
-	 *
-	 * <p>A golem through the pew is somewhere nobody outside the instance can see, and a
-	 * golem in the instance's copy of the island is not in the instance at all — both of which
-	 * look identical in coordinates, because an instance is its template's coordinates. This
-	 * is what tells them apart.
+	 * {@link #INTO_INSTANCE}, {@link #OUT_OF_INSTANCE}, or neither. A golem through the pew is
+	 * where nobody outside can see it, and one in the instance's copy of the island is not in
+	 * the instance at all — identical in coordinates, since an instance is its template's.
 	 */
 	@Getter
 	private int instanceFlags;
@@ -144,6 +127,21 @@ final class GolemTransport
 	boolean leavesInstance()
 	{
 		return (instanceFlags & OUT_OF_INSTANCE) != 0;
+	}
+
+	/**
+	 * The same journey the other way, for a golem somewhere it knows no other way out of. Not a
+	 * row in the network; only {@link RoamPlanner#wayHome} produces it. The player may have
+	 * entered a cave and teleported out, so nothing leaving it was ever learned and golems that
+	 * followed gathered underground for good. Not what the game does, but it beats never coming
+	 * out.
+	 */
+	GolemTransport backThrough()
+	{
+		GolemTransport back = new GolemTransport(toX, toY, toPlane, fromX, fromY, fromPlane, duration, archetype,
+			objectId, new int[0], new int[0], new int[0], new int[0]);
+		back.instanceFlags = (entersInstance() ? OUT_OF_INSTANCE : 0) | (leavesInstance() ? INTO_INSTANCE : 0);
+		return back;
 	}
 
 	void setReverse(int index)
@@ -203,12 +201,9 @@ final class GolemTransport
 	}
 
 	/**
-	 * How far the golem is carried, in tiles, or -1 where the question is meaningless.
-	 *
-	 * <p>Underground maps are laid out roughly 6,400 tiles north of the surface they sit
-	 * under, so the straight-line distance across a trapdoor is nonsense — a ladder down
-	 * measures as a continent-wide journey. Anything that big is reported as unknown
-	 * rather than as a number that will be quietly wrong in a comparison somewhere.
+	 * How far the golem is carried, in tiles, or -1 where the question is meaningless:
+	 * underground maps sit ~6,400 tiles north of the surface above them, so a ladder down
+	 * measures as a continent-wide journey.
 	 */
 	int travelDistance()
 	{
@@ -217,12 +212,8 @@ final class GolemTransport
 	}
 
 	/**
-	 * The animation that plays while the golem uses this, or -1 for none.
-	 *
-	 * <p>Doors are deliberately silent. The door animates, not the player — a golem that
-	 * walks onto the tile and out the other side is already doing the right thing, and it
-	 * is the second largest group in the network, so getting this wrong would be very
-	 * visible. Teleport-like transports are also -1: the golem holds its pose and goes.
+	 * The animation that plays while the golem uses this, or -1 for none. Doors are deliberately
+	 * silent: the door animates, not the player. Teleport-like transports are -1 too.
 	 */
 	int animation()
 	{
@@ -231,22 +222,15 @@ final class GolemTransport
 	}
 
 	/**
-	 * The clips to play, in order, while the golem uses this.
-	 *
-	 * <p>OSRS builds its obstacle animations in threes — mount, loop, dismount — and using
-	 * only the middle one throws away most of what was harvested. Nine of the twenty clips
-	 * in the catalogue were going unused, and a ladder played the same reach whether the
-	 * golem was going up or down.
-	 *
-	 * <p>So the set is chosen from what is actually known about this transport: which way
-	 * the plane changes, and how far it carries the golem. The clips are shared
-	 * {@code Animation} objects either way, so a set of three costs no more than one.
+	 * The clips to play, in order, while the golem uses this. OSRS builds obstacle animations in
+	 * threes — mount, loop, dismount — and using only the middle one left nine of twenty
+	 * catalogued clips unused. The set comes from the plane change and the distance carried;
+	 * clips are shared, so three cost as one.
 	 */
 	int[] animations()
 	{
-		// A shortcut somebody has actually watched beats any guess made from its menu
-		// text. The archetype below is a good guess and was measurably wrong for three of
-		// the first four obstacles anyone stood in front of.
+		// A shortcut somebody has watched beats a guess from menu text: the archetype below
+		// was wrong for three of the first four obstacles tried.
 		int measured = MeasuredShortcuts.animationFor(objectId);
 		if (measured != -1)
 		{
@@ -256,8 +240,8 @@ final class GolemTransport
 		switch (archetype)
 		{
 			case ARCHETYPE_LADDER:
-				// Reaching up for a ladder and reaching down off the top of one are
-				// different clips, and which applies is written in the plane change.
+				// Reaching up for a ladder and reaching down off the top are different
+				// clips; the plane change says which.
 				return new int[]{toPlane > fromPlane
 					? GolemContent.ANIM_LADDER_GRAB
 					: GolemContent.ANIM_LADDER_GRAB_TOP};
@@ -265,18 +249,13 @@ final class GolemTransport
 			case ARCHETYPE_CLIMB:
 				if (toPlane < fromPlane)
 				{
-					// Going down is its own clip, not the ascent run backwards.
-					//
-					// Measured on Wyrmscraig, where the climb is two objects: the west
-					// approach (62265) plays 740, HUMAN_CLIMBING_DOWN, and the east approach
-					// (62267) plays the climbing loop. Three independent reimplementations of the
-					// server use 740 for a descent too, so this is not a local quirk.
-					//
-					// Only the plane can say which way a climb goes, so this catches the
-					// ones that change floor and misses the ones that do not — a cliff on
-					// flat ground still gets the ascent both ways unless the object itself
-					// has been measured. That is the better failure: an ascent played
-					// descending reads as effortful, where the reverse reads as falling.
+					// Going down is its own clip, not the ascent reversed. Measured on
+					// Wyrmscraig: the west approach (62265) plays 740, HUMAN_CLIMBING_DOWN,
+					// the east (62267) the climbing loop; three server reimplementations
+					// use 740 for a descent too. Only the plane says which way a climb
+					// goes, so a cliff on flat ground gets the ascent both ways unless
+					// measured — the better failure, as an ascent played descending reads
+					// as effortful.
 					return new int[]{GolemContent.ANIM_CLIMB_DOWN};
 				}
 				// Take hold, haul up, step off.
@@ -291,18 +270,12 @@ final class GolemTransport
 
 			case ARCHETYPE_JUMP:
 			{
-				// A hop between stones and a running leap across a chasm are not the same
-				// movement, and distance is the only thing here that can tell them apart.
-				//
-				// The thresholds themselves are unverified. Only the shortest rung has
-				// been measured — Wyrmscraig's basalt stones, at two tiles, play 741 —
-				// and the three longer clips come from the handover's catalogue by name.
-				// There is reason to doubt the split exists at all: a 2019
-				// reimplementation of the server plays that same 741 for every stepping
-				// stone in the game regardless of span, and the single obstacle it does
-				// hand a longer clip to is the one obstacle it demonstrably gets wrong.
-				//
-				// Worth one measurement on a four-tile crossing to settle.
+				// A hop between stones and a running leap across a chasm are different
+				// movements, and distance is the only thing here that separates them. The
+				// thresholds are unverified: only the shortest rung is measured —
+				// Wyrmscraig's basalt stones, two tiles, play 741 — and the longer clips
+				// come from the catalogue by name. A 2019 server reimplementation plays 741
+				// for every stepping stone regardless of span, so the split may not exist.
 				int span = travelDistance();
 				if (span < 0 || span <= 2)
 				{
@@ -322,8 +295,8 @@ final class GolemTransport
 				return new int[]{GolemContent.ANIM_WALL_JUMP};
 
 			case ARCHETYPE_STILE:
-				// Stepped over deliberately, one leg then the other, where a broken wall
-				// is vaulted. Told apart offline from the menu text.
+				// Stepped over one leg at a time, where a broken wall is vaulted; told
+				// apart offline from the menu text.
 				return new int[]{GolemContent.ANIM_STILE};
 
 			case ARCHETYPE_TIGHTROPE:
@@ -350,8 +323,8 @@ final class GolemTransport
 				};
 
 			case ARCHETYPE_GANGPLANK:
-				// Walking the plank is walking. The golem keeps its gait and the boarding
-				// reads from the geometry, which is what the real thing looks like.
+				// Walking the plank is walking: the golem keeps its gait and the boarding
+				// reads from the geometry.
 				return new int[]{GolemContent.GOLEM_WALK_ANIMATION};
 
 			default:
@@ -360,16 +333,10 @@ final class GolemTransport
 	}
 
 	/**
-	 * True if this transport is worth drawing an animated copy of the object for.
-	 *
-	 * <p>The object's own animation is looked up at runtime from {@link PropFactory}, which
-	 * holds whatever that specific plank, gate or ring actually plays — so nothing here
-	 * needs to name clips. What this decides is only whether it is <i>worth</i> it.
-	 *
-	 * <p>Doors are excluded despite being the second largest group and despite animating.
-	 * A door's swing is driven by the real object when a real player opens it; drawing a
-	 * second copy swinging on top of a closed one would be a ghost door, which is worse
-	 * than a golem walking through.
+	 * True if this transport is worth drawing an animated copy of the object for. The object's
+	 * animation comes from {@link PropFactory} at runtime, so nothing here names clips. Doors
+	 * are excluded despite animating: the real object swings when a player opens it, and a
+	 * second copy on top of a closed one is a ghost door.
 	 */
 	boolean wantsPropAnimation()
 	{

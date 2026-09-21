@@ -29,7 +29,8 @@ import net.runelite.api.coords.WorldPoint;
  * that arrives at a dungeon goes in and keeps going. <b>Wyrmscraig</b> start at the plinth, for
  * the island's own floors: the ladder, the tower staircase and the cathedral basement.
  *
- * <p>Sailing is off. It needs the client for dock state, and it is not what is being measured.
+ * <p>Sailing is on, from the shipped docks with every port open; {@code -Dsail=0} leaves golems
+ * ashore, and {@code -Drestrict=1} runs with "Restrict Golem ambition" set.
  *
  *   java com.golemsdontdie.RoamSim profile.properties [golems] [ticks] [seed]
  */
@@ -160,12 +161,16 @@ public class RoamSim
 			SIM_TICK[0] = tick;
 			context.setTick(tick);
 			context.setMaySearchSea(true);
+			context.setAmbitionRestricted("1".equals(System.getProperty("restrict")));
 			for (Sim g : golems)
 			{
 				g.tick(tick, planner, context);
 			}
 		}
 
+		// Every plan folded into one number. Two builds that print the same fingerprint for the same
+		// seed made the same decisions, which is how a change meant only to be faster is checked.
+		System.out.printf("plan fingerprint: %016x%n", FINGERPRINT[0]);
 		report("entrances", golems, ticks);
 		report("wyrmscraig", golems, ticks);
 		reportForcedBack();
@@ -173,6 +178,29 @@ public class RoamSim
 
 	/** Sailing in the simulation; -Dsail=0 to leave golems ashore, as before. */
 	private static final boolean SAILING = !"0".equals(System.getProperty("sail"));
+
+	private static final long[] FINGERPRINT = {17};
+
+	private static long fingerprint(long hash, Itinerary plan, RoamPlanner.Outcome outcome)
+	{
+		hash = hash * 31 + outcome.ordinal();
+		if (plan == null)
+		{
+			return hash * 31 - 1;
+		}
+		WorldPoint end = plan.destination();
+		hash = hash * 31 + plan.getStartTick();
+		hash = hash * 31 + plan.getDuration();
+		hash = hash * 31 + end.getX() * 7919L + end.getY() * 104729L + end.getPlane();
+		for (int t = 0; t <= 4; t++)
+		{
+			int[] at = plan.fineAt(plan.getStartTick() + plan.getDuration() * t / 4);
+			hash = hash * 31 + at[0];
+			hash = hash * 31 + at[1];
+			hash = hash * 31 + plan.planeAt(plan.getStartTick() + plan.getDuration() * t / 4);
+		}
+		return hash;
+	}
 
 	/** The simulated tick, for the clock shore leave is measured on. */
 	private static final long[] SIM_TICK = {0};
@@ -307,6 +335,7 @@ public class RoamSim
 			maxPlanNanos = Math.max(maxPlanNanos, took);
 			plans++;
 			RoamPlanner.Outcome outcome = planner.getLastOutcome();
+			FINGERPRINT[0] = fingerprint(FINGERPRINT[0], itinerary, outcome);
 			if (outcome == RoamPlanner.Outcome.VOYAGE && landedTick >= 0)
 			{
 				ashoreTicks.add(tick - landedTick);

@@ -13,25 +13,16 @@ import net.runelite.api.Constants;
 /**
  * Where a golem may walk, anywhere in the world. Read-only, shipped, never written to.
  *
- * <p>The island map this replaces covered nine regions and was small enough to keep in a
- * config value. This covers 1,158 — the ocean plus every bit of land a golem could walk
- * or climb its way to from Lumbridge — and at 440 KB it belongs in the jar and nowhere
- * else. Nothing here is ever persisted to configuration; see {@link IslandMemory} for the
- * live harvest, which is the half that changes.
+ * <p>The island map this replaces covered nine regions and fitted in a config value; this
+ * covers 1,158, the ocean plus every bit of land reachable from Lumbridge, and at 440 KB
+ * belongs in the jar.
  *
- * <p>Three bits per tile rather than the island map's two:
- *
- * <ul>
- *   <li><b>north</b> and <b>east</b> — the same packing Shortest Path uses, and the same
- *       one {@code IslandMemory} already reads. South and west are the north and east of
- *       the neighbouring tile.</li>
- *   <li><b>ocean</b> — part of the single connected sea. Two ports can only be sailed
- *       between if both sit on it, and the check matters because enclosed water exists:
- *       the inland body on Karamja is 26,000 tiles that lead nowhere.</li>
- *   <li><b>isolated</b> — in a component of fewer than 50 tiles. A golem left on one
- *       could never walk out of it, so the fact is computed offline and simply looked
- *       up rather than rediscovered by a flood fill the client cannot afford.</li>
- * </ul>
+ * <p>Three bits per tile rather than two. <b>north</b> and <b>east</b> use the packing
+ * Shortest Path and {@code IslandMemory} use; south and west are the neighbouring tile's.
+ * <b>ocean</b> is the single connected sea: two ports are only sailable between if both sit
+ * on it, and enclosed water exists — Karamja's inland body is 26,000 tiles leading nowhere.
+ * <b>isolated</b> marks components under 50 tiles, computed offline rather than by a flood
+ * fill the client cannot afford.
  *
  * @see IslandMemory the live harvest, which takes precedence over this everywhere
  */
@@ -61,44 +52,65 @@ class WorldMesh
 	static final int FLAG_NORTH = 0;
 	static final int FLAG_EAST = 1;
 
-	/** Region and plane to its three packed bitmaps. */
-	private final Map<Long, byte[]> collision = new HashMap<>();
-	private final Map<Long, byte[]> ocean = new HashMap<>();
-	private final Map<Long, byte[]> isolated = new HashMap<>();
+	/**
+	 * Everything the mesh holds for one region and plane. One object rather than five maps
+	 * keyed alike: a walkability check touches several, planning asks millions of times,
+	 * and the boxed lookups were most of the cost.
+	 */
+	private static final class Region
+	{
+		/** Two bits per tile for passability. */
+		final byte[] collision;
+
+		/** The single connected sea. */
+		final byte[] ocean;
+
+		/** Components too small to wander. */
+		final byte[] isolated;
+
+		/**
+		 * Which connected component each tile belongs to, two bytes per tile, 0 for none.
+		 * The one thing no per-tile flag can say: whether two tiles are connected <b>to each
+		 * other</b>. Everything else answers "may a golem stand there", and a sealed room is
+		 * good ground. {@code isolated} only caught components under fifty tiles.
+		 */
+		final byte[] components;
+
+		/**
+		 * Tiles the land fill reached — ground a golem may stand on, on foot. The ocean bit
+		 * marks only the one connected sea, so cave water, lakes and enclosed basins read as
+		 * passable and golems walked out across them. Shoreline edges are blocked, so a fill
+		 * starting on land cannot leak.
+		 */
+		final byte[] land;
+
+		Region(byte[] collision, byte[] ocean, byte[] isolated, byte[] components, byte[] land)
+		{
+			this.collision = collision;
+			this.ocean = ocean;
+			this.isolated = isolated;
+			this.components = components;
+			this.land = land;
+		}
+	}
+
+	/** Region and plane to what the mesh holds for it. */
+	private final Map<Long, Region> regions = new HashMap<>();
 
 	/**
-	 * Tiles the land fill reached — ground a golem may stand on, on foot.
-	 *
-	 * <p>This is the exact answer, and the ocean bit was not. Ocean marks only the one
-	 * connected sea, so cave water, lakes and enclosed basins read as passable and not
-	 * ocean, and golems walked out across them. Shoreline edges are blocked in the source
-	 * map, so a fill that starts on land can never leak onto water: what it reached is land
-	 * and nothing else.
+	 * The same regions by region id and plane for planes 0 to 3, so the common case is an
+	 * array read with no key boxed. Anything else goes through {@link #regions}.
 	 */
-	private final Map<Long, byte[]> land = new HashMap<>();
+	private final Region[] byRegion = new Region[FAST_REGIONS << 2];
 
-	/**
-	 * Which connected component each tile belongs to, two bytes per tile, 0 for none.
-	 *
-	 * <p>The one thing the mesh can say that no per-tile flag can: whether two tiles are
-	 * connected <b>to each other</b>. Everything else here answers "may a golem stand
-	 * there", which is a different and much weaker question — a sealed room is perfectly
-	 * good ground and a golem put in one is stuck in it forever.
-	 *
-	 * <p>{@code isolated} was the previous approximation and only ever caught components
-	 * under fifty tiles. Any larger sealed space passed it.
-	 */
-	private final Map<Long, byte[]> components = new HashMap<>();
+	private static final int FAST_REGIONS = 1 << 16;
 
 	private boolean loaded;
 
 	/**
-	 * Reads the bundled mesh.
-	 *
-	 * <p>A missing or corrupt resource leaves every query answering "unknown", which is
-	 * survivable: the live harvest still works, so golems roam what the player has walked,
-	 * exactly as the island-only version did. Refusing to start over an optional table
-	 * would be a worse failure than a smaller world.
+	 * Reads the bundled mesh. A missing or corrupt resource leaves every query answering
+	 * "unknown", which is survivable: the live harvest still works, so golems roam what the
+	 * player has walked.
 	 */
 	void load()
 	{
@@ -144,23 +156,25 @@ class WorldMesh
 
 					byte[] flags = new byte[COLLISION_BYTES];
 					data.readFully(flags);
-					collision.put(key, flags);
 
 					byte[] sea = new byte[DERIVED_BYTES];
 					data.readFully(sea);
-					ocean.put(key, sea);
 
 					byte[] alone = new byte[DERIVED_BYTES];
 					data.readFully(alone);
-					isolated.put(key, alone);
 
 					byte[] parts = new byte[COMPONENT_BYTES];
 					data.readFully(parts);
-					components.put(key, parts);
 
 					byte[] ground = new byte[DERIVED_BYTES];
 					data.readFully(ground);
-					land.put(key, ground);
+
+					Region region = new Region(flags, sea, alone, parts, ground);
+					regions.put(key, region);
+					if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
+					{
+						byRegion[regionId << 2 | (plane & 0xF)] = region;
+					}
 				}
 				log.debug("Loaded world mesh: {} region-planes", entries);
 			}
@@ -168,18 +182,15 @@ class WorldMesh
 		catch (IOException | RuntimeException e)
 		{
 			log.warn("Bundled world mesh unreadable", e);
-			collision.clear();
-			ocean.clear();
-			isolated.clear();
-			land.clear();
-			components.clear();
+			regions.clear();
+			java.util.Arrays.fill(byRegion, null);
 		}
 	}
 
 	/** True if the mesh has anything at all to say about this region and plane. */
 	boolean covers(int regionId, int plane)
 	{
-		return collision.containsKey(key(regionId, plane));
+		return region(regionId, plane) != null;
 	}
 
 	boolean north(int x, int y, int plane)
@@ -195,52 +206,113 @@ class WorldMesh
 	/** True if this tile is part of the single connected sea. */
 	boolean isOcean(int x, int y, int plane)
 	{
-		return derived(ocean, x, y, plane);
+		Region region = region(regionIdOf(x, y), plane);
+		return region != null && bit(region.ocean, x, y);
 	}
 
 	/**
-	 * True if this tile sits in a component too small to wander.
-	 *
-	 * <p>The one question stuck detection has to answer, reduced to a bit lookup. A golem
-	 * restored onto one of these is relocated before it ever gets the chance to spend the
-	 * rest of its life walking into the same four walls.
+	 * True if this tile sits in a component too small to wander — the question stuck
+	 * detection asks, as a bit lookup. A golem restored onto one is relocated rather than
+	 * left walking into the same four walls forever.
 	 */
 	boolean isIsolated(int x, int y, int plane)
 	{
-		return derived(isolated, x, y, plane);
+		Region region = region(regionIdOf(x, y), plane);
+		return region != null && bit(region.isolated, x, y);
 	}
 
 	/**
-	 * Which connected space this tile belongs to, or 0 if the mesh does not know.
-	 *
-	 * <p>Zero means "no answer" rather than "no component", and callers must treat it as
-	 * unknown. A tile outside the shipped regions, on ground the player has walked but the
-	 * mesh never covered, is a perfectly good place for a golem to be — refusing to move
-	 * there because the mesh is silent would shrink the world to the shipped file.
+	 * Which connected space this tile belongs to, or 0 if the mesh does not know. Zero means
+	 * "no answer", not "no component": refusing a tile outside the shipped regions would
+	 * shrink the world to the shipped file.
 	 */
 	int componentAt(int x, int y, int plane)
 	{
-		byte[] parts = components.get(key(regionIdOf(x, y), plane));
-		if (parts == null)
+		Region region = region(regionIdOf(x, y), plane);
+		if (region == null)
 		{
 			return 0;
 		}
+		byte[] parts = region.components;
 		int tile = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
 		return ((parts[tile * 2] & 0xff) << 8) | (parts[tile * 2 + 1] & 0xff);
 	}
 
 	/**
-	 * True if a golem standing at the first tile could walk to the second.
-	 *
-	 * <p>Unknown counts as yes. The mesh covers most of the game but not all of it, and the
-	 * live harvest covers ground the mesh never will — so a silent answer must not be read
-	 * as a refusal, or golems would be confined to the regions that happened to ship.
+	 * True if a golem standing at the first tile could walk to the second. Unknown counts as
+	 * yes: the live harvest covers ground the mesh never will, so a silent answer must not
+	 * be read as a refusal.
 	 */
 	boolean sameComponent(int fromX, int fromY, int toX, int toY, int plane)
 	{
 		int from = componentAt(fromX, fromY, plane);
 		int to = componentAt(toX, toY, plane);
 		return from == 0 || to == 0 || from == to;
+	}
+
+	/**
+	 * True if this tile is water a boat sails but nobody walks, and is not the sea:
+	 * Wyrmscraig's underground lake, which has no bit of its own. It is passable because
+	 * boats cross it and the client does not block it, so the golems' map read it as ground
+	 * and golems walked on the water. Known by its connected component, bounds-checked
+	 * first so the rest of the world pays one comparison.
+	 */
+	boolean isInlandWater(int x, int y, int plane)
+	{
+		if (plane != 0)
+		{
+			return false;
+		}
+		if (lakeComponent < 0)
+		{
+			findLake();
+		}
+		return lakeComponent != 0 && x >= lakeMinX && x <= lakeMaxX && y >= lakeMinY && y <= lakeMaxY
+			&& componentAt(x, y, 0) == lakeComponent;
+	}
+
+	/** The underground lake's component and bounds; -1 until looked for, 0 if the mesh has none. */
+	private int lakeComponent = -1;
+	private int lakeMinX;
+	private int lakeMaxX;
+	private int lakeMinY;
+	private int lakeMaxY;
+
+	/** How far from its mouth the lake is looked for, in tiles. It is a few dozen across. */
+	private static final int LAKE_SEARCH = 96;
+
+	private synchronized void findLake()
+	{
+		if (lakeComponent >= 0)
+		{
+			return;
+		}
+		int lake = componentAt(GolemContent.CAVE_LAKE_MOUTH_X, GolemContent.CAVE_LAKE_MOUTH_Y, 0);
+		int minX = Integer.MAX_VALUE;
+		int maxX = Integer.MIN_VALUE;
+		int minY = Integer.MAX_VALUE;
+		int maxY = Integer.MIN_VALUE;
+		if (lake != 0)
+		{
+			for (int x = GolemContent.CAVE_LAKE_MOUTH_X - LAKE_SEARCH; x <= GolemContent.CAVE_LAKE_MOUTH_X + LAKE_SEARCH; x++)
+			{
+				for (int y = GolemContent.CAVE_LAKE_MOUTH_Y - LAKE_SEARCH; y <= GolemContent.CAVE_LAKE_MOUTH_Y + LAKE_SEARCH; y++)
+				{
+					if (componentAt(x, y, 0) == lake)
+					{
+						minX = Math.min(minX, x);
+						maxX = Math.max(maxX, x);
+						minY = Math.min(minY, y);
+						maxY = Math.max(maxY, y);
+					}
+				}
+			}
+		}
+		lakeMinX = minX;
+		lakeMaxX = maxX;
+		lakeMinY = minY;
+		lakeMaxY = maxY;
+		lakeComponent = lake;
 	}
 
 	/** True if something could stand here — the tile can be left in some direction. */
@@ -251,41 +323,53 @@ class WorldMesh
 	}
 
 	/**
-	 * True if a golem could stand here <em>on foot</em>.
-	 *
-	 * <p>The distinction this draws is the single most important one in the file, and
-	 * leaving it out put golems out on the open sea.
-	 *
-	 * <p>Open water is <b>passable</b> in the source collision map — that is not a bug, it
-	 * is why sea navigation works at all: shoreline edges are blocked and the ocean is
-	 * open, so a boat paths across it with the same flags a golem uses in a corridor. But
-	 * it means the passability bits alone cannot tell walkable ground from crossable
-	 * water. Both read as open.
-	 *
-	 * <p>The ocean bit is what separates them, and anything to do with walking has to
-	 * consult it. Only {@link SeaMesh}, which is routing a boat, may treat the sea as
+	 * True if a golem could stand here <em>on foot</em>. Leaving this distinction out put
+	 * golems on the open sea: water is <b>passable</b> in the source collision map, which is
+	 * why sea navigation works, so the passability bits alone cannot tell walkable ground
+	 * from crossable water. Only {@link SeaMesh}, routing a boat, may treat the sea as
 	 * passable.
 	 */
 	boolean isLandWalkable(int x, int y, int plane)
 	{
-		if (!derived(land, x, y, plane)
-			&& (landComponents.isEmpty() && dockFloors.isEmpty()
-				|| !landComponents.contains(componentAt(x, y, plane)) && !dockFloors.contains(componentAt(x, y, plane))))
+		if (isInlandWater(x, y, plane))
 		{
 			return false;
+		}
+		Region region = region(regionIdOf(x, y), plane);
+		if (region == null)
+		{
+			// Nothing known here: no land bit and no component that could have been admitted.
+			return false;
+		}
+		if (!bit(region.land, x, y))
+		{
+			// Only worth reading the component when some floor has been admitted at all.
+			if (admittedFloors == 0)
+			{
+				return false;
+			}
+			int component = componentOf(region, x, y);
+			if (!landComponents[component] && !dockFloors[component])
+			{
+				return false;
+			}
 		}
 		return isWalkable(x, y, plane);
 	}
 
 	/**
-	 * Floors counted as land because a dock stands on them.
-	 *
-	 * <p>Kept apart from the transport floors, which are replaced whenever a route is learned.
-	 * Sailing added islands no transport table has a row on, so the land fill never reached
-	 * them: twenty-two of the sixty-one docks had no land beside them at all, and a golem that
-	 * sailed there would have had nowhere to step off.
+	 * Floors counted as land because a dock stands on them. Kept apart from the transport
+	 * floors, which are replaced whenever a route is learned. Sailing added islands no
+	 * transport table has a row on: twenty-two of the sixty-one docks had no land beside
+	 * them, so a golem sailing there could not step off.
 	 */
-	private final java.util.Set<Integer> dockFloors = new java.util.HashSet<>();
+	private final boolean[] dockFloors = new boolean[1 << 16];
+
+	/** How many floors either kind of admission holds, so a check can skip reading the component. */
+	private int admittedFloors;
+
+	/** How many of them came from transports, for the log. */
+	private int transportFloors;
 
 	/** Admits the floor under a dock's quayside, if it is a floor at all. */
 	void admitDockFloor(int x, int y, int plane)
@@ -295,9 +379,10 @@ class WorldMesh
 			return;
 		}
 		int component = componentAt(x, y, plane);
-		if (component != 0)
+		if (component != 0 && !dockFloors[component])
 		{
-			dockFloors.add(component);
+			dockFloors[component] = true;
+			admittedFloors += landComponents[component] ? 0 : 1;
 		}
 	}
 
@@ -305,64 +390,87 @@ class WorldMesh
 	 * Floors counted as land because a transport starts or ends on them, beyond what the
 	 * shipped land fill reached.
 	 *
-	 * <p>The fill is run offline from Lumbridge and every row of the tables it was given, so a
-	 * floor whose only way in is a ladder no table lists has collision, a component and every
-	 * wall in place — and no land bit, which made it somewhere no golem would ever go. That was
-	 * Wyrmscraig's ladder tops and the cathedral basement, and it is every place newer than the
-	 * tables. Any row the plugin holds is the same evidence the fill used: a player can stand at
-	 * each end. So the connected floor under each end is admitted, as the fill would have done.
-	 *
-	 * <p>Only the exact end tile, never a neighbour. A stepping stone's tile is blocked, and
-	 * snapping to the water beside it would admit a river as land.
+	 * <p>The fill was run offline from Lumbridge over the tables it was given, so a floor
+	 * reachable only by a ladder no table lists has collision, a component and every wall
+	 * but no land bit — Wyrmscraig's ladder tops, the cathedral basement, every place newer
+	 * than the tables. A transport row is the same evidence the fill used. The exact end
+	 * tile only: a stepping stone's tile is blocked, and snapping to the water beside it
+	 * would admit a river as land.
 	 */
-	private final java.util.Set<Integer> landComponents = new java.util.HashSet<>();
+	private final boolean[] landComponents = new boolean[1 << 16];
 
 	/** Admits the floor under both ends of every transport. Replaces what was admitted before. */
 	void admitTransportEnds(java.util.List<GolemTransport> transports)
 	{
-		landComponents.clear();
+		java.util.Arrays.fill(landComponents, false);
+		transportFloors = 0;
+		admittedFloors = 0;
+		for (boolean dock : dockFloors)
+		{
+			admittedFloors += dock ? 1 : 0;
+		}
 		for (GolemTransport t : transports)
 		{
 			admit(t.getFromX(), t.getFromY(), t.getFromPlane());
 			admit(t.getToX(), t.getToY(), t.getToPlane());
 		}
-		log.debug("{} floors admitted as land from transport ends", landComponents.size());
+		log.debug("{} floors admitted as land from transport ends", transportFloors);
 	}
 
 	private void admit(int x, int y, int plane)
 	{
 		// Instances are rebuilt each visit; their coordinates name no lasting floor.
-		if (x >= 6400 || derived(land, x, y, plane) || isOcean(x, y, plane))
+		if (x >= 6400 || isLand(x, y, plane) || isOcean(x, y, plane))
 		{
 			return;
 		}
 		int component = componentAt(x, y, plane);
-		if (component != 0)
+		if (component != 0 && !landComponents[component])
 		{
-			landComponents.add(component);
+			landComponents[component] = true;
+			transportFloors++;
+			admittedFloors += dockFloors[component] ? 0 : 1;
 		}
 	}
 
 	private boolean flag(int x, int y, int plane, int which)
 	{
-		byte[] bits = collision.get(key(regionIdOf(x, y), plane));
-		if (bits == null)
+		Region region = region(regionIdOf(x, y), plane);
+		if (region == null)
 		{
 			return false;
 		}
+		byte[] bits = region.collision;
 		int bit = ((y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK)) * 2 + which;
 		return (bits[bit >> 3] >>> (bit & 7) & 1) != 0;
 	}
 
-	private boolean derived(Map<Long, byte[]> map, int x, int y, int plane)
+	/** The land fill's bit for this tile. */
+	private boolean isLand(int x, int y, int plane)
 	{
-		byte[] bits = map.get(key(regionIdOf(x, y), plane));
-		if (bits == null)
+		Region region = region(regionIdOf(x, y), plane);
+		return region != null && bit(region.land, x, y);
+	}
+
+	private Region region(int regionId, int plane)
+	{
+		if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
 		{
-			return false;
+			return byRegion[regionId << 2 | (plane & 0xF)];
 		}
+		return regions.get(key(regionId, plane));
+	}
+
+	private static boolean bit(byte[] bits, int x, int y)
+	{
 		int bit = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
 		return (bits[bit >> 3] >>> (bit & 7) & 1) != 0;
+	}
+
+	private static int componentOf(Region region, int x, int y)
+	{
+		int tile = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
+		return ((region.components[tile * 2] & 0xff) << 8) | (region.components[tile * 2 + 1] & 0xff);
 	}
 
 	private static int regionIdOf(int x, int y)

@@ -87,7 +87,7 @@ public class InstanceRouteHarness
 			memory.loadBundled();
 			GolemPathfinder pathfinder = new GolemPathfinder();
 			set(pathfinder, "memory", memory);
-			Map<Long, Long> room = pathfinder.flood(2537, 2216, 0, 4000);
+			TileMap room = pathfinder.flood(2537, 2216, 0, 4000);
 			check("the room behind the pew is a room (" + room.size() + " tiles)", room.size() < 4000);
 			check("and cannot be walked out of to the cathedral side",
 				!room.containsKey(GolemPathfinder.pack(2539, 2216)));

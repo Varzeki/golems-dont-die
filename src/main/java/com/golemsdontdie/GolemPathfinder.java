@@ -13,25 +13,15 @@ import javax.inject.Singleton;
 /**
  * Picks somewhere for a golem to go, and works out how to walk there.
  *
- * <p>Everything is in world tiles, queried against {@link IslandMemory}, so a search
- * works the same whether the golem is on screen or three regions away. That is the
- * whole point of harvesting the map: pathing cannot depend on the scene, because
- * most golems will not be in it.
- *
- * <p>Paths are breadth-first over cardinal steps. A* would be the reflex, but the
- * distances are short — a golem picks a tile within its wander window, it does not
- * cross the island in one go — and BFS has the property that matters here: it is
- * exhaustive within its budget, so a golem penned in by scenery finds out it is
- * stuck rather than walking hopefully into a wall.
+ * <p>Everything is in world tiles, queried against {@link IslandMemory}, so a search works the
+ * same whether the golem is on screen or three regions away: pathing cannot depend on the scene.
+ * Paths are breadth-first over cardinal steps — distances are short, and BFS is exhaustive within
+ * its budget, so a golem penned in by scenery finds out it is stuck rather than walking into it.
  */
 @Singleton
 class GolemPathfinder
 {
-	/**
-	 * Ceiling on tiles visited per search. Reached only when a golem is walled in and
-	 * the flood fill has to exhaust its pen before giving up — which is precisely the
-	 * case worth bounding, because it recurs every time that golem picks a target.
-	 */
+	/** Ceiling on tiles per search. Reached when a golem is walled in, which recurs every plan. */
 	private static final int NODE_BUDGET = 3000;
 
 	/** Tries for a reachable destination before the golem gives up and idles. */
@@ -40,16 +30,9 @@ class GolemPathfinder
 	/**
 	 * The eight steps a golem may take, cardinals first.
 	 *
-	 * <p>Uniform-cost BFS over eight neighbours is correct for this game rather than an
-	 * approximation of it: a diagonal step costs one game tick exactly as a cardinal one
-	 * does, so there is no diagonal penalty to model and no need for the weighted queue
-	 * A* would want.
-	 *
-	 * <p>Cardinals are listed first so that where two routes are the same length the
-	 * straight one is found first, which is what a golem crossing open ground should do.
-	 * Whether a diagonal is legal at all is {@link IslandMemory#canStep}'s business — it
-	 * applies the game's corner rule, which will not let a golem slip between two walls
-	 * that meet at a point.
+	 * <p>Uniform-cost BFS over eight neighbours is exact for this game: a diagonal step costs one
+	 * game tick exactly as a cardinal does. Cardinals come first so that where two routes are the
+	 * same length the straight one wins; whether a diagonal is legal is canStep's corner rule.
 	 */
 	private static final int[] DX = {1, -1, 0, 0, 1, -1, 1, -1};
 	private static final int[] DY = {0, 0, 1, -1, 1, 1, -1, -1};
@@ -58,21 +41,16 @@ class GolemPathfinder
 	private IslandMemory memory;
 
 	/**
-	 * A path to a random reachable destination inside {@code bounds}.
-	 *
-	 * <p>Destinations are sampled and rejected rather than enumerated. Enumerating
-	 * every walkable tile would bias the choice toward whichever part of the area has
-	 * the most of them; sampling keeps it even over the ground the player watches the
-	 * golem cross.
+	 * A path to a random reachable destination inside {@code bounds}. Destinations are sampled and
+	 * rejected rather than enumerated, which would bias the choice toward the densest part.
 	 *
 	 * @return world tiles to walk through, excluding the start; empty if nowhere goes
 	 */
 	Deque<int[]> wanderPath(int startX, int startY, int plane, RoamBounds bounds, Random random)
 	{
-		// Attempts are spent on searches, not on samples. A sample that lands on a wall costs
-		// nothing to reject, and counting it as an attempt meant a golem in a cramped room —
-		// the cathedral, where most of the window is walls — ran out of tries before it had
-		// searched once, and stood re-planning for ten seconds before walking anywhere.
+		// Attempts are spent on searches, not on samples: a sample landing on a wall costs nothing to
+		// reject, and counting it meant a golem in the cathedral, where most of the window is walls,
+		// ran out of tries before it had searched once.
 		int searched = 0;
 		for (int sampled = 0; sampled < DESTINATION_ATTEMPTS * 8 && searched < DESTINATION_ATTEMPTS; sampled++)
 		{
@@ -110,23 +88,22 @@ class GolemPathfinder
 			return result;
 		}
 
-		// Keyed by packed world tile rather than indexed by scene position: in free
-		// roam the search is not confined to a scene, so there is no fixed-size grid
-		// to index into.
-		Map<Long, Long> cameFrom = new HashMap<>();
-		Deque<Long> queue = new ArrayDeque<>();
+		// Keyed by packed world tile rather than indexed by scene position: in free roam there is no
+		// fixed-size grid to index into. Every tile reached is queued exactly when it is recorded, so
+		// the record's own order is the queue.
+		TileMap cameFrom = new TileMap(1024);
+		int head = 0;
 
 		long start = pack(startX, startY);
 		long goal = pack(goalX, goalY);
-		cameFrom.put(start, start);
-		queue.add(start);
+		cameFrom.add(start, start);
 
 		int visited = 0;
 		boolean found = false;
 
-		while (!queue.isEmpty() && visited < NODE_BUDGET)
+		while (head < cameFrom.size() && visited < NODE_BUDGET)
 		{
-			long current = queue.poll();
+			long current = cameFrom.keyAt(head++);
 			visited++;
 
 			if (current == goal)
@@ -151,8 +128,7 @@ class GolemPathfinder
 					continue;
 				}
 
-				cameFrom.put(next, current);
-				queue.add(next);
+				cameFrom.add(next, current);
 			}
 		}
 
@@ -161,8 +137,7 @@ class GolemPathfinder
 			return result;
 		}
 
-		// Walk the parent chain back, pushing each tile onto the front, which reverses
-		// it into start-to-goal order.
+		// Walk the parent chain back, pushing onto the front to reverse it into start-to-goal order.
 		for (long at = goal; at != start; at = cameFrom.get(at))
 		{
 			result.addFirst(new int[]{unpackX(at), unpackY(at)});
@@ -171,25 +146,20 @@ class GolemPathfinder
 	}
 
 	/**
-	 * Every tile that can be walked to from a start, breadth first, up to a budget.
-	 *
-	 * <p>Returned as each tile reached mapped to the tile it was reached from, in the order
-	 * reached — so the far end of the map is the far end of the flood, and the walk to any
-	 * tile in it is read back from {@link #pathFrom} without searching again. One of these
-	 * answers every "can the golem get there" a plan asks, where a search per question spent
-	 * its budget on the first and had nothing left for the rest.
+	 * Every tile that can be walked to from a start, breadth first, up to a budget: each tile mapped
+	 * to the one it was reached from, so {@link #pathFrom} reads back the walk without searching.
 	 */
-	java.util.LinkedHashMap<Long, Long> flood(int startX, int startY, int plane, int budget)
+	TileMap flood(int startX, int startY, int plane, int budget)
 	{
-		java.util.LinkedHashMap<Long, Long> cameFrom = new java.util.LinkedHashMap<>();
-		Deque<Long> queue = new ArrayDeque<>();
+		// The record's order is the queue, as in findPath.
+		TileMap cameFrom = new TileMap(budget + 8);
+		int head = 0;
 		long start = pack(startX, startY);
-		cameFrom.put(start, start);
-		queue.add(start);
+		cameFrom.add(start, start);
 
-		while (!queue.isEmpty() && cameFrom.size() < budget)
+		while (head < cameFrom.size() && cameFrom.size() < budget)
 		{
-			long current = queue.poll();
+			long current = cameFrom.keyAt(head++);
 			int cx = unpackX(current);
 			int cy = unpackY(current);
 			for (int d = 0; d < DX.length; d++)
@@ -203,8 +173,7 @@ class GolemPathfinder
 				{
 					continue;
 				}
-				cameFrom.put(next, current);
-				queue.add(next);
+				cameFrom.add(next, current);
 			}
 		}
 		return cameFrom;
@@ -215,7 +184,7 @@ class GolemPathfinder
 	 *
 	 * @return the tiles in order, empty if the goal is the start, null if it was not reached
 	 */
-	static Deque<int[]> pathFrom(Map<Long, Long> cameFrom, int startX, int startY, int goalX, int goalY)
+	static Deque<int[]> pathFrom(TileMap cameFrom, int startX, int startY, int goalX, int goalY)
 	{
 		long start = pack(startX, startY);
 		long goal = pack(goalX, goalY);
@@ -232,31 +201,26 @@ class GolemPathfinder
 	}
 
 	/**
-	 * How many tiles can be walked to from here, counting up to a limit.
-	 *
-	 * <p>Stops at the limit, because the answer that matters is only whether a space is
-	 * small; an open field and a whole continent are the same thing to a golem deciding
-	 * how long to stay.
+	 * How many tiles can be walked to from here, counting up to a limit. Stops there because only
+	 * whether a space is small matters: an open field and a continent are the same to a golem.
 	 */
 	int areaSize(int x, int y, int plane, int limit)
 	{
-		Set<Long> seen = new HashSet<>();
-		Deque<Long> queue = new ArrayDeque<>();
+		TileMap seen = new TileMap(limit + 8);
+		int head = 0;
 		long start = pack(x, y);
-		seen.add(start);
-		queue.add(start);
-		while (!queue.isEmpty() && seen.size() < limit)
+		seen.add(start, 0);
+		while (head < seen.size() && seen.size() < limit)
 		{
-			long current = queue.poll();
+			long current = seen.keyAt(head++);
 			int cx = unpackX(current);
 			int cy = unpackY(current);
 			for (int d = 0; d < DX.length; d++)
 			{
 				long next = pack(cx + DX[d], cy + DY[d]);
-				if (!seen.contains(next) && memory.canStep(cx, cy, plane, DX[d], DY[d]))
+				if (!seen.containsKey(next) && memory.canStep(cx, cy, plane, DX[d], DY[d]))
 				{
-					seen.add(next);
-					queue.add(next);
+					seen.add(next, 0);
 				}
 			}
 		}

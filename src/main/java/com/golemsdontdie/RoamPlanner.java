@@ -11,14 +11,9 @@ import net.runelite.api.coords.WorldPoint;
 /**
  * Plans where a far-away golem goes next, without pathing on tiles.
  *
- * <p>Tier 3 covers most of the world and most of the golems, and a tile-accurate search
- * across a region is far more than the answer is worth when nobody is watching. What it
- * needs is somewhere plausible to be heading and a believable time to arrive.
- *
- * <p>So a far golem aims at a transport it could reach, or failing that at open ground a
- * few dozen tiles away, and the route between is a straight run rather than a search. The
- * inaccuracy is invisible by construction: the moment a player gets close enough for the
- * difference to show, the golem is promoted and snapped onto real, walkable ground.
+ * <p>A tile-accurate search is more than the answer is worth when nobody is watching: a far golem
+ * aims at a transport or at open ground a few dozen tiles off, by a straight run. The inaccuracy
+ * is invisible: the moment a player could see it, the golem is promoted and snapped onto ground.
  */
 @Slf4j
 @Singleton
@@ -37,18 +32,17 @@ class RoamPlanner
 	@Inject
 	private WorldMesh mesh;
 
+	/** True if golems are kept on Wyrmscraig, which means no sailing at all. */
+	private static boolean ambitionRestricted(RoamContext context)
+	{
+		return context != null && context.isAmbitionRestricted();
+	}
+
 	/**
-	 * Collision harvested from the live scene, which outranks the shipped mesh.
-	 *
-	 * <p>Needed here because the shipped mesh is incomplete in a way that matters: its
-	 * reachability fill spreads through the transports that shipped with it, so anywhere
-	 * whose only way in is an obstacle nobody published a row for comes out as neither land
-	 * nor reachable. Wyrmscraig's upper floors are exactly that.
-	 *
-	 * <p>The effect was golems climbing a staircase they had been taught, finding that the
-	 * floor they arrived on was not somewhere the planner would consider going, and taking
-	 * the stairs straight back down — over and over, for the one reason that looked least
-	 * like a bug from the outside.
+	 * Collision harvested from the live scene, which outranks the shipped mesh: that mesh's fill
+	 * spreads only through the transports shipped with it, so anywhere reached only by a taught
+	 * obstacle is neither land nor reachable — Wyrmscraig's upper floors, where golems climbed a
+	 * taught staircase and took it straight back down.
 	 */
 	@Inject
 	private IslandMemory memory;
@@ -65,29 +59,13 @@ class RoamPlanner
 	@Inject
 	private SailingDocks docks;
 
-	/**
-	 * Chance per planning decision that a golem at a port sets sail.
-	 *
-	 * <p>Low on purpose. A golem plans a new leg every half-minute or so, so even at one
-	 * in eight a golem that reaches a dock leaves within a few minutes — while a golem
-	 * that merely walks past one usually keeps walking.
-	 */
+	/** Chance per plan that a golem at a port sets sail. Low: a golem plans every half-minute. */
 	private static final float SAIL_CHANCE = 0.125f;
 
-	/**
-	 * How close to the quayside counts as being at the port, in tiles.
-	 *
-	 * <p>Tight, because boarding is something a golem walks up to and does. Wide enough
-	 * that it need not land on one exact tile, narrow enough that it is plainly at the
-	 * dock rather than merely somewhere in the harbour.
-	 */
+	/** How close to the quayside counts as being at the port, in tiles: at the dock, not near. */
 	private static final int DOCK_REACH = 2;
 
-	/**
-	 * Plans the next leg for a golem that nobody can see.
-	 *
-	 * @return an itinerary, or null if nowhere sensible was found
-	 */
+	/** Plans the next leg for a golem that nobody can see; null if nowhere sensible was found. */
 	Itinerary plan(WorldPoint from, int tick, Random random, TransportMemory memory,
 		RoamContext context)
 	{
@@ -98,13 +76,29 @@ class RoamPlanner
 			lastOutcome = Outcome.VOYAGE;
 			return crossing;
 		}
+		if (memory != null && memory.getPendingPort() >= 0)
+		{
+			// Waiting at the dock for its crossing to be worked out: a golem that walked away here left
+			// the field to be evicted before it came back, and never sailed.
+			lastOutcome = Outcome.TO_DOCK;
+			return Itinerary.of(single(from), from.getPlane(), tick, DOCK_WAIT_POLL);
+		}
 
-		// Standing where no walk starts — a stepping stone, a landing the map calls blocked —
-		// the only way on is a transport from this very tile. Sampling the area found rows a
-		// straight line could not reach from a rock, and the golem stood on it for good.
+		// Standing where no walk starts — a stepping stone, a landing the map calls blocked — the
+		// only way on is a transport from this very tile; sampling the area left the golem on it.
 		if (!isSafe(from.getX(), from.getY(), from.getPlane()))
 		{
-			GolemTransport onward = fromHere(from, tick, memory);
+			// Unless it can simply step off. A fairy ring puts you down on the ring, which no map calls
+			// ground, beside ground that is: as a stone mid-river, golems rode the whole network in step.
+			WorldPoint off = transports.isStone(from.getX(), from.getY(), from.getPlane()) ? null : safeNeighbour(from);
+			if (off != null)
+			{
+				List<int[]> step = single(from);
+				step.add(new int[]{off.getX(), off.getY()});
+				lastOutcome = Outcome.WALK;
+				return Itinerary.of(step, from.getPlane(), tick, 0);
+			}
+			GolemTransport onward = fromHere(from, tick, memory, random);
 			if (onward != null)
 			{
 				noteTaken(onward, tick, memory);
@@ -113,11 +107,24 @@ class RoamPlanner
 			}
 		}
 
-		// Where the golem can walk to, flooded at most once and only once a straight line fails.
-		Reach reach = new Reach(from, context);
+		boolean pressed = context != null && context.crowdedRegion(from.getX(), from.getY(), from.getPlane());
+		Reach reach = new Reach(from, context, FAR_SEARCH_BUDGET);
 
-		// Out of view a golem only sailed if a leg happened to end within two tiles of a
-		// quayside, which almost never happens. Now and then it goes to one on purpose.
+		// Somewhere it knows no way out of: now and then, back out the way it came in.
+		if (random.nextFloat() < HOMEWARD_CHANCE)
+		{
+			GolemTransport home = wayHome(from.getX(), from.getY(), from.getPlane(), tick, memory, random);
+			List<int[]> path = home == null ? null : walk(from, home.getFromX(), home.getFromY(), reach);
+			if (path != null)
+			{
+				noteTaken(home, tick + path.size() - 1, memory);
+				lastOutcome = Outcome.TRANSPORT;
+				return Itinerary.thenTransport(path, from.getPlane(), tick, home);
+			}
+		}
+
+		// Out of view a golem only sailed if a leg ended within two tiles of a quayside, which almost
+		// never happens; now and then it goes to one on purpose.
 		if (random.nextFloat() < DOCK_SEEK_CHANCE)
 		{
 			Itinerary toDock = toNearbyDock(from, tick, memory, reach);
@@ -128,7 +135,8 @@ class RoamPlanner
 			}
 		}
 
-		if (random.nextFloat() < TRANSPORT_CHANCE)
+		// A golem in a crowd is looking for the way out, so it neither rolls for this nor rests first.
+		if (pressed || random.nextFloat() < TRANSPORT_CHANCE && (memory == null || !memory.restingFromTransports(tick)))
 		{
 			Itinerary toTransport = toNearbyTransport(from, tick, random, memory, reach);
 			if (toTransport != null)
@@ -144,45 +152,198 @@ class RoamPlanner
 	}
 
 	/**
-	 * Tiles a far golem's flood may visit.
-	 *
-	 * <p>A third of what a golem in view gets for one search, and this is the only one the plan
-	 * makes. Out of view golems plan every few dozen ticks each, a thousand of them; a corridor
-	 * to the next ladder is a few hundred tiles of flood, and an open field too big for it has
-	 * a straight line across it anyway.
+	 * Chance per decision that a golem with no known way out heads back out the way it came in. Not
+	 * every time: it has only just arrived, and the way back is on the way in's cooldown anyway.
 	 */
-	private static final int FAR_SEARCH_BUDGET = 1000;
+	static final float HOMEWARD_CHANCE = 0.25f;
+
+	/** The network revision the component index below was built from; -1 before the first. */
+	private int componentsRevision = -1;
+
+	/** Per mesh component: transports starting in it that go somewhere else. */
+	private final java.util.Map<Integer, List<GolemTransport>> exitsFrom = new java.util.HashMap<>();
+
+	/** Per mesh component: the way back out through each transport that comes into it from elsewhere. */
+	private final java.util.Map<Integer, List<GolemTransport>> waysBackFrom = new java.util.HashMap<>();
 
 	/**
-	 * Everywhere a golem can walk to from where it stands, within the budget — flooded at
-	 * most once per plan, and only when a straight line has already failed.
+	 * The way back out through something that led here, for a golem somewhere with no known way out;
+	 * or null if it knows one, or the mesh cannot say.
 	 *
-	 * <p>Straight lines were the whole of far planning, and underground they almost never
-	 * exist. A dungeon is corridors, so a golem at the foot of a ladder found no straight line
-	 * to anything and stood there, or took the ladder back up because that was the one thing
-	 * in reach. A path search per destination was the next attempt, and spent its budget on
-	 * the first unreachable one. One flood answers every question the plan asks.
+	 * <p>A player can learn the way into a place without the way out — in by cave, out by teleport —
+	 * and golems gathered in Wyrmscraig's cave until taught the exit. Refusing to go in would bar
+	 * every such dungeon, so a golem leaves the way it came; "somewhere" is the mesh's component.
+	 */
+	GolemTransport wayHome(int x, int y, int plane, int tick, TransportMemory memory, Random random)
+	{
+		if (mesh == null || transports == null || abilities == null)
+		{
+			return null;
+		}
+		int component = componentNear(x, y, plane);
+		if (component == 0)
+		{
+			return null;
+		}
+		indexComponents();
+		List<GolemTransport> ways = waysHome.get(component);
+		if (ways == null)
+		{
+			ways = findWaysHome(component);
+			waysHome.put(component, ways);
+		}
+		if (ways.isEmpty())
+		{
+			return null;
+		}
+		GolemTransport way = ways.get(random.nextInt(ways.size()));
+		return memory != null && memory.onCooldown(way, tick) ? null : way;
+	}
+
+	/** Spaces reachable by shortcuts and still shut in: the open world reaches hundreds. */
+	private static final int SHUT_IN = 8;
+
+	/** Ways home by component, worked out once per change to the network; empty where there is no need. */
+	private final java.util.Map<Integer, List<GolemTransport>> waysHome = new java.util.HashMap<>();
+
+	/**
+	 * The ways back out, for a golem in this component, if everywhere it can reach from here is shut
+	 * in; otherwise none.
+	 *
+	 * <p>Shut in is not only one room: a courtyard whose only way out is a cave whose only way out
+	 * is the courtyard is two spaces leading to each other, and a simulated year found golems dozens
+	 * to a tile in just that. If usable shortcuts run out within a few spaces, the golem may leave.
+	 */
+	private List<GolemTransport> findWaysHome(int start)
+	{
+		java.util.Set<Integer> reached = new java.util.HashSet<>();
+		java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+		reached.add(start);
+		queue.add(start);
+		while (!queue.isEmpty())
+		{
+			List<GolemTransport> exits = exitsFrom.get(queue.poll());
+			if (exits == null)
+			{
+				continue;
+			}
+			for (GolemTransport exit : exits)
+			{
+				if (!abilities.canUse(exit) || !landsSomewhereUseful(exit))
+				{
+					continue;
+				}
+				int to = componentNear(exit.getToX(), exit.getToY(), exit.getToPlane());
+				// Somewhere the mesh knows nothing about is somewhere else entirely: not shut in.
+				if (to == 0)
+				{
+					return java.util.Collections.emptyList();
+				}
+				if (reached.add(to))
+				{
+					if (reached.size() > SHUT_IN)
+					{
+						return java.util.Collections.emptyList();
+					}
+					queue.add(to);
+				}
+			}
+		}
+
+		List<GolemTransport> ways = new ArrayList<>();
+		for (GolemTransport way : waysBackFrom.getOrDefault(start, java.util.Collections.emptyList()))
+		{
+			// Back to somewhere outside the trap, not to another room of it.
+			int to = componentNear(way.getToX(), way.getToY(), way.getToPlane());
+			if (!reached.contains(to))
+			{
+				ways.add(way);
+			}
+		}
+		return ways;
+	}
+
+	/** The component of a tile, or of a tile beside it: a transport's end can sit on its object. */
+	private int componentNear(int x, int y, int plane)
+	{
+		int here = mesh.componentAt(x, y, plane);
+		for (int dx = -1; dx <= 1 && here == 0; dx++)
+		{
+			for (int dy = -1; dy <= 1 && here == 0; dy++)
+			{
+				here = mesh.componentAt(x + dx, y + dy, plane);
+			}
+		}
+		return here;
+	}
+
+	/** Sorts every transport into the components it leaves and enters, once per change to the network. */
+	private void indexComponents()
+	{
+		if (componentsRevision == transports.revision())
+		{
+			return;
+		}
+		componentsRevision = transports.revision();
+		exitsFrom.clear();
+		waysBackFrom.clear();
+		waysHome.clear();
+		for (GolemTransport t : transports.all())
+		{
+			if (!transports.isOffered(t))
+			{
+				continue;
+			}
+			int from = componentNear(t.getFromX(), t.getFromY(), t.getFromPlane());
+			int to = componentNear(t.getToX(), t.getToY(), t.getToPlane());
+			boolean elsewhere = from == 0 || to == 0 || from != to || t.getFromPlane() != t.getToPlane();
+			if (!elsewhere)
+			{
+				continue;
+			}
+			if (from != 0)
+			{
+				exitsFrom.computeIfAbsent(from, k -> new ArrayList<>()).add(t);
+			}
+			if (to != 0)
+			{
+				waysBackFrom.computeIfAbsent(to, k -> new ArrayList<>()).add(t.backThrough());
+			}
+		}
+	}
+
+	/** Tiles a far golem's flood may visit: a third of a golem in view's, and the plan's only one. */
+	private static final int FAR_SEARCH_BUDGET = 1000;
+
+	// A longer flood for golems in a crowd cost two and a half times the planning and got no more of
+	// them out of Meiyerditch, whose ways out are two tiles in a warren.
+
+	/**
+	 * Everywhere a golem can walk to from where it stands, within the budget — flooded at most once
+	 * per plan, only after a straight line fails, and underground those almost never exist.
 	 */
 	private static final class Reach
 	{
 		private final WorldPoint from;
 		private final RoamContext context;
-		private java.util.LinkedHashMap<Long, Long> cameFrom;
+		private final int budget;
+		private TileMap cameFrom;
 
-		Reach(WorldPoint from, RoamContext context)
+		Reach(WorldPoint from, RoamContext context, int budget)
 		{
 			this.from = from;
 			this.context = context;
+			this.budget = budget;
 		}
 
 		/** The flood, made on first use; empty without a pathfinder. */
-		java.util.LinkedHashMap<Long, Long> tiles()
+		TileMap tiles()
 		{
 			if (cameFrom == null)
 			{
 				cameFrom = context == null || context.getPathfinder() == null
-					? new java.util.LinkedHashMap<>()
-					: context.getPathfinder().flood(from.getX(), from.getY(), from.getPlane(), FAR_SEARCH_BUDGET);
+					? new TileMap(4)
+					: context.getPathfinder().flood(from.getX(), from.getY(), from.getPlane(), budget);
 			}
 			return cameFrom;
 		}
@@ -203,11 +364,8 @@ class RoamPlanner
 	}
 
 	/**
-	 * A walk somewhere else, or null.
-	 *
-	 * <p>A straight leg of a few dozen tiles where there is one. Where there is not — a
-	 * corridor, a cellar, a tower top smaller than any leg — somewhere the flood reached, from
-	 * its far half, so the golem goes somewhere rather than shuffling a tile.
+	 * A walk somewhere else, or null: a straight leg of a few dozen tiles where there is one, else
+	 * somewhere in the far half of the flood, so a golem in a corridor still goes somewhere.
 	 */
 	private Itinerary wander(WorldPoint from, int tick, Random random, Reach reach)
 	{
@@ -223,11 +381,8 @@ class RoamPlanner
 				continue;
 			}
 
-			// And in the same connected space. The straight line below already refuses to
-			// cross ground the golem could not walk, which stops it wading through the
-			// sea — but a destination inside a sealed courtyard can have a perfectly
-			// walkable line to it and still be somewhere the golem could never reach on
-			// foot. Only the component test catches that.
+			// And in the same connected space: a destination inside a sealed courtyard can have a
+			// perfectly walkable line to it and still be unreachable on foot.
 			if (!mesh.sameComponent(from.getX(), from.getY(), toX, toY, from.getPlane()))
 			{
 				continue;
@@ -236,22 +391,21 @@ class RoamPlanner
 			List<int[]> leg = straightLine(from.getX(), from.getY(), toX, toY, from.getPlane());
 			if (leg == null)
 			{
-				// The line crosses ground the golem could not walk. Try another angle.
 				continue;
 			}
 			return Itinerary.of(leg, from.getPlane(), tick, 0);
 		}
 
-		java.util.LinkedHashMap<Long, Long> tiles = reach.tiles();
+		TileMap tiles = reach.tiles();
 		if (tiles.size() < 2)
 		{
 			return null;
 		}
-		Long[] reached = tiles.keySet().toArray(new Long[0]);
-		int half = reached.length / 2;
+		int reached = tiles.size();
+		int half = reached / 2;
 		for (int attempt = 0; attempt < ATTEMPTS; attempt++)
 		{
-			long tile = reached[half + random.nextInt(reached.length - half)];
+			long tile = tiles.keyAt(half + random.nextInt(reached - half));
 			int x = GolemPathfinder.unpackX(tile);
 			int y = GolemPathfinder.unpackY(tile);
 			if ((x == from.getX() && y == from.getY()) || !isSafe(x, y, from.getPlane()))
@@ -275,10 +429,8 @@ class RoamPlanner
 	/**
 	 * A pause on the spot, for a golem that found nowhere to go.
 	 *
-	 * <p>Without it a golem with no plan asked for one again the next frame, and a golem with
-	 * no plan is exactly one whose plans fail — a search and two dozen probes, per stuck
-	 * golem, sixty times a second. Longer with each failure in a row, up to eight times, so a
-	 * golem that is truly stuck costs almost nothing while it waits for the watchdog.
+	 * <p>Without it a golem with no plan asked again the next frame, and a golem with no plan is
+	 * exactly one whose plans fail: a search and two dozen probes, sixty times a second.
 	 *
 	 * @param failures plans in a row that found nothing, before this one
 	 */
@@ -296,14 +448,12 @@ class RoamPlanner
 	}
 
 	/**
-	 * A walk to the quayside of the nearest open dock in reach, or null.
-	 *
-	 * <p>Not while on shore leave, and not to a dock the golem is already at — that is the
-	 * voyage roll's business.
+	 * A walk to the quayside of the nearest open dock in reach, or null. Not while on shore leave,
+	 * and not to a dock the golem is already at — that is the voyage roll's business.
 	 */
 	private Itinerary toNearbyDock(WorldPoint from, int tick, TransportMemory memory, Reach reach)
 	{
-		if (docks == null || memory == null || memory.onShoreLeave())
+		if (docks == null || memory == null || ambitionRestricted(reach.context) || memory.onShoreLeave())
 		{
 			return null;
 		}
@@ -333,9 +483,8 @@ class RoamPlanner
 	}
 
 	/**
-	 * A walk to a tile: a straight line where there is one, otherwise through the flood.
-	 *
-	 * @return the tiles to walk, the golem's own first; null if there is no way within reach
+	 * A walk to a tile — a straight line where there is one, otherwise through the flood — the
+	 * golem's own tile first; null if there is no way within reach.
 	 */
 	private List<int[]> walk(WorldPoint from, int toX, int toY, Reach reach)
 	{
@@ -344,11 +493,9 @@ class RoamPlanner
 	}
 
 	/**
-	 * Puts a transport a far golem has chosen on its cooldown, from when it will be used.
-	 *
-	 * <p>Far golems never did, so nothing stopped the next plan choosing the way straight
-	 * back: at the foot of a ladder the ladder is the nearest transport there is, and nine in
-	 * ten climbs on Wyrmscraig were undone by the very next one.
+	 * Puts a transport a far golem has chosen on its cooldown, from when it will be used. Far golems
+	 * never did, and at the foot of a ladder the nearest transport is the ladder: nine in ten climbs
+	 * on Wyrmscraig were undone at once.
 	 */
 	private static void noteTaken(GolemTransport transport, int whenUsed, TransportMemory memory)
 	{
@@ -359,14 +506,14 @@ class RoamPlanner
 	}
 
 	/**
-	 * A transport starting on exactly this tile, for a golem that cannot walk off it.
-	 *
-	 * <p>One not on cooldown if there is one; failing that, the way back, because a golem
-	 * left standing on a stone is worse than one that goes back to the bank.
+	 * A transport starting on exactly this tile, for a golem that cannot walk off it. One not on
+	 * cooldown if there is one; failing that the way back, since standing on a stone is worse.
 	 */
-	private GolemTransport fromHere(WorldPoint at, int tick, TransportMemory memory)
+	private GolemTransport fromHere(WorldPoint at, int tick, TransportMemory memory, Random random)
 	{
 		GolemTransport back = null;
+		// Any of the ways on, not the first listed: always the first sent every golem the same way.
+		List<GolemTransport> onward = new ArrayList<>();
 		for (GolemTransport transport : transports.from(at.getX(), at.getY()))
 		{
 			if (transport.getFromPlane() != at.getPlane() || !abilities.canUse(transport)
@@ -376,23 +523,34 @@ class RoamPlanner
 			}
 			if (memory == null || !memory.onCooldown(transport, tick))
 			{
-				return transport;
+				onward.add(transport);
 			}
-			if (back == null)
+			else if (back == null)
 			{
 				back = transport;
 			}
 		}
-		return back;
+		return onward.isEmpty() ? back : onward.get(random.nextInt(onward.size()));
+	}
+
+	private WorldPoint safeNeighbour(WorldPoint at)
+	{
+		for (int dx = -1; dx <= 1; dx++)
+		{
+			for (int dy = -1; dy <= 1; dy++)
+			{
+				if ((dx != 0 || dy != 0) && isSafe(at.getX() + dx, at.getY() + dy, at.getPlane()))
+				{
+					return new WorldPoint(at.getX() + dx, at.getY() + dy, at.getPlane());
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
-	 * True if a golem arriving by this transport has somewhere to go from the landing.
-	 *
-	 * <p>Walkable ground, or a chain of transports onward — not simply this one in reverse —
-	 * that ends on some. The middle stone of a crossing is blocked ground, and the crossing is
-	 * still a perfectly good way over the river; a crossing that never reaches a bank is not.
-	 * The same rule golems in view follow. See {@link TransportNetwork#leadsToGround}.
+	 * True if a golem arriving by this transport has somewhere to go: walkable ground, or a chain of
+	 * transports onward — not this one in reverse — ending on some. See leadsToGround.
 	 */
 	private boolean landsSomewhereUseful(GolemTransport transport)
 	{
@@ -404,16 +562,12 @@ class RoamPlanner
 	/**
 	 * Rolls for a crossing, for a golem standing at a port.
 	 *
-	 * <p>Called from two places, and that is the point: a far golem plans one when its
-	 * route runs out, and a golem in view rolls for one as it steps onto a tile. Sailing
-	 * used to happen only out of range, which meant nobody ever watched a golem leave.
+	 * <p>Called from two places, which is the point: a far golem plans one when its route runs out,
+	 * and a golem in view rolls as it steps onto a tile, sailing having once happened only out of
+	 * range. Affordable in view because crossings are cached per pair of ports.
 	 *
-	 * <p>Affordable in view because crossings are cached per pair of ports and new
-	 * searches are rationed to one a frame. A golem refused the budget just does not sail
-	 * this time — indistinguishable from one that chose to stay.
-	 *
-	 * @return a crossing, or null if the golem is not at a port, is on shore leave, lost
-	 *         the roll, or the route is unknown and the frame's search is spent
+	 * @return a crossing, or null if the golem is not at a port, is on shore leave, lost the roll,
+	 *         or the route is unknown and the frame's search is spent
 	 */
 	Itinerary planVoyage(WorldPoint from, int tick, Random random, TransportMemory memory,
 		RoamContext context)
@@ -421,27 +575,96 @@ class RoamPlanner
 		return planVoyage(from, tick, random, memory, context, SAIL_CHANCE);
 	}
 
-	/**
-	 * Chance a far golem at a dock sets sail, per plan.
-	 *
-	 * <p>Much higher than the in-view roll, which is made on every tile a golem enters and so
-	 * adds up quickly. A far golem plans once per leg, and one that walked to a dock on purpose
-	 * and then only sailed one time in eight mostly walked away again.
-	 */
+	/** Chance a far golem at a dock sets sail, per plan: higher, as it plans once per leg. */
 	private static final float AT_DOCK_SAIL_CHANCE = 0.6f;
+
+	/** Ticks a far golem at a dock waits before asking again whether its crossing is ready. */
+	private static final int DOCK_WAIT_POLL = 4;
 
 	/** Chance per plan that a far golem with a dock in reach heads for it. */
 	private static final float DOCK_SEEK_CHANCE = 0.1f;
 
+	/**
+	 * How near a gangplank, in tiles, draws a golem in view toward it. A golem only rolled to sail
+	 * on stepping within a couple of tiles of the quayside, which at random it almost never did.
+	 */
+	static final int DOCK_ATTRACTION = 15;
+
+	/** Chance, each time a golem in view picks somewhere to walk, that a dock in range is where. */
+	private static final float DOCK_ATTRACTION_CHANCE = 0.25f;
+
+	/**
+	 * A dock a golem in view has chosen to walk up to, or null: the nearest open one within
+	 * {@link #DOCK_ATTRACTION} tiles, not one it is at, and not on shore leave.
+	 */
+	SailingDocks.Dock dockToVisit(WorldPoint from, TransportMemory memory, RoamContext context, Random random)
+	{
+		if (docks == null || memory == null || ambitionRestricted(context) || memory.onShoreLeave())
+		{
+			return null;
+		}
+		SailingDocks.Dock nearest = null;
+		int nearestDistance = Integer.MAX_VALUE;
+		for (SailingDocks.Dock dock : docks.getDocks())
+		{
+			WorldPoint shore = dock.getShore();
+			if (shore.getPlane() != from.getPlane())
+			{
+				continue;
+			}
+			int distance = Math.max(Math.abs(shore.getX() - from.getX()), Math.abs(shore.getY() - from.getY()));
+			if (distance > DOCK_REACH && distance <= DOCK_ATTRACTION && distance < nearestDistance && docks.isOpen(dock))
+			{
+				nearest = dock;
+				nearestDistance = distance;
+			}
+		}
+		if (nearest == null || random.nextFloat() >= DOCK_ATTRACTION_CHANCE)
+		{
+			return null;
+		}
+		return nearest;
+	}
+
+	SailingDocks.Dock dockAt(WorldPoint from)
+	{
+		return voyage == null ? null : voyage.dockAt(from, DOCK_REACH);
+	}
+
+	boolean atDock(WorldPoint from, SailingDocks.Dock dock)
+	{
+		WorldPoint shore = dock.getShore();
+		return shore.getPlane() == from.getPlane()
+			&& Math.max(Math.abs(shore.getX() - from.getX()), Math.abs(shore.getY() - from.getY())) <= DOCK_REACH;
+	}
+
+	/** Rolls for a crossing for a golem that walked to a dock on purpose: the far golem's chance. */
+	Itinerary planVoyageAtDock(WorldPoint from, int tick, Random random, TransportMemory memory, RoamContext context)
+	{
+		return planVoyage(from, tick, random, memory, context, AT_DOCK_SAIL_CHANCE);
+	}
+
 	private Itinerary planVoyage(WorldPoint from, int tick, Random random, TransportMemory memory,
 		RoamContext context, float chance)
 	{
-		if (memory == null || voyage == null || memory.onShoreLeave() || random.nextFloat() >= chance)
+		// A golem already waiting to sail has made its decision and does not roll again, but only at
+		// the dock it is waiting at. See TransportMemory.holdPending.
+		boolean waiting = memory != null && memory.getPendingPort() >= 0;
+		if (memory == null || voyage == null || ambitionRestricted(context) || memory.onShoreLeave()
+			|| !waiting && random.nextFloat() >= chance)
 		{
 			return null;
 		}
 
 		SailingDocks.Dock dock = voyage.dockAt(from, DOCK_REACH);
+		if (waiting && (dock == null || dock.getRowId() != memory.getPendingFrom()))
+		{
+			memory.clearPending();
+			if (dock == null || random.nextFloat() >= chance)
+			{
+				return null;
+			}
+		}
 		if (dock == null || !docks.isOpen(dock))
 		{
 			return null;
@@ -453,19 +676,15 @@ class RoamPlanner
 			return null;
 		}
 
-		// Ashore at the far end, the golem walks inland for a while before it is allowed
-		// to think about boats again. Otherwise a golem that arrives at a port simply
-		// leaves it, and no golem is ever seen anywhere except on the water.
+		// Ashore at the far end, the golem walks inland a while before it may think about boats
+		// again; otherwise a golem that arrives at a port simply leaves it again.
 		memory.beginShoreLeaveOnArrival(tick + crossing.getDuration(), tick, random);
 		return crossing;
 	}
 
 	/**
-	 * Chance per plan that a golem heads for a transport rather than wandering.
-	 *
-	 * <p>Finding one used to be rare enough to cap this by itself. Now that every transport in
-	 * range is considered, a golem that always took one would do nothing but hop, and never
-	 * walk the floor it had just arrived on.
+	 * Chance per plan that a golem heads for a transport rather than wandering. Finding one used to
+	 * cap this by itself; now every transport in range is considered, and always taking one is hops.
 	 */
 	private static final float TRANSPORT_CHANCE = 0.5f;
 
@@ -490,11 +709,8 @@ class RoamPlanner
 	private int lastCandidates;
 
 	/**
-	 * A walk to a transport in range and the transport itself, or null.
-	 *
-	 * <p>Every transport starting within reach is considered, in a random order, and the
-	 * first one the golem can use and walk to is taken. Random order keeps the choice fair;
-	 * the cooldown stops it being the way the golem just came.
+	 * A walk to a transport in range and the transport itself, or null. Every transport starting
+	 * within reach is considered in a random order, which keeps the choice fair.
 	 */
 	private Itinerary toNearbyTransport(WorldPoint from, int tick, Random random, TransportMemory memory,
 		Reach reach)
@@ -504,16 +720,12 @@ class RoamPlanner
 		java.util.Collections.shuffle(near, random);
 
 		int walksTried = 0;
+		// The first one it passed over for being crowded, in case nothing roomier turns up.
+		GolemTransport crowdedChoice = null;
 		for (GolemTransport transport : near)
 		{
-			// Landing judged by the same test as everywhere else in the planner.
-			//
-			// This one alone asked for the shipped land fill, which only reaches ground
-			// connected by shipped transports. The cathedral's interior and the floors
-			// above ladders are reached only by obstacles the player taught, so a golem
-			// out of view would never choose them — and one already inside could never
-			// choose the way back out either, because that route's origin was fine but
-			// nothing about the interior counted as somewhere to be.
+			// Landing judged by the same test as everywhere else in the planner: this one alone asked
+			// for the shipped land fill, so the cathedral's interior never counted as somewhere to be.
 			if (transport.getFromPlane() != from.getPlane()
 				|| (memory != null && memory.onCooldown(transport, tick))
 				|| !mesh.sameComponent(from.getX(), from.getY(), transport.getFromX(), transport.getFromY(),
@@ -523,29 +735,47 @@ class RoamPlanner
 			{
 				continue;
 			}
+			// Somewhere with room in it, by preference; see RoamContext.appeal. One that turns a
+			// transport down falls back on the first it passed over rather than staying put.
+			float appeal = reach.context == null ? 1f
+				: reach.context.appeal(from.getX(), from.getY(), from.getPlane(),
+					transport.getToX(), transport.getToY(), transport.getToPlane());
+			if (appeal < 1f && random.nextFloat() >= appeal)
+			{
+				if (crowdedChoice == null)
+				{
+					crowdedChoice = transport;
+				}
+				continue;
+			}
 			List<int[]> path = walk(from, transport.getFromX(), transport.getFromY(), reach);
 			if (path != null)
 			{
 				noteTaken(transport, tick + path.size() - 1, memory);
 				return Itinerary.thenTransport(path, from.getPlane(), tick, transport);
 			}
-			// Past the first few, each try is a straight line and a lookup in the flood that
-			// already exists — cheap, but a town can have a hundred rows in range.
+			// Past the first few, each try is a line and a lookup in the flood — cheap, but a town
+			// can have a hundred rows in range.
 			if (++walksTried >= ATTEMPTS * 4)
 			{
 				break;
+			}
+		}
+		if (crowdedChoice != null)
+		{
+			List<int[]> path = walk(from, crowdedChoice.getFromX(), crowdedChoice.getFromY(), reach);
+			if (path != null)
+			{
+				noteTaken(crowdedChoice, tick + path.size() - 1, memory);
+				return Itinerary.thenTransport(path, from.getPlane(), tick, crowdedChoice);
 			}
 		}
 		return null;
 	}
 
 	/**
-	 * A straight run of tiles between two points, eight-directional.
-	 *
-	 * <p>Deliberately not a search. At Tier 3 nothing observes the route — only where the
-	 * golem ends up and roughly how long it took — and the destination has already been
-	 * checked for being real walkable ground. Paying for a pathfind here would buy
-	 * accuracy in the one place it cannot be seen.
+	 * A straight run of tiles between two points, eight-directional. Deliberately not a search: at
+	 * Tier 3 nothing observes the route, only where the golem ends up and roughly how long it took.
 	 */
 	private List<int[]> straightLine(int fromX, int fromY, int toX, int toY, int plane)
 	{
@@ -559,11 +789,8 @@ class RoamPlanner
 			int stepX = Integer.signum(toX - x);
 			int stepY = Integer.signum(toY - y);
 
-			// The step, not only the tile it lands on. Two walkable tiles either side of a
-			// wall are both fine ground, and a line that only checked tiles walked straight
-			// through the wall between them — which is how golems out of view got into the
-			// sealed boss room behind the cathedral pew, and out onto the water past a
-			// shoreline. The golems' own step test is the same one the pathfinder uses.
+			// The step, not only the tile it lands on: two walkable tiles either side of a wall are
+			// both fine ground, and a line checking tiles alone walked through the wall between them.
 			if (!memory.canStep(x, y, plane, stepX, stepY))
 			{
 				return null;
@@ -571,15 +798,8 @@ class RoamPlanner
 			x += stepX;
 			y += stepY;
 
-			// Every tile is checked, not just the destination.
-			//
-			// Checking only the far end was how golems ended up standing on water inside
-			// Wyrmscraig's caves: the destination was good ground, the line to it was not,
-			// and a far golem's position comes straight off the line. A route nobody
-			// watches still has to be a route the golem could have walked.
-			// Harvested ground counts here too. A route across a floor the mesh never
-			// found a way onto is perfectly walkable; refusing it was why golems upstairs
-			// could not plan a single leg and went straight back down the way they came.
+			// Every tile is checked, not just the destination, which left golems standing on water in
+			// Wyrmscraig's caves. Harvested ground counts too, or golems upstairs went back down.
 			if (!mesh.isLandWalkable(x, y, plane) && !memory.isKnownWalkable(x, y, plane))
 			{
 				return null;
@@ -589,8 +809,8 @@ class RoamPlanner
 
 			if (path.size() > 512)
 			{
-				// A leg this long means the destination was nonsense — most likely an
-				// underground coordinate compared against a surface one.
+				// A leg this long means nonsense: most likely an underground coordinate against a
+				// surface one.
 				return null;
 			}
 		}
@@ -600,10 +820,8 @@ class RoamPlanner
 	/**
 	 * The nearest tile a golem could actually stand on, spiralling outward.
 	 *
-	 * <p>Used when a golem is promoted into view, and when one is restored from a save
-	 * onto ground that has since changed. A golem is moved, never replaced: it keeps its
-	 * name, its id and its gait, because the entire premise of the plugin is that golems
-	 * do not die and being quietly deleted to tidy up a map problem would be a death.
+	 * <p>Used when a golem is promoted into view, and when one is restored onto ground that has since
+	 * changed. A golem is moved, never replaced — name, id and gait kept — since golems do not die.
 	 *
 	 * @return a safe tile, or the original if nothing better was found within range
 	 */
@@ -613,16 +831,26 @@ class RoamPlanner
 		{
 			return at;
 		}
+		// Standing on water no golem can walk: the nearest ground, on whatever side of the shore.
+		// Kept to the golem's own component, the search found only more water and left it there.
+		if (mesh.isInlandWater(at.getX(), at.getY(), at.getPlane()))
+		{
+			WorldPoint shore = nearestSafe(at, false);
+			return shore != null ? shore : at;
+		}
+		WorldPoint near = nearestSafe(at, true);
+		return near != null ? near : at;
+	}
 
-		// Where the golem is now decides where it may be put. Without this the nearest
-		// walkable tile wins outright, and the nearest walkable tile to a golem standing
-		// in a wall is very often the inside of the building — so the rescue dropped
-		// golems into sealed rooms and the watchdog spent the rest of the session
-		// discovering they could not get out again.
-		//
-		// Zero means the mesh has nothing to say about this tile, and is treated as a
-		// match: the live harvest covers ground the mesh never will, and refusing to move
-		// a golem there would shrink the world to whatever happened to ship.
+	/**
+	 * The nearest tile a golem can stand on, up to 32 tiles out, or null; {@code sameSpace} keeps it
+	 * to the connected space the golem is in, as far as the mesh knows it.
+	 */
+	private WorldPoint nearestSafe(WorldPoint at, boolean sameSpace)
+	{
+
+		// Where the golem is now decides where it may be put: the nearest walkable tile to one in a
+		// wall is often inside the building. Zero means the mesh has nothing to say, and is a match.
 		int origin = mesh.componentAt(at.getX(), at.getY(), at.getPlane());
 
 		for (int radius = 1; radius <= 32; radius++)
@@ -638,7 +866,7 @@ class RoamPlanner
 					}
 					int x = at.getX() + dx;
 					int y = at.getY() + dy;
-					if (origin != 0)
+					if (sameSpace && origin != 0)
 					{
 						int here = mesh.componentAt(x, y, at.getPlane());
 						if (here != 0 && here != origin)
@@ -653,16 +881,12 @@ class RoamPlanner
 				}
 			}
 		}
-		return at;
+		return null;
 	}
 
 	/**
-	 * Walkable, and not in a pocket too small to wander out of.
-	 *
-	 * <p>Ground the player has actually stood on counts regardless of what the shipped mesh
-	 * says about it. The harvest is the better authority — it is this client, this
-	 * revision, this floor — and the mesh cannot describe somewhere it never found a way
-	 * into.
+	 * Walkable, and not in a pocket too small to wander out of. Ground the player has stood on
+	 * counts whatever the shipped mesh says: the harvest is this client, this revision, this floor.
 	 */
 	private boolean isSafe(int x, int y, int plane)
 	{

@@ -78,6 +78,11 @@ public class IslandMapHarness
 		mask[0] |= 1;
 		regions(memory).put(key, bits);
 		seen(memory).put(key, mask);
+		// Put straight into the map, so the memory's note of which regions it holds is made by hand
+		// too, as every real path into the map makes it.
+		Field mayHold = IslandMemory.class.getDeclaredField("mayHold");
+		mayHold.setAccessible(true);
+		((boolean[]) mayHold.get(memory))[regionId] = true;
 
 		boolean meshSays = mesh.isLandWalkable(caveX, caveY, 0);
 		boolean memorySays = memory.isKnownWalkable(caveX, caveY, 0);
