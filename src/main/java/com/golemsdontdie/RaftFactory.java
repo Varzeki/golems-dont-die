@@ -6,19 +6,10 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
-import net.runelite.api.NPCComposition;
 
 /**
- * Builds the boat drawn under a golem at sea, once.
- *
- * <p>The hull has to come from an NPC rather than a scene object, for the same reason the
- * props do in reverse: {@code NPCComposition} exposes model ids and
- * {@code ObjectComposition} does not.
- *
- * <p>Which NPC is a measured constant, {@link GolemContent#RAFT_NPC}. This used to search
- * Sailing's boat table at runtime for anything named like a vessel, and found nothing in
- * any session: the table lists boat crews, not boats. See the constant for how the hull was
- * found.
+ * Builds the boat drawn under a golem at sea, once: Sailing's raft, assembled from its hull, sail
+ * and helm models. See {@link GolemContent#RAFT_HULL_MODEL}.
  */
 @Slf4j
 @Singleton
@@ -40,11 +31,8 @@ class RaftFactory
 	/**
 	 * The boat model, or null if it could not be built.
 	 *
-	 * <p>Built once and shared by every golem at sea. Safe to share for the usual reason:
-	 * the client's transformation clones vertices out of its source rather than writing to
-	 * it.
-	 *
-	 * <p>Must be called on the client thread.
+	 * <p>Built once and shared by every golem at sea; safe because the client's transformation
+	 * clones vertices rather than writing to its source. Client thread only.
 	 */
 	Model raftModel()
 	{
@@ -56,28 +44,26 @@ class RaftFactory
 
 		try
 		{
-			NPCComposition composition = client.getNpcDefinition(GolemContent.RAFT_NPC);
-			int[] models = composition == null ? null : composition.getModels();
-			if (models == null || models.length == 0)
+			ModelData hull = client.loadModelData(GolemContent.RAFT_HULL_MODEL);
+			ModelData mast = client.loadModelData(GolemContent.RAFT_SAIL_MODEL);
+			ModelData cloth = client.loadModelData(GolemContent.RAFT_SAIL_CLOTH_MODEL);
+			ModelData helm = client.loadModelData(GolemContent.RAFT_HELM_MODEL);
+			if (hull == null || mast == null || cloth == null || helm == null)
 			{
-				log.warn("Boat NPC {} has no models; golems will sail without a visible hull", GolemContent.RAFT_NPC);
+				log.debug("Raft models not loaded yet");
+				searched = false;
 				return null;
 			}
-
-			ModelData[] parts = new ModelData[models.length];
-			for (int i = 0; i < models.length; i++)
-			{
-				parts[i] = client.loadModelData(models[i]);
-				if (parts[i] == null)
-				{
-					log.debug("Boat model {} not loaded yet", models[i]);
-					searched = false;
-					return null;
-				}
-			}
-			ModelData merged = parts.length == 1 ? parts[0].cloneVertices() : client.mergeModels(parts).cloneVertices();
+			// Painted as the objects paint them; the raw models are place-holder purple.
+			hull = recolour(hull.cloneVertices().cloneColors(), GolemContent.RAFT_HULL_RECOLOUR_FROM,
+				GolemContent.RAFT_HULL_RECOLOUR_TO);
+			helm = recolour(helm.cloneVertices().cloneColors(), GolemContent.RAFT_HELM_RECOLOUR_FROM,
+				GolemContent.RAFT_HELM_RECOLOUR_TO);
+			// Hull, mast and sail sit on the middle tile; the helm is its own tile at the stern.
+			helm = helm.translate(0, 0, GolemContent.RAFT_HELM_OFFSET);
+			ModelData merged = client.mergeModels(hull, mast.cloneVertices(), cloth.cloneVertices(), helm);
 			model = merged.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
-			log.debug("Boat model built from NPC {} ({})", GolemContent.RAFT_NPC, composition.getName());
+			log.debug("Raft model built from hull, sail and helm");
 			return model;
 		}
 		catch (RuntimeException e)
@@ -85,6 +71,15 @@ class RaftFactory
 			log.debug("Could not build the boat model", e);
 			return null;
 		}
+	}
+
+	private static ModelData recolour(ModelData model, short[] from, short[] to)
+	{
+		for (int i = 0; i < from.length; i++)
+		{
+			model.recolor(from[i], to[i]);
+		}
+		return model;
 	}
 
 	void clear()

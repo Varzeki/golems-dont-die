@@ -11,40 +11,35 @@ import net.runelite.api.coords.LocalPoint;
 /**
  * Draws the boat a golem crosses the ocean in.
  *
- * <p>A drawn prop, under the plugin's complete control. No game physics apply to it and
- * nothing about it is real: {@code WorldEntity} — the thing the game's own boats are — is
- * read-only to a plugin, so a plugin boat is a model at a position, exactly as a fake
- * golem is.
- *
- * <p>Two things differ from {@link FakeGolem}:
- *
- * <ul>
- *   <li><b>A slower turn.</b> A boat that pivots at a golem's turn rate reads as a sliding
- *       crate. It comes round gradually, and its heading leads its motion.</li>
- *   <li><b>Its own animation.</b> The boat's idle is on the boat's rig, which is precisely
- *       why the golem cannot play it and the boat can.</li>
- * </ul>
- *
- * <p>Its height is the ground under it, the same as the golem's, so the golem stands in the
- * boat rather than above or below it. This used to be a constant zero on the grounds that
- * the terrain under the sea is seabed — never checked in game, and it would have put the
- * golem and its boat at different heights whichever was true.
+ * <p>{@code WorldEntity} — what the game's own boats are — is read-only to a plugin, so this
+ * is a drawn model at a position, as a fake golem is. It turns at a third of a golem's rate,
+ * because a boat pivoting at a golem's rate reads as a sliding crate, and its heading leads
+ * its motion.
  */
 class FakeRaft extends RuneLiteObjectController
 {
-	/** Orientation units per cycle. A third of a golem's, so the boat comes about slowly. */
+	/** Orientation units per cycle; a third of a golem's. */
 	private static final int TURN_PER_CYCLE = 8;
 
 	private final Client client;
 	private final Model model;
 	private final AnimationController animation;
 
-	/** Where the boat is, in the same 128ths-of-a-tile world units the golems use. */
+	/** Where the boat is, in 128ths of a tile, as for golems. */
 	private int fineX;
 	private int fineY;
 
 	private int orientation;
 	private int targetOrientation;
+
+	/**
+	 * The ground height the boat sits at: the golem's, not the ground under the boat's own middle.
+	 *
+	 * <p>The raft's middle is a tile ahead of the golem and at sea the ground under water is
+	 * seabed, so a raft on its own tile sank out of sight where that drops away, leaving the
+	 * golem on nothing at the helm; one whose middle lay outside the scene got no height at all.
+	 */
+	private int groundZ = Integer.MIN_VALUE;
 
 	FakeRaft(Client client, Model model, GolemModelFactory shared, int fineX, int fineY,
 		int orientation)
@@ -56,22 +51,29 @@ class FakeRaft extends RuneLiteObjectController
 		this.orientation = orientation;
 		this.targetOrientation = orientation;
 
+		// The raft's models carry no rig, so it plays nothing; the golem at the helm does.
 		this.animation = new AnimationController(client, -1);
-		this.animation.setAnimation(shared.animationFor(GolemContent.RAFT_ANIM));
 
-		// A boat covers several tiles, so the ground under its footprint has to be drawn
-		// before it or the hull z-fights with the water at its edges.
+		// A boat covers several tiles; ground under its footprint must draw first or the hull
+		// z-fights with the water.
 		setRadius(3 * 64);
 		setDrawFrontTilesFirst(true);
 		syncTransform();
 	}
 
-	/** Moves the boat to a world position, easing the heading toward where it is going. */
+	/** Moves the boat to a world position, easing the heading round. */
 	void steer(int worldFineX, int worldFineY, int heading)
 	{
 		this.fineX = worldFineX;
 		this.fineY = worldFineY;
 		this.targetOrientation = heading & 2047;
+	}
+
+	/** As {@link #steer(int, int, int)}, at this ground height. */
+	void steer(int worldFineX, int worldFineY, int heading, int groundZ)
+	{
+		steer(worldFineX, worldFineY, heading);
+		this.groundZ = groundZ;
 	}
 
 	@Override
@@ -93,7 +95,7 @@ class FakeRaft extends RuneLiteObjectController
 		return posed == null ? model : posed;
 	}
 
-	/** Eases the heading round the short way, at a boat's rate rather than a golem's. */
+	/** Eases the heading round the short way, at a boat's rate. */
 	private void turn(int cycles)
 	{
 		if (orientation == targetOrientation || cycles <= 0)
@@ -120,7 +122,11 @@ class FakeRaft extends RuneLiteObjectController
 		setWorldView(wv.getId());
 		setLevel(0);
 		setOrientation(orientation);
-		if (Golem.isInScene(wv, localX, localY))
+		if (groundZ != Integer.MIN_VALUE)
+		{
+			setZ(groundZ);
+		}
+		else if (Golem.isInScene(wv, localX, localY))
 		{
 			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), 0));
 		}

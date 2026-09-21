@@ -14,43 +14,21 @@ import net.runelite.api.coords.WorldPoint;
 /**
  * Routes a raft across the ocean.
  *
- * <p>The finding that made this easy: the collision map already marks open water as
- * passable and shoreline edges as blocked. That is why Wyrmscraig reads as a sealed
- * 2,456-tile island <em>and</em> why 2,458,003 tiles of connected sea sit in the same
- * resource. There is no separate sea navigation to build — golems path the ocean with the
- * same flags and the same corner rule they use in a corridor.
- *
- * <p>Three differences from the land pathfinder, all of them because an ocean is enormous:
- *
- * <ul>
- *   <li><b>A*, not breadth-first.</b> Three thousand nodes does not cross an ocean.</li>
- *   <li><b>An inflated heuristic.</b> Weighting it above the true distance expands far
- *       fewer nodes and produces straighter routes. Both are wanted: a boat holding a
- *       heading looks better than one weaving optimally around a headland.</li>
- *   <li><b>Straightening afterwards.</b> Sailing moves in long axis-aligned or perfectly
- *       diagonal runs, so the tile path is collapsed into legs before anything draws it.</li>
- * </ul>
- *
- * <p>This runs at Tier 3, off the frame budget, a handful of times per golem per crossing.
+ * <p>The collision map already marks open water as passable and shoreline edges as blocked,
+ * which is why Wyrmscraig reads as a sealed 2,456-tile island <em>and</em> why 2,458,003 tiles
+ * of connected sea sit in the same resource: golems path the ocean with the same flags and corner
+ * rule they use in a corridor. Three differences, all because an ocean is enormous: A*, since
+ * three thousand nodes does not cross one; an inflated heuristic, which expands far fewer nodes
+ * and gives straighter routes; and straightening afterwards, sailing moving in long runs.
  */
 @Slf4j
 @Singleton
 class SeaMesh
 {
-	/**
-	 * Ceiling on tiles expanded for one crossing.
-	 *
-	 * <p>Large, because the alternative is a golem that cannot leave. An ocean crossing is
-	 * planned once and then replayed from a timestamp for several minutes, so the cost is
-	 * amortised over the whole voyage rather than paid per frame.
-	 */
+	/** Ceiling on tiles expanded for one crossing. Large: a crossing is planned once per pair. */
 	private static final int NODE_BUDGET = 200_000;
 
-	/**
-	 * How much the heuristic is inflated. Above 1 this stops being optimal and starts
-	 * being fast and straight, which is the trade wanted here — nobody measures a golem's
-	 * route for optimality, but a visibly wandering boat reads as broken.
-	 */
+	/** Heuristic inflation. Above 1 it is fast and straight, not optimal; a weaving boat reads badly. */
 	private static final float HEURISTIC_WEIGHT = 1.4f;
 
 	private static final int[] DX = {0, 0, 1, -1, 1, -1, 1, -1};
@@ -60,11 +38,8 @@ class SeaMesh
 	private WorldMesh mesh;
 
 	/**
-	 * True if two points sit on the same body of water.
-	 *
-	 * <p>Always ask before pathing. Not every water tile is the ocean — the inland body on
-	 * Karamja is 26,000 tiles that connect to nothing — and a search between two
-	 * disconnected basins would burn the whole node budget before failing.
+	 * True if two points sit on the same body of water. Always ask before pathing: the inland body
+	 * on Karamja is 26,000 tiles connecting to nothing, and a search between basins burns the budget.
 	 */
 	boolean sameWater(WorldPoint a, WorldPoint b)
 	{
@@ -74,33 +49,21 @@ class SeaMesh
 	/**
 	 * Routes already computed, keyed by the pair of endpoints.
 	 *
-	 * <p>This is what makes the search affordable at all. There are only sixty-odd ports,
-	 * so however many golems cross however many times, there are a few thousand distinct
-	 * crossings in the entire game — and in a real session, a handful. The first golem to
-	 * sail Wyrmscraig to Catherby pays for the search; every golem after it reads the
-	 * answer.
-	 *
-	 * <p>Failures are cached too, as an empty list. A pair with no route will not acquire
-	 * one by being asked again, and re-running a quarter-million-node search to rediscover
-	 * that is the worst thing this class could do.
+	 * <p>What makes the search affordable at all: there are only sixty-odd ports, so a real session
+	 * sees a handful of crossings. Failures are cached too, as an empty list.
 	 */
 	private final Map<Long, List<int[]>> routes = new HashMap<>();
 
 	/**
-	 * A cached route, or null if this pair has not been searched yet.
-	 *
-	 * <p>Separate from {@link #route} so the caller can take the cheap answer on a render
-	 * frame and defer the expensive one.
+	 * A cached route, or null if this pair has not been searched yet. Separate from {@link #route}
+	 * so the caller can take the cheap answer on a render frame and defer the expensive one.
 	 */
 	/**
 	 * Crossings between every pair of moorings, computed offline by
-	 * {@code dev-tools/probe/com/golemsdontdie/BuildSeaRoutes.java}.
-	 *
-	 * <p>The live search could not be relied on for them. Sampling forty pairs of ports, it
-	 * found no route for twenty-one — the ocean is one body of water, so every one of those was
-	 * the search running out of budget, not a real answer — and each failure took a quarter to
-	 * two fifths of a second on the client thread, then was remembered as unroutable for the
-	 * rest of the session. The search remains for a pair the table does not have.
+	 * {@code dev-tools/probe/com/golemsdontdie/BuildSeaRoutes.java}. The live search could not be
+	 * relied on: sampling forty pairs of ports it found no route for twenty-one — the ocean being
+	 * one body of water, every one was the budget running out, at a quarter to two fifths of a
+	 * second each on the client thread. It remains for a pair the table does not have.
 	 */
 	private static final String SHIPPED = "/sea-routes.gz";
 
@@ -163,10 +126,8 @@ class SeaMesh
 	}
 
 	/**
-	 * A route between two moorings, as straightened legs, or null if there is none.
-	 *
-	 * <p>Cached, so this is expensive exactly once per pair of ports. The first call may
-	 * expand a large number of nodes; every call after it is a map lookup.
+	 * A route between two moorings, as straightened legs. Cached, so this is expensive exactly once
+	 * per pair of ports; every call after the first is a map lookup.
 	 *
 	 * @return waypoints including both ends, or null
 	 */
@@ -256,12 +217,8 @@ class SeaMesh
 	}
 
 	/**
-	 * Collapses runs of tiles into legs.
-	 *
-	 * <p>The tile path is only interesting where it turns. Keeping every tile would mean a
-	 * raft interpolating between adjacent points for the whole crossing — the same motion,
-	 * many times the storage, and an itinerary hundreds of waypoints long for something
-	 * nobody is watching.
+	 * Collapses runs of tiles into legs. The tile path is only interesting where it turns; keeping
+	 * every tile would mean the same motion at many times the storage.
 	 */
 	private static List<int[]> straighten(List<int[]> path)
 	{
@@ -298,15 +255,215 @@ class SeaMesh
 		return (int) (Math.max(dx, dy) * HEURISTIC_WEIGHT);
 	}
 
+	/** True if every tile a straight line between two points passes over, sampled four times a tile, is open sea. */
+	boolean clearLine(int fromX, int fromY, int toX, int toY)
+	{
+		int dx = toX - fromX;
+		int dy = toY - fromY;
+		int samples = Math.max(1, Math.max(Math.abs(dx), Math.abs(dy)) * 4);
+		for (int s = 0; s <= samples; s++)
+		{
+			int x = (int) Math.floor(fromX + 0.5 + dx * (double) s / samples);
+			int y = (int) Math.floor(fromY + 0.5 + dy * (double) s / samples);
+			if (!mesh.isOcean(x, y, 0))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Distance to a destination by sea, for every tile of open water near a route to it. Travel
+	 * distance, not straight-line: filled outward from the destination round every headland, so from
+	 * any tile some neighbour is one step nearer. Only within {@code band} tiles of the route.
+	 */
+	/** Which tiles a raft may sail on: the ocean, or one enclosed body of water. */
+	interface Water
+	{
+		boolean at(int x, int y);
+	}
+
+	/** The one connected sea. */
+	final Water ocean = (x, y) -> mesh.isOcean(x, y, 0);
+
+	/** Water that is not the sea, by component: a cave lake, passable and marked as nothing else. */
+	Water lake(int component)
+	{
+		return (x, y) -> component != 0 && mesh.componentAt(x, y, 0) == component;
+	}
+
+	/** Which connected component a surface tile belongs to, 0 for none. */
+	int componentAt(int x, int y)
+	{
+		return mesh.componentAt(x, y, 0);
+	}
+
+	static final class Field
+	{
+		private final TileMap distance;
+		private final SeaMesh sea;
+		private final Water water;
+
+		private Field(TileMap distance, SeaMesh sea, Water water)
+		{
+			this.distance = distance;
+			this.sea = sea;
+			this.water = water;
+		}
+
+		/** True if a raft sailing this field may be on this tile. */
+		boolean isWater(int x, int y)
+		{
+			return water.at(x, y);
+		}
+
+		/** Steps to the destination from this tile, or -1 if it is not in the field. */
+		int distance(int x, int y)
+		{
+			return (int) distance.getOrDefault(pack(x, y), -1);
+		}
+
+		/** A neighbour one step nearer the destination, or null at the destination itself. */
+		int[] downhill(int x, int y)
+		{
+			int here = distance(x, y);
+			for (int d = 0; d < 8; d++)
+			{
+				int nx = x + DX[d];
+				int ny = y + DY[d];
+				int there = distance(nx, ny);
+				if (there >= 0 && there < here && canStep(water, x, y, DX[d], DY[d]))
+				{
+					return new int[]{nx, ny};
+				}
+			}
+			return null;
+		}
+
+		int size()
+		{
+			return distance.size();
+		}
+	}
+
+	/** True if this tile of the surface is open sea. */
+	boolean isWater(int x, int y)
+	{
+		return mesh.isOcean(x, y, 0);
+	}
+
+	/** The distance field to the last point of a route, over open water within {@code band} tiles of the route. */
+	Field fieldAlong(List<int[]> route, int band)
+	{
+		return fieldAlong(route, band, 0, 0);
+	}
+
+	/**
+	 * As {@link #fieldAlong(List, int)}, over water with room around it. A raft is three tiles long
+	 * and a tile wide, and a course plotted for the golem at its helm ran it through gaps its bow
+	 * could not fit; {@code openNearEnds} tiles of either end are exempt, for coming in to a dock.
+	 */
+	Field fieldAlong(List<int[]> route, int band, int clearance, int openNearEnds)
+	{
+		return fieldAlong(route, band, clearance, openNearEnds, ocean);
+	}
+
+	/** As {@link #fieldAlong(List, int, int, int)}, over a given body of water. */
+	Field fieldAlong(List<int[]> route, int band, int clearance, int openNearEnds, Water water)
+	{
+		int[] start = route.get(0);
+		int[] goal = route.get(route.size() - 1);
+		// Breadth first, and every tile is queued exactly when its distance is recorded, so the
+		// record's own order is the queue.
+		TileMap distance = new TileMap(1 << 14);
+		distance.add(pack(goal[0], goal[1]), 0);
+		// Water refused for itself: too far from the route, or too near a shore. Both are questions
+		// about the tile alone, and each of its neighbours offers it again, so the answer is kept.
+		TileMap tooFar = new TileMap(1 << 12);
+		int head = 0;
+		while (head < distance.size())
+		{
+			long at = distance.keyAt(head++);
+			int x = (int) (at >> 32);
+			int y = (int) at;
+			long steps = distance.get(at);
+			for (int d = 0; d < 8; d++)
+			{
+				int nx = x + DX[d];
+				int ny = y + DY[d];
+				long key = pack(nx, ny);
+				if (distance.containsKey(key) || !water.at(nx, ny) || !canStep(water, x, y, DX[d], DY[d])
+					|| tooFar.containsKey(key))
+				{
+					continue;
+				}
+				if (!near(route, nx, ny, band) || !roomy(water, nx, ny, clearance, start, goal, openNearEnds))
+				{
+					tooFar.add(key, 0);
+					continue;
+				}
+				distance.add(key, steps + 1);
+			}
+		}
+		return new Field(distance, this, water);
+	}
+
+	/** True if a tile has open sea for {@code clearance} tiles all round, or is near enough an end not to need it. */
+	private static boolean roomy(Water water, int x, int y, int clearance, int[] start, int[] goal, int openNearEnds)
+	{
+		if (clearance <= 0
+			|| Math.max(Math.abs(x - start[0]), Math.abs(y - start[1])) <= openNearEnds
+			|| Math.max(Math.abs(x - goal[0]), Math.abs(y - goal[1])) <= openNearEnds)
+		{
+			return true;
+		}
+		for (int dx = -clearance; dx <= clearance; dx++)
+		{
+			for (int dy = -clearance; dy <= clearance; dy++)
+			{
+				if (!water.at(x + dx, y + dy))
+				{
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/** True if a tile is within {@code band} tiles of any leg of a route. */
+	private static boolean near(List<int[]> route, int x, int y, int band)
+	{
+		for (int i = 0; i + 1 < route.size(); i++)
+		{
+			int[] a = route.get(i);
+			int[] b = route.get(i + 1);
+			double dx = b[0] - a[0];
+			double dy = b[1] - a[1];
+			double lengthSquared = dx * dx + dy * dy;
+			double t = lengthSquared == 0 ? 0 : Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / lengthSquared));
+			if (Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t)) <= band)
+			{
+				return true;
+			}
+		}
+		return route.size() == 1 && Math.max(Math.abs(x - route.get(0)[0]), Math.abs(y - route.get(0)[1])) <= band;
+	}
+
 	/** The game's corner rule, restricted to water. */
-	private boolean canStep(int x, int y, int dx, int dy)
+	boolean canStep(int x, int y, int dx, int dy)
+	{
+		return canStep(ocean, x, y, dx, dy);
+	}
+
+	static boolean canStep(Water water, int x, int y, int dx, int dy)
 	{
 		if (dx == 0 || dy == 0)
 		{
 			return true;
 		}
 		// A diagonal needs both ways round to be water, or the raft would cut a headland.
-		return mesh.isOcean(x + dx, y, 0) && mesh.isOcean(x, y + dy, 0);
+		return water.at(x + dx, y) && water.at(x, y + dy);
 	}
 
 	/** Endpoint pair key. Direction matters: a route is reversed, not reused. */
