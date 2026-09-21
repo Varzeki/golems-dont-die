@@ -1,8 +1,15 @@
 package com.golemsdontdie;
 
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +19,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.worldmap.WorldMap;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPoint;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPointManager;
 import net.runelite.client.util.ImageUtil;
@@ -44,8 +52,8 @@ class GolemMapPoints
 	/** The face's size on screen, in pixels, which sets how far apart two faces must be. */
 	private static final int FACE_PIXELS = 15;
 
-	/** Names listed on a crowded face's tooltip before it counts instead. */
-	private static final int NAMES_SHOWN = 3;
+	/** Named faces kept before the oldest are dropped: renaming in the sidebar makes one a keystroke. */
+	private static final int MOST_LABELS = 256;
 
 	@Inject
 	private Client client;
@@ -55,6 +63,12 @@ class GolemMapPoints
 
 	@Inject
 	private Whereabouts whereabouts;
+
+	@Inject
+	private GolemsDontDieConfig config;
+
+	/** Faces with a name written over them, by the name. A player names a few dozen golems at most. */
+	private final Map<String, BufferedImage> labelled = new HashMap<>();
 
 	private BufferedImage face;
 
@@ -83,6 +97,7 @@ class GolemMapPoints
 		shown.clear();
 		used = 0;
 		cells.clear();
+		labelled.clear();
 	}
 
 	/**
@@ -167,15 +182,10 @@ class GolemMapPoints
 				fresh.plane = golem.getPlane();
 				fresh.count = 0;
 				fresh.first = golem;
-				fresh.named.clear();
 				cells.add(key, index);
 			}
 			Cell cell = cellList.get(index);
 			cell.count++;
-			if (isNamed(golem) && cell.named.size() < NAMES_SHOWN)
-			{
-				cell.named.add(golem);
-			}
 		}
 	}
 
@@ -190,9 +200,10 @@ class GolemMapPoints
 		{
 			Cell cell = cellList.get(i);
 			WorldPoint at = new WorldPoint(cell.x, cell.y, cell.plane);
+			CellPoint point;
 			if (i < shown.size())
 			{
-				CellPoint point = shown.get(i);
+				point = shown.get(i);
 				point.cell = cell;
 				if (!at.equals(point.getWorldPoint()))
 				{
@@ -201,11 +212,74 @@ class GolemMapPoints
 			}
 			else
 			{
-				CellPoint point = new CellPoint(cell, at, face);
+				point = new CellPoint(cell, at, face);
 				shown.add(point);
 				mapPoints.add(point);
 			}
+			dress(point, cell);
 		}
+	}
+
+	/**
+	 * Gives a point its picture: a plain face, or the face with the golem's name written over it.
+	 *
+	 * <p>The name is part of the image because the map overlay draws images and nothing else. The
+	 * image is anchored on the face rather than its middle, so the name sits above the golem's tile
+	 * rather than pushing the face off it.
+	 */
+	private void dress(CellPoint point, Cell cell)
+	{
+		String name = cell.count == 1 && isNamed(cell.first) ? cell.first.getNickname().trim() : null;
+		if (name == null)
+		{
+			if (point.getImage() != face)
+			{
+				point.setImage(face);
+				point.setImagePoint(null);
+			}
+			return;
+		}
+		if (labelled.size() > MOST_LABELS)
+		{
+			labelled.clear();
+		}
+		BufferedImage withName = labelled.computeIfAbsent(name, this::label);
+		if (point.getImage() != withName)
+		{
+			point.setImage(withName);
+			point.setImagePoint(new Point(withName.getWidth() / 2,
+				withName.getHeight() - face.getHeight() / 2));
+		}
+	}
+
+	/** The face with a name above it, drawn once per name and kept. */
+	private BufferedImage label(String name)
+	{
+		Font font = FontManager.getRunescapeSmallFont();
+		BufferedImage measuring = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D measure = measuring.createGraphics();
+		measure.setFont(font);
+		FontMetrics metrics = measure.getFontMetrics();
+		int textWidth = metrics.stringWidth(name);
+		int textHeight = metrics.getHeight();
+		measure.dispose();
+
+		int width = Math.max(face.getWidth(), textWidth + 2);
+		BufferedImage image = new BufferedImage(width, textHeight + face.getHeight(),
+			BufferedImage.TYPE_INT_ARGB);
+		Graphics2D graphics = image.createGraphics();
+		graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+		graphics.setFont(font);
+		int textX = (width - textWidth) / 2;
+		int baseline = metrics.getAscent();
+		// The game's own shadow, a pixel down and right, so the name reads over any map colour.
+		graphics.setColor(Color.BLACK);
+		graphics.drawString(name, textX + 1, baseline + 1);
+		graphics.setColor(config.nameplateColour());
+		graphics.drawString(name, textX, baseline);
+		graphics.drawImage(face, (width - face.getWidth()) / 2, textHeight, null);
+		graphics.dispose();
+		return image;
 	}
 
 	private static boolean isNamed(Golem golem)
@@ -221,7 +295,6 @@ class GolemMapPoints
 		int plane;
 		int count;
 		Golem first;
-		final List<Golem> named = new ArrayList<>(NAMES_SHOWN);
 	}
 
 	/** One face on the map, which says who is under it only when asked. */
@@ -263,20 +336,9 @@ class GolemMapPoints
 				return null;
 			}
 			String place = whereabouts.of(cell.first, tick);
-			if (cell.count == 1)
-			{
-				return getName() + " — " + place;
-			}
-			StringBuilder names = new StringBuilder();
-			for (Golem golem : cell.named)
-			{
-				names.append(names.length() == 0 ? "" : ", ").append(golem.getNickname());
-			}
-			if (cell.count > cell.named.size() && names.length() > 0)
-			{
-				names.append(" and others");
-			}
-			return getName() + " — " + place + (names.length() == 0 ? "" : "<br>" + names);
+			// A golem with a name already wears it on the map, so the tooltip only adds where it is.
+			// One without a name is just a golem: the place is the whole of what there is to say.
+			return cell.count == 1 && !isNamed(cell.first) ? place : getName() + " — " + place;
 		}
 	}
 }
