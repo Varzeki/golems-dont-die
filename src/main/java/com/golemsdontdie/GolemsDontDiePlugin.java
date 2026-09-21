@@ -244,6 +244,17 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private GolemCensus census;
 
+	@Inject
+	private PlaceNames placeNames;
+
+	@Inject
+	private Whereabouts whereabouts;
+
+	/** How often the sidebar's "where is it" lines are brought up to date, in game ticks. */
+	private static final int PLACES_TICKS = 5;
+
+	private int ticksSincePlaces;
+
 	/** How often golems are counted by region, in game ticks. See GolemCensus. */
 	private static final int CENSUS_TICKS = 10;
 
@@ -438,6 +449,7 @@ public class GolemsDontDiePlugin extends Plugin
 		// Read-only and shared, so loaded once here: a first-use load would land mid-frame,
 		// the one place a few milliseconds shows.
 		worldMesh.load();
+		placeNames.load();
 		propFactory.load();
 		transports.load();
 		// The index before the routes, because the routes are filtered by it.
@@ -1967,6 +1979,18 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			applyLearnedRoutes();
 			obstacleData.save();
+		}
+
+		if (panel != null && panel.isOnScreen() && ++ticksSincePlaces >= PLACES_TICKS)
+		{
+			ticksSincePlaces = 0;
+			List<Golem> living = livingGolems();
+			List<String> places = new ArrayList<>(living.size());
+			for (Golem golem : living)
+			{
+				places.add(whereabouts.of(golem, roamContext.getTick()));
+			}
+			panel.showPlaces(living, places);
 		}
 
 		if (++ticksSinceCensus >= CENSUS_TICKS)

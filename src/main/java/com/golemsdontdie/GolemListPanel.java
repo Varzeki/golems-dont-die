@@ -65,11 +65,12 @@ class GolemListPanel extends PluginPanel
 	 */
 	private final java.util.Map<Golem, Row> shown = new java.util.IdentityHashMap<>();
 
-	/** One golem's row: what goes in the list, and the name field in it. */
+	/** One golem's row: what goes in the list, the name field in it, and where the golem is. */
 	private static final class Row
 	{
 		final JPanel component;
 		final JTextField name;
+		JLabel place;
 
 		/** Set while the name is being put in from the game, so it is not taken for typing. */
 		boolean settingName;
@@ -210,6 +211,34 @@ class GolemListPanel extends PluginPanel
 		});
 	}
 
+	/**
+	 * Says where each golem is, under its name.
+	 *
+	 * <p>Given as a list in step with the roster rather than read from the golems here: they belong
+	 * to the client thread, and this is Swing's.
+	 */
+	void showPlaces(List<Golem> golems, List<String> places)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			for (int i = 0; i < golems.size() && i < places.size(); i++)
+			{
+				Row row = shown.get(golems.get(i));
+				String place = places.get(i);
+				if (row != null && row.place != null && !row.place.getText().equals(place))
+				{
+					row.place.setText(place);
+				}
+			}
+		});
+	}
+
+	/** True while the panel is on screen: nothing else is worth updating. */
+	boolean isOnScreen()
+	{
+		return isShowing();
+	}
+
 	/** Puts a golem's name into its field, if it differs, without that counting as typing. */
 	private static void showName(Row row, Golem golem)
 	{
@@ -259,7 +288,14 @@ class GolemListPanel extends PluginPanel
 		JPanel panel = new JPanel(new BorderLayout(6, 0));
 		panel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		panel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 6));
-		panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+		panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+
+		// Where the golem is, under its name. Empty until the first update, so a row does not
+		// jump in height the moment the panel is opened.
+		JLabel place = new JLabel(" ");
+		place.setFont(FontManager.getRunescapeSmallFont());
+		place.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		place.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 0));
 
 		JTextField name = new PlaceholderField(golem.getNickname());
 		Row[] self = new Row[1];
@@ -295,7 +331,12 @@ class GolemListPanel extends PluginPanel
 				onRename.accept(golem, text.isEmpty() ? null : text);
 			}
 		});
-		panel.add(name, BorderLayout.CENTER);
+		// Name across the top, place beneath it.
+		JPanel text = new JPanel(new BorderLayout());
+		text.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		text.add(name, BorderLayout.CENTER);
+		text.add(place, BorderLayout.SOUTH);
+		panel.add(text, BorderLayout.CENTER);
 
 		JButton remove = new JButton("✕");
 		remove.setToolTipText("Remove this golem");
@@ -311,9 +352,10 @@ class GolemListPanel extends PluginPanel
 		JPanel spaced = new JPanel(new BorderLayout());
 		spaced.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		spaced.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
-		spaced.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+		spaced.setMaximumSize(new Dimension(Integer.MAX_VALUE, 62));
 		spaced.add(panel, BorderLayout.CENTER);
 		self[0] = new Row(spaced, name);
+		self[0].place = place;
 		return self[0];
 	}
 
