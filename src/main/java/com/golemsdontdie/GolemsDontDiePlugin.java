@@ -32,6 +32,7 @@ import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.callback.RenderCallback;
 import net.runelite.client.callback.RenderCallbackManager;
 import net.runelite.client.config.ConfigManager;
@@ -520,7 +521,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Golems and their maps belong to the client thread and this runs on Swing's: saving
 		// here iterated the roster while a frame could be moving it.
-		onClientThreadAndWait(() ->
+		onClientThread(() ->
 		{
 			// Each step on its own, so one failing cannot stop the rest: the old shutdown's
 			// first line threw, the roster stayed in memory, and re-enabling doubled every
@@ -587,52 +588,48 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 	}
 
-	/** How long shutdown waits for the client thread before doing the work here. */
-	private static final long SHUTDOWN_WAIT_MILLIS = 3000;
-
 	/**
-	 * Runs a task on the client thread and waits, or here if that thread does not get to it in
-	 * time — closing the client may have stopped it, and the saves must still happen. Once.
+	 * Runs a task on the client thread: here if this is already it, queued otherwise.
+	 *
+	 * <p>Golems, their maps and everything drawn belong to that thread, and the plugin is stopped
+	 * from Swing's. Nothing waits for the task: the client runs while the plugin is being stopped,
+	 * so it is picked up on the next cycle, and a closing client has its own moment to save — see
+	 * {@link #onClientShutdown}.
 	 */
-	private void onClientThreadAndWait(Runnable task)
+	private void onClientThread(Runnable task)
 	{
 		if (client.isClientThread())
 		{
 			task.run();
 			return;
 		}
-		java.util.concurrent.atomic.AtomicBoolean claimed = new java.util.concurrent.atomic.AtomicBoolean();
-		java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
-		clientThread.invoke(() ->
+		clientThread.invoke(task);
+	}
+
+	/**
+	 * Saves before the client closes.
+	 *
+	 * <p>Stopping a plugin and closing the client are different moments, and only this one ends with
+	 * the client thread going away. The save is handed to that thread and the client is asked to wait
+	 * for it, which is how a plugin keeps work alive across shutdown without holding anything up.
+	 */
+	@Subscribe
+	public void onClientShutdown(ClientShutdown event)
+	{
+		if (!running)
 		{
-			try
-			{
-				if (claimed.compareAndSet(false, true))
-				{
-					task.run();
-				}
-			}
-			finally
-			{
-				done.countDown();
-			}
+			return;
+		}
+		java.util.concurrent.CompletableFuture<Void> saved = new java.util.concurrent.CompletableFuture<>();
+		event.waitFor(saved);
+		onClientThread(() ->
+		{
+			safely("saving golems", this::saveGolems);
+			safely("saving the island map", this::saveIslandMemory);
+			safely("saving learned routes", this::saveLearnedObstacles);
+			safely("saving obstacle data", obstacleData::save);
+			saved.complete(null);
 		});
-		try
-		{
-			if (done.await(SHUTDOWN_WAIT_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS))
-			{
-				return;
-			}
-		}
-		catch (InterruptedException e)
-		{
-			Thread.currentThread().interrupt();
-		}
-		if (claimed.compareAndSet(false, true))
-		{
-			log.warn("Client thread did not run shutdown in time; saving from here");
-			task.run();
-		}
 	}
 
 	/** Saves the roster shortly, folding in any other change asked for before then. */

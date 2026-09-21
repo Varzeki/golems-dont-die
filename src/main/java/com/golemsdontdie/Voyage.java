@@ -58,12 +58,19 @@ class Voyage
 		return builder;
 	}
 
-	/** Stops the builder and forgets every field, when the plugin stops. */
+	/**
+	 * Stops the builder and forgets every field, when the plugin stops.
+	 *
+	 * <p>Queued builds are dropped and the thread is left to finish the one in hand, which takes a
+	 * fraction of a second and touches nothing but the mesh. It is a daemon thread and times out
+	 * when idle, so nothing holds the client open.
+	 */
 	synchronized void shutDown()
 	{
 		if (builder != null)
 		{
-			builder.shutdownNow();
+			builder.getQueue().clear();
+			builder.shutdown();
 			builder = null;
 		}
 		building.clear();
