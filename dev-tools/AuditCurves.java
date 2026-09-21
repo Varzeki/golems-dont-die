@@ -54,12 +54,19 @@ import java.util.regex.Pattern;
  */
 public class AuditCurves
 {
-	private static final String DEFAULT_PROFILE =
-		"C:/Users/varzeki/.runelite/profiles2/default-0.properties";
-	private static final String RUNELITE_DIR = "C:/Users/varzeki/.runelite";
+	/** RuneLite's folder, {@code -Drunelite.dir=...} to point elsewhere. */
+	private static final String RUNELITE_DIR =
+		System.getProperty("runelite.dir", System.getProperty("user.home") + "/.runelite");
+
+	private static final String DEFAULT_PROFILE = RUNELITE_DIR + "/profiles2/default-0.properties";
+
+	/**
+	 * Where the transport tables are read from: this project's own, and Shortest Path's if a copy is
+	 * to hand. {@code -Dshortest.path=<dir>} names the second.
+	 */
 	private static final String[] TRANSPORT_DIRS = {
-		"R:/RunelitePluginDevelopment/References/shortest-path/src/main/resources/transports",
-		"R:/RunelitePluginDevelopment/MyPlugins/Golems Dont Die/dev-tools/transports",
+		System.getProperty("shortest.path", "../References/shortest-path/src/main/resources/transports"),
+		"dev-tools/transports",
 	};
 
 	/** 128ths of a tile, matching the plugin and the client's local coordinates. */
@@ -108,8 +115,8 @@ public class AuditCurves
 	 * minutes behind. The log records every value as it is set — the stile had been learned
 	 * for several minutes before the profile knew anything about it.
 	 */
-	private static final String CLIENT_LOG =
-		"C:/Users/varzeki/AppData/Local/Temp/runelite-plugin-stdout.txt";
+	private static final String CLIENT_LOG = System.getProperty("client.log",
+		System.getProperty("java.io.tmpdir") + "/runelite-plugin-stdout.txt");
 
 	/** Rescues the client log reported, by the tile the golem was lifted from. */
 	private final Map<String, Integer> logRescues = new HashMap<>();

@@ -1,0 +1,5 @@
+# Exploration Expansion mosaic, largest first: file | focus across,down | size
+../Exploration1.webp | 0.42,0.5 | 2.6
+../Exploration2.webp | 0.45,0.5 | 1.7
+../Exploration3.webp | 0.58,0.45 | 1.4
+../Exploration4.webp | 0.52,0.55 | 1.0

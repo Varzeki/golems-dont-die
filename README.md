@@ -1,39 +1,42 @@
-# Golems Don't Die
+![Golems Don't Die](media/golems-dont-die-title.png)
 
-Golems you craft on Wyrmscraig should live forever.
+Golems should live forever.
 
-A crafted golem normally steps off its plinth, wanders for about twenty seconds and
-falls apart. This plugin makes them live forever — and they no longer stay on the island.
+Golem Crafting usually has Golems briefly wander around before dramatically dying of sadness about 20 seconds later. 
+This plugin makes them continue to wander around indefinitely instead.
 
 You can even name them.
 
-![Hundreds of golems roaming Wyrmscraig](golem-island.jpg)
+---
 
-## Golems abroad
+**NEW UPDATE**
+![Exploration Expansion: golems sailing, climbing, hopping stones and exploring dungeons](media/exploration-expansion.jpg)
 
-On the island itself they use Wyrmscraig's own shortcuts — the rock climb on the west
-cliff and the three basalt stepping-stone crossings. There are two ways off: the main
-dock, or down into the caves and out through the dock inside them.
+The golems figured out Sailing. They've trained Agility. They've even done quests.
 
-A golem that reaches either will sail. From there it walks the rest of Gielinor, using
-the same ladders, stiles, shortcuts and ferries you do — it inherits your account, so a
-shortcut you have the Agility for is a shortcut your golems have too. It climbs and jumps
-and squeezes with the game's own animations, and the scenery it uses animates with it.
+### They explore.
 
-Golems will not use anything that needs an item you would have to carry, they never touch
-the server, and they are visible only to you.
+Golems now inherit your characters capabilities - they can access the same agility shortcuts and quest areas you can, and are *mostly* capable of getting there.
 
-None of this costs anything while you are not looking. A golem outside your screen is
-stored as a route and a departure time rather than being stepped, so the price of a
-thousand golems wandering the world is roughly the price of the handful you can see.
+They can sail, use shortcuts, activate travel systems such as fairy rings or spirit trees, and even enter instances.
+
+
+
+
+---
 
 ## Settings
 
-Golems roam freely and persist permanently. There is a limit
-toggle, off by default, for anyone who notices the framerate dip after crafting 1000 golems.
+**Golems**
 
-The **Golems** side panel lists every golem currently ingame. Each golem can be given
-a name or removed.
+| Setting | Default | |
+|---|---|---|
+| Limit golems | Off | Cap golems, for anyone who notices the framerate dip after crafting 1000+ golems. |
+| Maximum golems | 25 | The cap, when Limit golems is on. |
+| Show golem names | On | Show golem names above their head. |
+| Name colour | Yellow (#FFE700) | The colour of the golem names. |
+| Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
+
 
 ## Building
 
@@ -44,11 +47,16 @@ a name or removed.
 Requires a local RuneLite install in `~/.m2` (`./gradlew publishAllToMavenLocal` in the
 runelite repo), or `repo.runelite.net` for the published client artifact.
 
+
 ## Credits
 
-Collision map and transport data from [Shortest Path](https://github.com/Skretzo/shortest-path)
-by Skretzo, BSD 2-Clause. Model and animation technique from
-[Creator's Kit](https://github.com/ScreteMonge/creators-kit) by ScreteMonge.
+Collision map and transport data from [Shortest Path](https://github.com/Skretzo/shortest-path) by Skretzo. 
+
+Model and animation technique from
+[Creator's Kit](https://github.com/ScreteMonge/creators-kit) by ScreteMonge. 
+
+Boat movement modelled
+on [Turning Circles](https://github.com/anmcgrath/turning-circles) by anmcgrath. 
 
 ## Licence
 

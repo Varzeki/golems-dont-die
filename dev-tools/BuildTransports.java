@@ -77,8 +77,9 @@ public class BuildTransports
 
 	public static void main(String[] args) throws IOException
 	{
+		// Shortest Path's tables, wherever a copy of that project sits beside this one.
 		File dir = new File(args.length > 0 ? args[0]
-			: "R:/RunelitePluginDevelopment/References/shortest-path/src/main/resources/transports");
+			: System.getProperty("shortest.path", "../References/shortest-path/src/main/resources/transports"));
 		if (!dir.isDirectory())
 		{
 			System.err.println("usage: BuildTransports <transports-dir> [out.gz]");
