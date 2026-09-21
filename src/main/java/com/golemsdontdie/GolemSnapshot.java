@@ -10,19 +10,10 @@ import net.runelite.api.coords.WorldPoint;
  * Everything about a live golem that a copy will need, recorded while the real one
  * is still standing.
  *
- * <p>It has to be gathered in advance because none of it survives the NPC. Once the
- * golem despawns it is gone from the scene and the animation IDs the client was
- * posing it with go with it — so the plugin keeps a snapshot refreshed for every
- * golem it is watching, and builds the copy from the last one taken before the death
- * animation began.
- *
- * <p>The split between what is looked up and what is remembered matters for saving.
- * Models, recolours, scale and size all come from {@link NPCComposition}, so they can
- * be re-fetched from the cache later given only an NPC ID. The animation IDs cannot:
- * the RuneLite API's composition exposes no standing or walking animation, so there
- * is no way to ask the cache how an NPC walks. Only the live
- * {@link net.runelite.api.Actor}, which has already been told, will answer — which is
- * why those three ints are the part that has to be written to disk.
+ * <p>None of it survives the NPC, so a snapshot is kept refreshed for every watched golem
+ * and the copy built from the last one before the death animation. Models, recolours, scale
+ * and size come from {@link NPCComposition} given only an NPC ID; the animation IDs do not,
+ * only the live {@link net.runelite.api.Actor} having them, so those three go to disk.
  */
 @Value
 class GolemSnapshot
@@ -30,7 +21,7 @@ class GolemSnapshot
 	int npcId;
 	String name;
 
-	/** Model IDs from the composition, merged and recoloured to build the base model. */
+	/** Model IDs from the composition, merged and recoloured into the base model. */
 	int[] modelIds;
 	short[] recolourFrom;
 	short[] recolourTo;
@@ -39,19 +30,18 @@ class GolemSnapshot
 	int widthScale;
 	int heightScale;
 
-	/** Footprint in tiles, used to size the drawn object's tile-sorting radius. */
+	/** Footprint in tiles; sizes the drawn object's tile-sorting radius. */
 	int size;
 
-	/** Pose animations, harvested from the actor. -1 where the golem has none. */
+	/** Pose animations from the actor. -1 where the golem has none. */
 	int idlePoseAnimation;
 	int walkAnimation;
 	int runAnimation;
 
-	/** Where it stood and which way it faced when the snapshot was taken. */
+	/** Where it stood and which way it faced when taken. */
 	WorldPoint worldLocation;
 	int orientation;
 
-	/** A copy of this snapshot facing somewhere else. */
 	GolemSnapshot facing(int newOrientation)
 	{
 		return new GolemSnapshot(npcId, name, modelIds, recolourFrom, recolourTo,
@@ -59,11 +49,7 @@ class GolemSnapshot
 			worldLocation, newOrientation & 2047);
 	}
 
-	/**
-	 * Reads the current state of a live golem.
-	 *
-	 * @return the snapshot, or null if the NPC has no usable composition
-	 */
+	/** Reads the current state of a live golem; null if the NPC has no usable composition. */
 	static GolemSnapshot of(NPC npc)
 	{
 		NPCComposition comp = npc.getTransformedComposition();
@@ -87,8 +73,7 @@ class GolemSnapshot
 	}
 
 	/**
-	 * Rebuilds a snapshot for a saved golem, taking appearance from the cache and
-	 * everything the cache does not hold from the save.
+	 * Rebuilds a snapshot for a saved golem: appearance from the cache, the rest from the save.
 	 *
 	 * @return the snapshot, or null if the NPC ID is no longer in the cache
 	 */
@@ -102,9 +87,7 @@ class GolemSnapshot
 		}
 
 		// A golem with no animation stands frozen, which is worse than one moving
-		// slightly wrong. Saves written before the animations were recorded, or ones
-		// that caught a golem mid-transition, can carry -1 — so fall back to the known
-		// values rather than restoring a statue.
+		// slightly wrong; saves predating the recording, or catching a transition, carry -1.
 		if (walk == -1)
 		{
 			walk = GolemContent.GOLEM_WALK_ANIMATION;

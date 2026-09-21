@@ -11,14 +11,10 @@ import net.runelite.api.coords.WorldPoint;
 /**
  * Reads and writes the saved golem roster.
  *
- * <p>Only what the cache cannot supply is written: the NPC ID, where the golem is,
- * where it calls home, and the three animation IDs that no composition exposes.
- * Everything visual is re-fetched from the cache on load, so the save stays about
- * ten numbers per golem however elaborate the model is.
- *
- * <p>The format is a flat delimited string rather than JSON. The whole record is
- * numbers, the config store takes a string either way, and a save the player can
- * read and edit in the config file is worth more here than a schema.
+ * <p>Only what the cache cannot supply is written: the NPC ID, position, home tile, and the
+ * three animation IDs no composition exposes. Everything visual is re-fetched on load, so the
+ * save stays about ten numbers per golem. A flat delimited string rather than JSON: the record
+ * is all numbers, and a save the player can read and edit is worth more than a schema.
  */
 @Slf4j
 @Singleton
@@ -79,9 +75,8 @@ class GolemStore
 				.append(snapshot.getIdlePoseAnimation()).append(FIELD_SEPARATOR)
 				.append(snapshot.getWalkAnimation()).append(FIELD_SEPARATOR)
 				.append(snapshot.getRunAnimation()).append(FIELD_SEPARATOR)
-				// Separators are stripped rather than escaped: a nickname is free text
-				// the player types, and losing a stray comma from one is a far smaller
-				// problem than a save file that will not parse.
+				// Separators are stripped rather than escaped: losing a stray comma from
+				// free text beats a save file that will not parse.
 				.append(golem.getNickname() == null
 					? ""
 					: golem.getNickname().replaceAll(ILLEGAL_IN_NICKNAME, ""))
@@ -144,8 +139,7 @@ class GolemStore
 	/**
 	 * Turns a saved record back into a golem, pulling its appearance from the cache.
 	 *
-	 * @param index position in the save file, which is what keeps each golem's seed
-	 *              distinct — see below
+	 * @param index position in the save file, which keeps each golem's seed distinct
 	 * @return the golem, or null if the cache no longer knows that NPC ID
 	 */
 	Golem revive(SavedGolem saved, int index)
@@ -161,16 +155,10 @@ class GolemStore
 
 		WorldPoint home = new WorldPoint(saved.homeX, saved.homeY, saved.plane);
 
-		// The index is what makes the seed unique, and it is not decoration.
-		//
-		// Position alone is not enough: two golems standing on the same tile when the
-		// game was saved would come back with the same seed, and a Golem's entire gait
-		// — where it wanders, how long it dwells — comes out of that one number. They
-		// would walk in perfect lockstep forever, which is both obviously wrong and
-		// exactly what happens where golems congregate, such as on a spawn tile.
-		//
-		// Position still contributes, so a golem keeps a stable character across
-		// reloads as long as the roster does not change around it.
+		// The index is what makes the seed unique. Position alone is not enough: two golems
+		// saved on the same tile — what happens on a spawn tile — would share a seed, and a
+		// Golem's entire gait comes out of that one number. Position still contributes, so a
+		// golem keeps a stable character across reloads.
 		long seed = ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
 		Golem golem = Golem.onTile(snapshot, home, seed, at);
 		golem.setNickname(saved.nickname);

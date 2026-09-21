@@ -13,33 +13,18 @@ import net.runelite.api.ModelData;
 /**
  * Rebuilds a golem's model from the cache, unposed.
  *
- * <p>The tempting shortcut is to take {@link net.runelite.api.Renderable#getModel()}
- * off the live NPC, the way the Player Owned Island plugin copies the player. That
- * works for a copy that only has to live as long as the thing it is copying, and
- * only if the original keeps supplying fresh frames — the model handed back is
- * already posed for the current animation frame, and the client owns the buffer it
- * sits in.
- *
- * <p>Neither holds here. The copy has to outlive the golem by an unbounded amount
- * and animate on its own, so it needs the <i>rest</i> pose the animation frames are
- * defined against. Posing a posed model compounds the two transforms and produces a
- * golem folded through itself.
- *
- * <p>So the model is assembled the way the client would: load each model ID from the
- * composition, apply the composition's colour swaps, merge, scale, and light. What
- * comes back is a rest-pose {@link Model} that
- * {@link Client#applyTransformations(Model, net.runelite.api.Animation, int, net.runelite.api.Animation, int)}
- * will accept for as long as the plugin cares to keep it.
+ * <p>{@link net.runelite.api.Renderable#getModel()} on the live NPC returns a model already
+ * posed for the current frame, in a client-owned buffer. This copy outlives the golem and
+ * animates on its own, so it needs the <i>rest</i> pose the animation frames are defined
+ * against; posing a posed model compounds the two transforms and folds the golem through itself.
  */
 @Slf4j
 @Singleton
 class GolemModelFactory
 {
 	/**
-	 * The client's base lighting for actors. An NPC's own ambient and contrast are
-	 * added to these — a detail that is easy to miss and plainly visible when missed,
-	 * since a copy lit with the bare defaults sits next to the real thing looking
-	 * flatter and the wrong brightness.
+	 * The client's base lighting for actors; an NPC's own ambient and contrast add to these. Bare
+	 * defaults look flatter and the wrong brightness beside the real thing.
 	 */
 	private static final int BASE_AMBIENT = 64;
 	private static final int BASE_CONTRAST = 850;
@@ -54,25 +39,14 @@ class GolemModelFactory
 	private Client client;
 
 	/**
-	 * One built model per NPC ID, shared by every golem wearing it.
-	 *
-	 * <p>Every golem on the island is the same NPC with the same models, recolours and
-	 * scale, so building one per golem was building the same thing hundreds of times —
-	 * a cache load, a merge, a vertex clone and a lighting pass each. With a few
-	 * hundred golems arriving at once as the scene loads, that is seconds of stall for
-	 * no benefit.
-	 *
-	 * <p>Sharing is safe because nothing downstream writes to the base model:
-	 * {@link Client#applyTransformations} clones the vertices out of its source and
-	 * leaves it untouched, and the posed result it returns is what gets drawn.
+	 * One built model per NPC ID, shared by every golem wearing it. Every golem is the same NPC,
+	 * so building one each meant a cache load, merge, vertex clone and lighting pass per golem —
+	 * seconds of stall as a few hundred arrive with the scene. Safe because
+	 * {@link Client#applyTransformations} clones its source's vertices rather than writing to it.
 	 */
 	private final Map<Integer, Model> cache = new HashMap<>();
 
-	/**
-	 * The rest-pose model for a snapshot, built once and thereafter shared.
-	 *
-	 * @return the lit model, or null if the cache would not give up the parts
-	 */
+	/** The lit rest-pose model for a snapshot, built once and shared; null if a part is missing. */
 	Model modelFor(GolemSnapshot snapshot)
 	{
 		Model cached = cache.get(snapshot.getNpcId());
@@ -90,13 +64,9 @@ class GolemModelFactory
 	}
 
 	/**
-	 * Animation definitions, shared the same way the models are.
-	 *
-	 * <p>Golems switch between walking and standing constantly, and each switch used to
-	 * re-fetch the definition from the client. There are exactly two of them across the
-	 * whole population, and an {@link Animation} is immutable frame data — the mutable
-	 * playback state lives in each golem's own controller — so one copy of each serves
-	 * every golem on the island.
+	 * Animation definitions, shared the same way the models are: there are exactly two across the
+	 * whole population, and an {@link Animation} is immutable frame data — mutable playback state
+	 * lives in each golem's own controller — so one copy of each serves every golem.
 	 */
 	private final Map<Integer, Animation> animations = new HashMap<>();
 
@@ -107,8 +77,8 @@ class GolemModelFactory
 		{
 			return null;
 		}
-		// computeIfAbsent is avoided: loadAnimation can return null, and that would
-		// mean re-asking for a missing animation on every switch.
+		// computeIfAbsent is avoided: loadAnimation can return null, which would mean
+		// re-asking for a missing animation on every switch.
 		if (animations.containsKey(animationId))
 		{
 			return animations.get(animationId);
@@ -119,29 +89,17 @@ class GolemModelFactory
 	}
 
 	/**
-	 * How long a clip runs for, in client cycles, or 0 if it is not known.
-	 *
-	 * <p>Asked of the client rather than measured offline and shipped. The length is the
-	 * sum of the animation's own frame lengths, so this is the game's answer to how long
-	 * the action takes — and it stays right if Jagex ever retimes one, where a harvested
-	 * constant would quietly drift.
-	 *
-	 * <p>Used to pace a golem through a shortcut. Guessing that instead is what had golems
-	 * scaling a cliff in two thirds of a second.
+	 * How long a clip runs for, in client cycles, or 0 if unknown: the sum of its frame lengths,
+	 * asked of the client so it stays right if Jagex retimes one. Paces a golem through a
+	 * shortcut; guessing had golems scaling a cliff in two thirds of a second.
 	 */
 	/**
 	 * True if this animation is built to repeat.
 	 *
-	 * <p>{@code frameStep} is how many frames the client winds back when a clip reaches its
-	 * end: a positive value loops, and -1 runs once and stops. The distinction is not
-	 * cosmetic and cannot be guessed from the name — {@code human_climbing} (737) does not
-	 * loop while {@code human_climbing_loop} (4435) does, and a stepping-stone hop (741)
-	 * never does however long the obstacle takes.
-	 *
-	 * <p>It decides whether a clip may be stretched to fill a duration. Stretching a
-	 * one-shot makes the golem restart it partway through and drift across at the wrong
-	 * rate, which is exactly what a hop looked like; refusing to stretch a loop makes a
-	 * climb finish in a fraction of the time it should.
+	 * <p>{@code frameStep} is how many frames the client winds back at a clip's end: positive
+	 * loops, -1 runs once. It cannot be guessed from the name — {@code human_climbing} (737) does
+	 * not loop, {@code human_climbing_loop} (4435) does. Only a loop may be stretched to fill a
+	 * duration; a stretched one-shot restarts partway and drifts.
 	 */
 	boolean loops(int animationId)
 	{
@@ -157,15 +115,9 @@ class GolemModelFactory
 			return 0;
 		}
 
-		// Frame lengths, summed. Not getDuration().
-		//
-		// getDuration() is a frame *count* — RuneLite's own javadoc says "how many frames
-		// the animation lasts" — and reading it as a length in cycles made every clip in
-		// the plugin four or five times shorter than it is. A stepping-stone hop came out
-		// at 8 cycles against its real 38, so golems crossed the gap in a quarter of a
-		// tick. Every attempt to fix the pacing was tuning around this.
-		//
-		// The frame lengths are in client cycles and are the authority.
+		// Frame lengths, summed, not getDuration(): that is a frame *count*, and reading it as
+		// cycles made every clip four or five times shorter — a hop came out at 8 cycles against
+		// its real 38. Frame lengths are in client cycles.
 		int[] frames = animation.getFrameLengths();
 		if (frames == null || frames.length == 0)
 		{
@@ -183,21 +135,16 @@ class GolemModelFactory
 	/**
 	 * The longest a clip is allowed to claim to be, in client cycles.
 	 *
-	 * <p>Some sequences end on a frame held for an absurd length of time, as a way of
-	 * saying "stay like this until told otherwise" — {@code agilityarena_handholds_middle}
-	 * reports 20,056 cycles, which is six and a half minutes, and
-	 * {@code agilty_shortcut_enter_hole} reports 2,060.
-	 *
-	 * <p>Taken at face value those become the length of a traversal, and a golem that used
-	 * one would stand frozen inside the obstacle for minutes. Twenty ticks is longer than
-	 * any real traversal in the game and far shorter than any of these.
+	 * <p>Some sequences end on a frame held absurdly long, meaning "stay like this until told
+	 * otherwise": {@code agilityarena_handholds_middle} reports 20,056 cycles and
+	 * {@code agilty_shortcut_enter_hole} 2,060, which taken at face value freeze a golem in the
+	 * obstacle for minutes. Twenty ticks is longer than any real traversal.
 	 */
 	private static final int MAX_CLIP_CYCLES = 600;
 
 	/**
-	 * Drops the shared models and animations. Called when the plugin stops, so a
-	 * disable/enable cycle does not keep handing out resources built against a client
-	 * that has moved on.
+	 * Drops the shared models and animations when the plugin stops, so a disable/enable cycle
+	 * does not hand out resources built against a client that has moved on.
 	 */
 	void clear()
 	{
@@ -205,11 +152,7 @@ class GolemModelFactory
 		animations.clear();
 	}
 
-	/**
-	 * Builds the rest-pose model described by a snapshot.
-	 *
-	 * @return the lit model, or null if the cache would not give up the parts
-	 */
+	/** Builds the rest-pose model a snapshot describes; null if the cache lacks a part. */
 	private Model build(GolemSnapshot snapshot)
 	{
 		try
@@ -223,8 +166,8 @@ class GolemModelFactory
 				ModelData part = client.loadModelData(id);
 				if (part == null)
 				{
-					// A single missing part would leave a golem with no head. Better to
-					// fail the whole build and let the real death play out.
+					// A missing part would leave a golem with no head; better to fail the
+					// whole build and let the real death play out.
 					log.debug("Golem model part {} not in cache for npc {}", id, snapshot.getNpcId());
 					return null;
 				}
@@ -242,9 +185,9 @@ class GolemModelFactory
 				return null;
 			}
 
-			// Recolour and resize both write into the vertex and colour arrays, which
-			// are shared with the cache's copy until cloned. Skipping this repaints
-			// every other model in the game that happens to share the source.
+			// Recolour and resize write into the vertex and colour arrays, shared with the
+			// cache's copy until cloned. Skipping this repaints every other model in the
+			// game that shares the source.
 			merged.cloneColors().cloneVertices();
 
 			short[] from = snapshot.getRecolourFrom();

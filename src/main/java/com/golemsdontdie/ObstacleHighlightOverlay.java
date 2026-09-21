@@ -22,42 +22,29 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 /**
  * Colours the shortcuts around the player by how well the plugin knows them.
  *
- * <p>Golems only perform animations that have been measured, and the set of obstacles they
- * can use grows as the player is seen using them. That is invisible by design — nothing is
- * announced — which leaves no way to tell which obstacles would benefit from being used
- * once. This is that way, for anyone who wants it.
+ * <p>Golems only perform animations that have been measured, and the set grows as the
+ * player is seen using obstacles. Nothing announces that, so this is the only way to tell
+ * which would benefit from being used once. Green is confirmed here; orange is inferred
+ * from similar objects elsewhere, and using it once turns it green, so those are the ones
+ * worth a detour; red has no usable animation and golems route around it.
  *
- * <ul>
- *   <li><b>Green.</b> Confirmed: the player has been seen using this exact obstacle, here.
- *       Golems copy what was observed.</li>
- *   <li><b>Orange.</b> Inferred: golems will use it already, on data generalised from
- *       similar objects elsewhere. Using it once turns it green and replaces a
- *       generalisation with a fact — these are the ones worth a detour.</li>
- *   <li><b>Red.</b> No usable animation, so golems route around it entirely.</li>
- * </ul>
- *
- * <p>Off by default. It is a diagnostic for people who want to help, not decoration.
+ * <p>Off by default: a diagnostic, not decoration.
  */
 class ObstacleHighlightOverlay extends Overlay
 {
 	/**
-	 * How far out obstacles are gathered, in tiles.
-	 *
-	 * <p>Larger than anything that can actually be drawn, deliberately. The client loads a
-	 * scene of 104 tiles square, so nothing beyond roughly fifty tiles has a position on
-	 * the canvas at all and {@link Perspective} declines to project it. Gathering further
-	 * out than that costs nothing here and means the highlights are already in hand the
-	 * moment a tile scrolls into the scene, rather than appearing a frame later.
+	 * How far out obstacles are gathered, in tiles. Deliberately larger than anything
+	 * drawable: the scene is 104 tiles square, so {@link Perspective} declines to project
+	 * beyond about fifty. Gathering further costs nothing and has highlights ready the
+	 * moment a tile scrolls in.
 	 */
 	private static final int RADIUS = 100;
 
 	/**
-	 * Tiles the player may move before the gathered set is rebuilt.
-	 *
-	 * <p>The set is rebuilt by sweeping the whole transport table, which is thirteen
-	 * thousand rows — fine occasionally, far too much every frame at fifty frames a second.
-	 * Ten tiles of slack means a running player rebuilds about once a second, and the
-	 * radius is a hundred, so nothing can scroll into view between rebuilds.
+	 * Tiles the player may move before the gathered set is rebuilt. A rebuild sweeps the
+	 * whole transport table, thirteen thousand rows — far too much at fifty frames a second.
+	 * Ten tiles is about one rebuild a second at a run, and the radius is a hundred, so
+	 * nothing scrolls into view between them.
 	 */
 	private static final int REBUILD_DISTANCE = 10;
 
@@ -91,12 +78,16 @@ class ObstacleHighlightOverlay extends Overlay
 		final int plane;
 		final Color colour;
 
+		/** The same colour at the fill's alpha, made once rather than every frame. */
+		final Color fill;
+
 		Marked(int x, int y, int plane, Color colour)
 		{
 			this.x = x;
 			this.y = y;
 			this.plane = plane;
 			this.colour = colour;
+			this.fill = new Color(colour.getRed(), colour.getGreen(), colour.getBlue(), FILL_ALPHA);
 		}
 	}
 
@@ -119,31 +110,26 @@ class ObstacleHighlightOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		if (!config.highlightObstacles())
+		if (!DevOptions.HIGHLIGHT_OBSTACLES)
 		{
-			// Dropped rather than kept, so turning the overlay off does not leave a
-			// hundred tiles of stale highlights waiting to be drawn again.
+			// Dropped, so turning the overlay off does not leave a hundred tiles
+			// of stale highlights waiting to be drawn again.
 			marked.clear();
 			builtPlane = -1;
 			builtVersion = -1;
 			return null;
 		}
 
-		Player local = client.getLocalPlayer();
-		if (local == null)
-		{
-			return null;
-		}
-
-		WorldPoint at = local.getWorldLocation();
+		// In the main world, aboard a boat too; see PlayerPosition.
+		WorldPoint at = PlayerPosition.of(client);
 		if (at == null)
 		{
 			return null;
 		}
 
-		// Inside an instance, everything known about obstacles is known by where the instance
-		// was copied from. Looking the instance's own coordinates up found nothing, so no
-		// obstacle in the Mad Angel's room was ever coloured. See InstanceMap.
+		// Inside an instance, obstacle knowledge is keyed by where it was copied from;
+		// looking up its own coordinates left the Mad Angel's room uncoloured. See
+		// InstanceMap.
 		WorldView wv = client.getTopLevelWorldView();
 		WorldView instance = wv != null && wv.isInstance() ? wv : null;
 		WorldPoint centre = instance != null ? InstanceMap.templateOf(instance, at) : at;
@@ -157,9 +143,15 @@ class ObstacleHighlightOverlay extends Overlay
 			rebuild(centre, instance);
 		}
 
+		// Once for every tile rather than once per tile: there can be thousands.
+		WorldView top = client.getTopLevelWorldView();
 		for (Marked mark : marked)
 		{
-			draw(graphics, mark);
+			if (top == null)
+			{
+				break;
+			}
+			draw(graphics, top, mark);
 		}
 
 		return null;
@@ -171,10 +163,9 @@ class ObstacleHighlightOverlay extends Overlay
 
 	private boolean needsRebuild(WorldPoint at, WorldView instance)
 	{
-		// Movement is not the only thing that invalidates the set. Using an obstacle
-		// changes its colour while the player stands still beside it, which is exactly
-		// when a distance-keyed cache would never notice. Nor is it the only thing that moves
-		// the tiles: a new instance of the same room is somewhere else each visit.
+		// Using an obstacle changes its colour while the player stands still beside it,
+		// which a distance-keyed cache would miss; and a new instance of the same room is
+		// somewhere else each visit.
 		int baseX = instance == null ? Integer.MIN_VALUE : instance.getBaseX();
 		int baseY = instance == null ? Integer.MIN_VALUE : instance.getBaseY();
 		return knowledge.getVersion() != builtVersion
@@ -185,13 +176,10 @@ class ObstacleHighlightOverlay extends Overlay
 	}
 
 	/**
-	 * Gathers every obstacle within range, one colour per tile.
-	 *
-	 * <p>Drawn from the obstacle index rather than the transport table, and that is the
-	 * point of the index existing. The table only holds obstacles somebody has worked out a
-	 * destination for; the index holds every obstacle in the game. An obstacle in neither
-	 * the table nor the learned set comes out red, which is accurate — golems cannot use
-	 * it — and is precisely the obstacle worth walking over to and using once.
+	 * Gathers every obstacle within range, one colour per tile. Drawn from the obstacle
+	 * index, not the transport table, which is why the index exists: the table holds only
+	 * obstacles with a worked-out destination. One in neither comes out red, which is
+	 * accurate and is precisely the obstacle worth using once.
 	 */
 	private void rebuild(WorldPoint at, WorldView instance)
 	{
@@ -203,10 +191,9 @@ class ObstacleHighlightOverlay extends Overlay
 		builtBaseY = instance == null ? Integer.MIN_VALUE : instance.getBaseY();
 		marked.clear();
 
-		// A tile can start several transports — a ladder that is also a door, or one
-		// obstacle recorded in both directions. Drawing each would stack outlines on one
-		// tile, so the most confident wins: anything confirmed makes the tile green, and
-		// only a tile where nothing at all is usable comes out red.
+		// A tile can start several transports — a ladder that is also a door — so the most
+		// confident wins rather than stacking outlines: only a tile where nothing at all
+		// is usable comes out red.
 		Map<Long, ObstacleKnowledge.Status> best = new HashMap<>();
 
 		for (ObstacleIndex.Obstacle obstacle : obstacles.near(builtX, builtY, builtPlane, RADIUS))
@@ -215,18 +202,15 @@ class ObstacleHighlightOverlay extends Overlay
 				obstacle.x, obstacle.y, obstacle.plane, obstacle.sizeX, obstacle.sizeY,
 				transports.archetypeFor(obstacle.objectId));
 
-			// Ordinary doors are not obstacles a golem can perform and there are three
-			// and a half thousand of them; outlining the lot would bury everything else in
-			// red. The few that are really transports — a door that teleports you through
-			// instead of opening — are shown once something is known about them.
+			// Ordinary doors are not obstacles a golem can perform and there are three and a
+			// half thousand of them; outlining the lot would bury everything else in red.
 			if (obstacle.wall && status == ObstacleKnowledge.Status.UNUSABLE)
 			{
 				continue;
 			}
 
-			// Every tile the object stands on, not just the corner the cache records it
-			// at. A church pew is two tiles and a cave mouth can be three; outlining one
-			// of them reads as the plugin not knowing about the rest.
+			// Every tile the object stands on, not just the corner the cache records. A church
+			// pew is two tiles and a cave mouth can be three.
 			for (int dx = 0; dx < obstacle.sizeX; dx++)
 			{
 				for (int dy = 0; dy < obstacle.sizeY; dy++)
@@ -244,10 +228,9 @@ class ObstacleHighlightOverlay extends Overlay
 			}
 		}
 
-		// Obstacles the player has used that the index has never heard of. The index is read
-		// from the world's fixed placements, and some obstacles are only ever placed in an
-		// instance — the Mad Angel's exit pew is one — so the only record of them is the player
-		// having used one there.
+		// Obstacles the player has used that the index has never heard of: it is read from
+		// the world's fixed placements, and some exist only in an instance — the Mad
+		// Angel's exit pew — so the player's use is the only record.
 		for (int[] place : knowledge.confirmedPlaces())
 		{
 			if (obstacles.knows(place[0]) || place[3] != builtPlane
@@ -281,10 +264,11 @@ class ObstacleHighlightOverlay extends Overlay
 	}
 
 	/** Outlines one tile, or silently skips it if the client cannot place it on screen. */
-	private void draw(Graphics2D graphics, Marked mark)
+	private void draw(Graphics2D graphics, WorldView top, Marked mark)
 	{
-		LocalPoint localPoint = LocalPoint.fromWorld(client.getTopLevelWorldView(),
-			new WorldPoint(mark.x, mark.y, mark.plane));
+		// LocalPoint.fromWorld without making the point: a tile on another plane is not in
+		// this scene.
+		LocalPoint localPoint = top.getPlane() != mark.plane ? null : LocalPoint.fromWorld(top, mark.x, mark.y);
 		if (localPoint == null)
 		{
 			// Outside the loaded scene. Most of a hundred-tile radius is, most of the time.
@@ -300,8 +284,7 @@ class ObstacleHighlightOverlay extends Overlay
 
 		graphics.setColor(mark.colour);
 		graphics.drawPolygon(tile);
-		graphics.setColor(new Color(mark.colour.getRed(), mark.colour.getGreen(),
-			mark.colour.getBlue(), FILL_ALPHA));
+		graphics.setColor(mark.fill);
 		graphics.fillPolygon(tile);
 	}
 

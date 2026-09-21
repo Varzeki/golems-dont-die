@@ -10,34 +10,28 @@ import net.runelite.api.NPC;
 /**
  * Decides what counts as a golem, and when one is dying.
  *
- * <p>Both answers are hardcoded from {@link GolemContent}, harvested once out of the
- * game cache rather than discovered at runtime. That is worth doing rather than
- * clever: a name match would sweep up the sixty-odd unrelated golems in the game, and
- * learning the death animation from the first golem to die costs one visible crumble
- * every time the roster is empty. Knowing the IDs up front means the very first swap
- * is as seamless as the hundredth.
- *
- * <p>Both remain overridable, because a content update can move them and a config
- * field is faster than a rebuild.
+ * <p>Both are hardcoded in {@link GolemContent}, not discovered at runtime: a name match
+ * would sweep up the sixty-odd unrelated golems in the game, and learning the death
+ * animation from the first death costs a visible crumble whenever the roster is empty.
+ * Both stay overridable, as a content update can move them.
  */
 @Singleton
 class GolemDetector
 {
-	/** Live golems being watched, by NPC index, with their most recent snapshot. */
+	/** Live golems watched, by NPC index, with their latest snapshot. */
 	private final Map<Integer, GolemSnapshot> tracked = new HashMap<>();
 
 	/** Golems already replaced by a copy, so a despawn does not replace them twice. */
 	private final Set<Integer> replaced = new HashSet<>();
 
 	/**
-	 * Golems seen playing the plinth animation. The copy takes over on the tick that
-	 * animation ends, which is the one moment a golem is reliably standing still.
+	 * Golems seen playing the plinth animation. The copy takes over as it ends, the one
+	 * moment a golem is reliably standing still.
 	 */
 	private final Set<Integer> leftPlinth = new HashSet<>();
 
 	// ---- identity ----
 
-	/** True if this NPC is a crafted golem. */
 	boolean isGolem(NPC npc)
 	{
 		return npc != null && GolemContent.isGolem(npc.getId());
@@ -51,7 +45,6 @@ class GolemDetector
 
 	// ---- tracking ----
 
-	/** Records or refreshes what a live golem looks like. */
 	void track(NPC npc)
 	{
 		GolemSnapshot snapshot = GolemSnapshot.of(npc);
@@ -61,19 +54,17 @@ class GolemDetector
 		}
 	}
 
-	/** The last snapshot taken of a golem, or null if it was never tracked. */
+	/** Last snapshot of a golem, or null if never tracked. */
 	GolemSnapshot snapshotOf(NPC npc)
 	{
 		return tracked.get(npc.getIndex());
 	}
 
-	/** Records that a golem has played the animation for stepping off its plinth. */
 	void noteLeftPlinth(NPC npc)
 	{
 		leftPlinth.add(npc.getIndex());
 	}
 
-	/** True if this golem has stepped off its plinth and is now standing free. */
 	boolean hasLeftPlinth(NPC npc)
 	{
 		return leftPlinth.contains(npc.getIndex());
@@ -98,7 +89,7 @@ class GolemDetector
 		leftPlinth.remove(npc.getIndex());
 	}
 
-	/** Drops everything. Called on logout and when the plugin stops. */
+	/** Drops everything; on logout and plugin stop. */
 	void reset()
 	{
 		tracked.clear();

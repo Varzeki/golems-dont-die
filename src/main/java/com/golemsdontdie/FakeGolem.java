@@ -12,18 +12,11 @@ import net.runelite.api.coords.LocalPoint;
 /**
  * Draws a {@link Golem} while it is inside the loaded scene.
  *
- * <p>This is deliberately thin: it owns no intentions and decides nothing about
- * where the golem goes. It reads the simulation's position each frame and poses the
- * model to match. A golem that leaves the scene loses its renderer and keeps walking;
- * one that comes back gets a new one.
- *
- * <p>The pose is applied here rather than borrowed from a real NPC. Copying a posed
- * model — the trick the Player Owned Island plugin uses for the player — needs an
- * original that is still alive and still being posed every frame. There isn't one:
- * the golem this stands in for is dead. So the base model is the cache's rest pose
- * and the animation is driven from an {@link AnimationController} of our own, which
- * is also what lets a golem keep walking indefinitely rather than for as long as
- * something else animates it.
+ * <p>Deliberately thin: it decides nothing about where the golem goes, only reading the
+ * simulation's position each frame, and a golem that leaves the scene loses its renderer but
+ * keeps walking. The pose is applied here rather than copied from a real NPC, which would need
+ * an original still alive and posed every frame; the base model is the cache's rest pose, driven
+ * by an {@link AnimationController} of our own.
  */
 class FakeGolem extends RuneLiteObjectController
 {
@@ -38,9 +31,8 @@ class FakeGolem extends RuneLiteObjectController
 	private final GolemModelFactory shared;
 
 	/**
-	 * Drives the walk or idle loop. A single controller rather than the client's
-	 * active-plus-pose pair, because a wandering golem only ever plays one thing at
-	 * a time — there is no attack or emote to layer over the gait.
+	 * Drives the walk or idle loop. One controller, not the client's active-plus-pose pair:
+	 * a wandering golem only ever plays one thing at a time.
 	 */
 	private final AnimationController animation;
 
@@ -48,13 +40,22 @@ class FakeGolem extends RuneLiteObjectController
 	private int loadedAnimationId = Integer.MIN_VALUE;
 
 	/**
-	 * Where each drawn frame of a traversal is reported, or null.
-	 *
-	 * <p>Here rather than in the simulation because this is what is actually on screen:
-	 * the position after the renderer has copied it, and the keyframe the controller is
-	 * really on, which is not necessarily the one the simulation asked for.
+	 * Where each drawn frame of a traversal is reported, or null. Here rather than in the
+	 * simulation because this is what is on screen: the position after the renderer copied it.
 	 */
 	private java.util.function.Consumer<String> trace;
+
+	/**
+	 * Whether anyone is recording. A golem mid-obstacle otherwise built a dozen strings every
+	 * frame for nothing to read.
+	 */
+	private java.util.function.BooleanSupplier tracing = () -> true;
+
+	/** How tall the golem is drawn, in the client's height units, for putting things above its head. */
+	int getModelHeight()
+	{
+		return baseModel.getModelHeight();
+	}
 
 	/** Whether the last traced frame was mid-traversal. */
 	private boolean wasTraversing;
@@ -67,9 +68,8 @@ class FakeGolem extends RuneLiteObjectController
 		this.shared = shared;
 		this.animation = new AnimationController(client, -1);
 
-		// A single-tile object is drawn correctly by the default radius; a bigger
-		// golem needs the tiles under its footprint drawn first or it will z-fight
-		// with the ground at its edges.
+		// The default radius suits a single-tile object; a bigger golem needs the tiles under
+		// its footprint drawn first or it z-fights with the ground.
 		int size = Math.max(1, golem.getSnapshot().getSize());
 		setRadius(size * 64 - 4);
 		setDrawFrontTilesFirst(true);
@@ -78,17 +78,16 @@ class FakeGolem extends RuneLiteObjectController
 		applyPose();
 	}
 
-	void setTrace(java.util.function.Consumer<String> trace)
+	void setTrace(java.util.function.Consumer<String> trace, java.util.function.BooleanSupplier tracing)
 	{
 		this.trace = trace;
+		this.tracing = tracing;
 	}
 
 	/**
-	 * Called by the client once per frame while registered.
-	 *
-	 * <p>Only the animation is advanced here. Position is advanced centrally by the
-	 * plugin, for every golem including the ones off screen — if movement happened
-	 * here, a golem would freeze the moment it left the scene and never walk back in.
+	 * Called by the client once per frame while registered. Only the animation is advanced here;
+	 * position is advanced centrally for every golem, including those off screen, or one would
+	 * freeze on leaving the scene.
 	 */
 	@Override
 	public void tick(int ticksSinceLastFrame)
@@ -103,13 +102,12 @@ class FakeGolem extends RuneLiteObjectController
 			animation.tick(ticksSinceLastFrame);
 		}
 
-		// One frame past the end as well, so the landing is on record. A door teleports on
-		// the frame its transition ends, and stopping the trace there left every door's
-		// last logged position halfway across.
+		// One frame past the end too: a door teleports on the frame its transition ends, so
+		// stopping there logged its last position halfway across.
 		boolean traversing = golem.inTransition();
 		boolean landed = wasTraversing && !traversing;
 		wasTraversing = traversing;
-		if (trace != null && (traversing || landed))
+		if (trace != null && (traversing || landed) && tracing.getAsBoolean())
 		{
 			Animation playing = animation.getAnimation();
 			trace.accept("fine=" + golem.getFineX() + "," + golem.getFineY()
@@ -133,9 +131,8 @@ class FakeGolem extends RuneLiteObjectController
 	@Override
 	public Model getModel()
 	{
-		// Only asked for when the client actually draws the object. Recorded so that a golem
-		// registered but not drawn — culled, or one too many on a crowded tile — shows in the
-		// journal rather than only as flicker on screen.
+		// Only asked for when the client actually draws the object, so a golem registered but
+		// not drawn shows in the journal.
 		lastDrawnCycle = client.getGameCycle();
 		if (animation.getAnimation() == null)
 		{
@@ -146,22 +143,15 @@ class FakeGolem extends RuneLiteObjectController
 	}
 
 	/**
-	 * The shape the mouse has to be inside for this golem to be hovered.
+	 * The shape the mouse has to be inside for this golem to be hovered. A
+	 * {@link RuneLiteObjectController} is drawn but not clickable, the client building its menu
+	 * from real entities, so the hit test is done by hand.
 	 *
-	 * <p>A {@link RuneLiteObjectController} is drawn but not clickable — the client
-	 * builds its menu from real entities, and a client-side object is not one. So the
-	 * hit test has to be done by hand.
-	 *
-	 * <p>Tested against the <b>rest pose</b>, not the posed model. Using
-	 * {@link #getModel()} here meant a full skeletal transform per golem per tick on
-	 * top of projecting the geometry, which is what made the client stall whenever the
-	 * cursor sat over the scene. It was also unsound: that model is a shared buffer the
-	 * client reuses, and the API forbids holding it across another transformation —
-	 * which is exactly what computing a clickbox from it does.
-	 *
-	 * <p>The cost of using the rest pose is that the box does not follow a swinging arm.
-	 * For deciding whether the cursor is over a golem, that is not a cost worth paying
-	 * a transform for.
+	 * <p>Tested against the <b>rest pose</b>, so the box ignores a swinging arm:
+	 * {@link #getModel()} meant a skeletal transform per golem per tick on top of the
+	 * projection, which stalled the client whenever the cursor sat over the scene, and was
+	 * unsound, that model being a shared buffer the API forbids holding across another
+	 * transformation.
 	 *
 	 * @return the clickbox, or null if it cannot be computed this frame
 	 */
@@ -178,7 +168,7 @@ class FakeGolem extends RuneLiteObjectController
 		}
 		catch (RuntimeException e)
 		{
-			// Off-screen or degenerate geometry. Not being hoverable for a frame is
+			// Off-screen or degenerate geometry; not being hoverable for a frame is
 			// not worth propagating.
 			return null;
 		}
@@ -204,16 +194,14 @@ class FakeGolem extends RuneLiteObjectController
 		setLevel(golem.getDrawPlane());
 		setOrientation(golem.getOrientation());
 
-		// Ground height has to be re-read as the golem moves, not just when it is
-		// placed: Wyrmscraig is not flat, and a golem holding its spawn height would
-		// sink into a rise and float off a dip.
+		// Ground height is re-read as the golem moves: Wyrmscraig is not flat, and a golem
+		// holding its spawn height would sink into a rise.
 		if (Golem.isInScene(wv, localX, localY))
 		{
-			// Terrain height, plus whatever the golem is doing above it. Mid-jump that is
-			// an arc, so a stepping-stone hop leaves the ground instead of sliding across
-			// the water at ankle height.
+			// Terrain height plus whatever the golem is doing above it — mid-jump an arc, so
+			// a hop leaves the ground instead of sliding at ankle height.
 			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getDrawPlane())
-				- golem.jumpArc());
+				- golem.jumpArc() - golem.deckLift());
 		}
 	}
 
@@ -228,17 +216,13 @@ class FakeGolem extends RuneLiteObjectController
 		}
 
 		// While performing a recording, the keyframe is the player's own, set directly.
+		// Advancing the clip by elapsed cycles at its authored speed is wrong: on a basalt
+		// stone the player holds keyframe one for about twenty-five cycles then runs the other
+		// seven during the jump, where the authored clip takes forty — golems finished hopping
+		// before leaving the ground.
 		//
-		// Earlier versions advanced the clip by the number of cycles the recording had
-		// run, at the clip's authored speed. That is not how the player's clip runs: on a
-		// basalt stone the player holds the first keyframe for about twenty-five cycles
-		// and then goes through the other seven during the jump, where the authored clip
-		// is done in forty. So golems finished hopping before they had left the ground.
-		// The recording now carries which keyframe the player was on at every sample, and
-		// that is simply what is drawn.
-		//
-		// Never past the last keyframe: a one-shot that completes is nulled by the
-		// controller, and the next frame would load it again and play it twice.
+		// Never past the last keyframe: the controller nulls a completed one-shot, and the
+		// next frame would load and play it again.
 		int frame = golem.getMotionFrame();
 		Animation loaded = animation.getAnimation();
 		if (frame >= 0 && loaded != null && loaded.getNumFrames() > 0)

@@ -17,19 +17,16 @@ import net.runelite.api.ModelData;
 /**
  * Builds the animated scenery drawn beside a golem that is using something.
  *
- * <p>Objects are harder to draw than NPCs, for one specific reason: the client's
- * {@code ObjectComposition} exposes an object's name, actions and size but <b>not its
- * model ids</b>, where {@code NPCComposition} does. There is no runtime route from an
- * object id to its geometry at all. So the ids are harvested offline by
- * {@code dev-tools/BuildProps.java} and shipped — 206 of them, the animated objects the
- * transport network actually references, in about a kilobyte.
+ * <p>{@code ObjectComposition} exposes an object's name, actions and size but <b>not its
+ * model ids</b>, where {@code NPCComposition} does, so there is no runtime route from an
+ * object id to its geometry. The ids are harvested offline by
+ * {@code dev-tools/BuildProps.java} and shipped: 206 objects the transport network
+ * references, in about a kilobyte. Each carries the animation the object itself plays, so a
+ * gate, a portcullis and a fairy ring each get their own motion with nothing enumerating
+ * which is which.
  *
- * <p>Each also carries the animation the object itself plays. That is better than naming
- * clips by hand: a gate, a portcullis and a fairy ring each get their own motion, and
- * nothing has to enumerate which is which.
- *
- * <p>Models and animations are cached and shared exactly as the golems' are. A hundred
- * golems boarding the same ferry build one plank between them.
+ * <p>Models are cached and shared as the golems' are: a hundred golems boarding the same
+ * ferry build one plank between them.
  */
 @Slf4j
 @Singleton
@@ -125,18 +122,15 @@ class PropFactory
 		}
 	}
 
-	/** What is known about an object, or null if it has no animation worth drawing. */
+	/** Null if the object has no animation worth drawing. */
 	Prop propFor(int objectId)
 	{
 		return props.get(objectId);
 	}
 
 	/**
-	 * The object's model, built once and shared.
-	 *
-	 * <p>Sharing is safe for the same reason it is safe for the golems: the client's
-	 * transformation clones vertices out of its source and returns a separate posed model,
-	 * so the base is never written to.
+	 * The object's model, built once and shared. Sharing is safe because the client's
+	 * transformation clones vertices out of its source, so the base is never written to.
 	 *
 	 * @return the lit model, or null if the cache would not give up the parts
 	 */

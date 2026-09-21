@@ -4,30 +4,27 @@ import java.awt.Shape;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.KeyCode;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Perspective;
 import net.runelite.api.Point;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.client.callback.ClientThread;
+import net.runelite.client.game.chatbox.ChatboxPanelManager;
 
 /**
  * Gives the copies the right-click menu the real golems have.
  *
- * <p>Without this a fake golem is inert under the cursor: a
- * {@link net.runelite.api.RuneLiteObjectController} is drawn by the client but is not
- * an entity it will build a menu from, so hovering one produces nothing where the real
- * golem offered an option and an examine. That reads as wrong immediately — the
- * illusion survives the swap and then dies to a mouse hover.
- *
- * <p>So the hit test is done by hand each tick: take the posed model that was drawn,
- * ask {@link net.runelite.api.Perspective} for its clickbox, and see whether the mouse
- * is inside it. Entries are added with {@link MenuAction#RUNELITE} and their own click
- * handlers, so nothing is sent to the server — a fake golem is a local fiction and
- * clicking one must stay local.
+ * <p>A {@link net.runelite.api.RuneLiteObjectController} is drawn by the client but is not
+ * an entity it builds a menu from, so hovering a copy would otherwise produce nothing. The
+ * hit test is done by hand each tick, against the posed model's clickbox. Entries use
+ * {@link MenuAction#RUNELITE} with their own handlers, so nothing reaches the server.
  */
 @Singleton
 class GolemMenu
@@ -38,12 +35,25 @@ class GolemMenu
 	@Inject
 	private Client client;
 
+	@Inject
+	private ClientThread clientThread;
+
+	@Inject
+	private ChatboxPanelManager chatboxPanelManager;
+
+	/** Told when a golem is named here, so the roster is saved and the sidebar shows it. */
+	private Consumer<Golem> onRenamed = golem ->
+	{
+	};
+
+	void setOnRenamed(Consumer<Golem> onRenamed)
+	{
+		this.onRenamed = onRenamed;
+	}
+
 	/**
-	 * Adds entries for whichever golem is under the cursor.
-	 *
-	 * <p>Called once per client tick, which is when the client rebuilds its menu. Only
-	 * the topmost golem gets entries — stacking three sets because three golems overlap
-	 * is not what the real game does.
+	 * Adds entries for whichever golem is under the cursor. Called once per client tick,
+	 * when the client rebuilds its menu. Only the topmost golem gets entries.
 	 */
 	void addEntries(List<Golem> golems)
 	{
@@ -64,13 +74,8 @@ class GolemMenu
 			return;
 		}
 
-		// A named golem is shown by its name.
-		//
-		// This does cost some of the disguise — every real golem is called "Golem", so
-		// a named one is visibly not one of them. That is the right trade: naming a
-		// golem you then cannot pick out of a crowd is pointless, and a name is only
-		// ever there because the player deliberately put it there. Leave a golem
-		// unnamed and it stays indistinguishable.
+		// Shown by its name. Every real golem is called "Golem", so this costs some of the
+		// disguise, but a name is only there because the player put it there.
 		String name = hovered.getNickname();
 		if (name == null || name.isEmpty())
 		{
@@ -78,28 +83,51 @@ class GolemMenu
 		}
 		String target = NPC_COLOUR + name + "</col>";
 
-		// Index 1, immediately above Cancel, which the client always keeps at index 0.
-		// The menu array is drawn bottom-up, so inserting at 0 would put Examine
-		// *below* Cancel — which is exactly what the first attempt did, giving
-		// "Walk here, Cancel, Examine" against the real "Walk here, Examine, Cancel".
+		// Index 1, immediately above Cancel, which the client keeps at index 0. The menu
+		// array is drawn bottom-up: inserting at 0 put Examine *below* Cancel.
 		client.getMenu().createMenuEntry(1)
 			.setOption("Examine")
 			.setTarget(target)
 			.setType(MenuAction.RUNELITE)
 			.onClick(e -> message(GolemContent.GOLEM_EXAMINE));
+
+		// Shift held, as NPC Indicators offers its tag. Added after Examine at the same
+		// index, so it sits just above Cancel.
+		if (client.isKeyPressed(KeyCode.KC_SHIFT))
+		{
+			client.getMenu().createMenuEntry(1)
+				.setOption("Set Name")
+				.setTarget(target)
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> askForName(hovered));
+		}
+	}
+
+	/** Opens the chatbox prompt for a golem's name. Left empty, the golem is "Golem" again. */
+	private void askForName(Golem golem)
+	{
+		String current = golem.getNickname();
+		chatboxPanelManager.openTextInput("Name this golem")
+			.value(current == null ? "" : current)
+			// Enter arrives on the AWT thread; golems are only touched on the client's.
+			.onDone((String text) -> clientThread.invoke(() ->
+			{
+				String name = text.trim();
+				golem.setNickname(name.isEmpty() ? null : name);
+				onRenamed.accept(golem);
+			}))
+			.build();
 	}
 
 	/**
-	 * How far from the cursor, in pixels, a golem's ground point can be and still be
-	 * worth an exact hit test. Generous enough to cover a golem drawn tall on screen
-	 * with the camera zoomed right in.
+	 * How far from the cursor, in pixels, a golem's ground point can be and still be worth
+	 * an exact hit test. Generous enough for a golem drawn tall, camera zoomed in.
 	 */
 	private static final int CANDIDATE_RADIUS = 180;
 
 	/**
-	 * Ceiling on exact hit tests per tick. Only reached when the cursor sits over a
-	 * heap of golems that are near it but not under it, which is the one case the
-	 * early exit cannot help with.
+	 * Ceiling on exact hit tests per tick. Only reached when the cursor sits over golems
+	 * near it but not under it, the one case the early exit cannot help with.
 	 */
 	private static final int MAX_CLICKBOX_TESTS = 10;
 
@@ -111,18 +139,11 @@ class GolemMenu
 	private final List<Candidate> candidates = new ArrayList<>();
 
 	/**
-	 * The golem whose clickbox contains the mouse and which is nearest the camera.
-	 *
-	 * <p>Nearest is approximated by the largest canvas Y of the clickbox — a golem
-	 * drawn lower on the screen is closer to the camera in an isometric view, which is
-	 * the same ordering the client's own entity picking produces.
-	 *
-	 * <p>Clickboxes are only computed for golems already near the cursor. Building one
-	 * means projecting every face of the model and merging the results, and this runs
-	 * on every client tick; doing it for a few hundred golems made the client stutter
-	 * whenever the mouse was over the scene. Projecting a golem's ground point instead
-	 * is a single matrix transform, so the expensive test is reserved for the handful
-	 * of golems that could plausibly be under the cursor.
+	 * The golem whose clickbox contains the mouse and is nearest the camera. Nearest is the
+	 * largest canvas Y — in an isometric view a golem drawn lower is closer — the ordering
+	 * the client's own entity picking produces. Clickboxes are only computed for golems
+	 * already near the cursor: building one projects every face of the model, and doing
+	 * that for a few hundred golems every client tick made the client stutter.
 	 */
 	private Golem topmostAt(List<Golem> golems, Point mouse)
 	{
@@ -132,8 +153,7 @@ class GolemMenu
 			return null;
 		}
 
-		// Gather the golems near enough the cursor to be worth an exact test, keeping
-		// how far down the screen each is drawn.
+		// Golems near enough the cursor to be worth an exact test.
 		candidates.clear();
 		for (Golem golem : golems)
 		{
@@ -154,12 +174,9 @@ class GolemMenu
 			candidates.add(new Candidate(golem, ground.getY()));
 		}
 
-		// Nearest the camera first. In an isometric view a golem drawn lower on the
-		// screen is in front, which is the order the client picks entities in — so the
-		// first golem whose box contains the cursor is the answer and the rest need
-		// never be projected at all. That early exit is what keeps this cheap when a
-		// few hundred golems are piled up under the mouse; the radius filter alone
-		// does nothing when they are all in the same place.
+		// Nearest the camera first, so the first golem whose box contains the cursor is the
+		// answer and the rest are never projected — the early exit that keeps this cheap
+		// when hundreds are piled under the mouse, where the radius filter cannot.
 		candidates.sort(BY_DEPTH);
 
 		int tested = 0;
@@ -167,7 +184,7 @@ class GolemMenu
 		{
 			if (tested++ >= MAX_CLICKBOX_TESTS)
 			{
-				// A pile deep enough to hit this is a pile where one more golem's
+				// In a pile this deep, one more golem's
 				// right-click is not worth a frame drop.
 				break;
 			}

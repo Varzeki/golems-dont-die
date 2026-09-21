@@ -1,5 +1,6 @@
 package com.golemsdontdie;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -21,10 +22,8 @@ public interface GolemsDontDieConfig extends Config
 	)
 	String golemsSection = "golems";
 
-	// Roaming and persistence are not settings. Golems always roam the whole island and
-	// are always kept permanently — those were the interesting options and the answer
-	// turned out to be the same in both cases, so offering the alternatives only
-	// invited someone to pick the worse one.
+	// Roaming and persistence are not settings: golems always roam the whole island and are
+	// always kept, and offering the alternatives only invited picking the worse one.
 
 	@ConfigItem(
 		keyName = "limitGolems",
@@ -51,80 +50,98 @@ public interface GolemsDontDieConfig extends Config
 		return 25;
 	}
 
-	@ConfigSection(
-		name = "Obstacles",
-		description = "How golems learn to use shortcuts",
-		position = 1,
-		closedByDefault = true
-	)
-	String obstaclesSection = "obstacles";
-
 	@ConfigItem(
-		keyName = "learnObstacles",
-		name = "Learn from your play",
-		description = "Golems only use shortcuts whose animation is known. Watching you use "
-			+ "one teaches them how, and unlocks it permanently.",
-		section = obstaclesSection,
-		position = 0
+		keyName = "showNameplates",
+		name = "Show golem names",
+		description = "Shows a named golem's name above its head. Name golems in the sidebar tab.",
+		section = golemsSection,
+		position = 2
 	)
-	default boolean learnObstacles()
+	default boolean showNameplates()
 	{
 		return true;
 	}
 
 	@ConfigItem(
-		keyName = "sendObstacleTelemetry",
-		name = "Send obstacle telemetry",
-		description = "Share which animation each shortcut plays, so a future update can "
-			+ "ship them for everyone. Sends only the object, its animation and how long it "
-			+ "took — never your name, world, location or anything identifying. Needs a "
-			+ "collection URL below; nothing is sent without one.",
-		section = obstaclesSection,
-		position = 1
-	)
-	default boolean sendObstacleTelemetry()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "telemetryEndpoint",
-		name = "Collection URL",
-		description = "Where to send obstacle telemetry. Blank means nothing is ever sent.",
-		section = obstaclesSection,
-		position = 2
-	)
-	default String telemetryEndpoint()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "highlightObstacles",
-		name = "Highlight nearby obstacles",
-		description = "Outlines shortcuts around you by how well golems know them. "
-			+ "Green: seen you use this one. Orange: golems will use it, inferred from "
-			+ "similar objects elsewhere — using it once confirms it. Red: no animation "
-			+ "data, so golems route around it.",
-		section = obstaclesSection,
+		keyName = "nameplateColour",
+		name = "Name colour",
+		description = "Colour of golem names shown above their heads.",
+		section = golemsSection,
 		position = 3
 	)
-	default boolean highlightObstacles()
+	default Color nameplateColour()
+	{
+		// The golems' own yellow, so a name reads as belonging to the golem under it.
+		return new Color(0xFFE700);
+	}
+
+	@ConfigItem(
+		keyName = "restrictAmbition",
+		name = "Restrict Golem ambition",
+		description = "Keeps the Golems on Wyrmscraig",
+		section = golemsSection,
+		position = 4
+	)
+	default boolean restrictGolemAmbition()
 	{
 		return false;
 	}
 
+	// Developer settings, not shipped. Golems always learn from the player's play, so that is
+	// not an option. Obstacle data is kept on disk for a later update to offer to send; see the
+	// telemetry package. The two below are always off in a release: on a dev client, uncomment
+	// the section and the item and read the setting in place of the matching DevOptions constant
+	// (GolemsDontDiePlugin.applyObstacleSettings, ObstacleHighlightOverlay.render).
+	// @ConfigSection(
+	// 	name = "Obstacles",
+	// 	description = "How golems learn to use shortcuts",
+	// 	position = 1,
+	// 	closedByDefault = true
+	// )
+	// String obstaclesSection = "obstacles";
+
+	// @ConfigItem(
+	// 	keyName = "highlightObstacles",
+	// 	name = "Highlight nearby obstacles",
+	// 	description = "Outlines shortcuts around you by how well golems know them. "
+	// 		+ "Green: seen you use this one. Orange: golems will use it, inferred from "
+	// 		+ "similar objects elsewhere — using it once confirms it. Red: no animation "
+	// 		+ "data, so golems route around it.",
+	// 	section = obstaclesSection,
+	// 	position = 3
+	// )
+	// default boolean highlightObstacles()
+	// {
+	// 	return false;
+	// }
+
+	// @ConfigItem(
+	// 	keyName = "logGolemState",
+	// 	name = "Log golem state (developer)",
+	// 	description = "Records what every visible golem is doing, every tick, into the same "
+	// 		+ "journal as your own obstacle use — so the two can be compared directly. "
+	// 		+ "Very verbose; for diagnosing a specific problem, not for ordinary play.",
+	// 	section = obstaclesSection,
+	// 	position = 4
+	// )
+	// default boolean logGolemState()
+	// {
+	// 	return false;
+	// }
+
+	/**
+	 * Not a setting: a note at the bottom of the panel, so people know the sidebar tab exists.
+	 * The panel draws an item it has no widget for as its name alone, and HTML in a label
+	 * wraps. It stores nothing: no default value means unset to the config manager.
+	 */
 	@ConfigItem(
-		keyName = "logGolemState",
-		name = "Log golem state (developer)",
-		description = "Records what every visible golem is doing, every tick, into the same "
-			+ "journal as your own obstacle use — so the two can be compared directly. "
-			+ "Very verbose; for diagnosing a specific problem, not for ordinary play.",
-		section = obstaclesSection,
-		position = 4
+		keyName = "sidebarNote",
+		name = "<html><body style='width: 170px; text-align: center'>Missing golems can be revived in the sidebar tab. "
+			+ "Golems may also be managed or renamed in this tab.</body></html>",
+		description = "",
+		position = 100
 	)
-	default boolean logGolemState()
+	default void sidebarNote()
 	{
-		return false;
 	}
 }

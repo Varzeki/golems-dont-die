@@ -13,6 +13,7 @@ import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.SpriteID;
 import net.runelite.api.widgets.Widget;
@@ -24,25 +25,17 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 /**
  * Draws the copies onto the minimap, the way a real golem is drawn.
  *
- * <p>The client puts a dot on the minimap for every NPC whose composition asks for
- * one, and the golem's does. A {@link net.runelite.api.RuneLiteObject} is not an NPC,
- * so it gets nothing — which left the real golems showing as yellow dots and the
- * copies beside them showing as bare minimap.
- *
- * <p>The dot is the game's own sprite, not an approximation of it. A hand-drawn square
- * is close enough to notice and not close enough to pass: the real dot is a shaded
- * circle, and two subtly different kinds of yellow dot on one minimap draw the eye
- * straight to the fake ones.
- *
- * <p>Drawing is clipped to the minimap widget so a golem at the edge slides under the
- * frame as a real one does, instead of being painted over it.
+ * <p>The client dots every NPC whose composition asks for one, and the golem's does; a
+ * {@link net.runelite.api.RuneLiteObject} is not an NPC, so the copies showed as bare minimap
+ * beside real golems. The dot is the game's own sprite, not an approximation: the real one is a
+ * shaded circle, and two subtly different yellow dots draw the eye to the fakes. Drawing is
+ * clipped to the minimap widget so a golem at the edge slides under the frame.
  */
 class GolemMinimapOverlay extends Overlay
 {
 	/**
-	 * Candidate minimap widgets, one per interface layout — fixed, the two resizable
-	 * modes, and the stretched variant. Only one exists at a time; which one depends on
-	 * settings this plugin has no business reading, so all four are tried.
+	 * Candidate minimap widgets, one per interface layout. Only one exists at a time, and which
+	 * depends on settings this plugin does not read, so all four are tried.
 	 */
 	private static final int[] MINIMAP_WIDGETS = {
 		InterfaceID.Toplevel.MINIMAP,
@@ -51,10 +44,7 @@ class GolemMinimapOverlay extends Overlay
 		InterfaceID.ToplevelOsm.MINIMAP,
 	};
 
-	/**
-	 * How far the minimap reaches, in tiles, with a margin. Anything beyond this is
-	 * rejected before the projection is attempted.
-	 */
+	/** How far the minimap reaches, in tiles, with a margin. Beyond this, skip the projection. */
 	private static final int MINIMAP_RANGE_TILES = 20;
 
 	private final Client client;
@@ -78,7 +68,7 @@ class GolemMinimapOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		List<Golem> golems = plugin.activeGolems();
+		List<Golem> golems = plugin.drawnGolems();
 		if (golems.isEmpty())
 		{
 			return null;
@@ -92,8 +82,8 @@ class GolemMinimapOverlay extends Overlay
 
 		if (dot == null)
 		{
-			// Asked for lazily: the sprite cache is not necessarily ready when the
-			// plugin starts, and a null here simply means trying again next frame.
+			// Lazily: the sprite cache may not be ready at start-up, and null means
+			// trying again next frame.
 			dot = spriteManager.getSprite(SpriteID.MapdotsInterface.YELLOW_NPC, 0);
 			if (dot == null)
 			{
@@ -107,17 +97,16 @@ class GolemMinimapOverlay extends Overlay
 			return null;
 		}
 
-		// The minimap only reaches a short way, so a golem further out than that cannot
-		// produce a dot however the projection is done. Rejecting on tile distance
-		// first is two subtractions against a matrix transform, which matters when the
-		// island holds hundreds of golems and this runs every frame.
-		Player me = client.getLocalPlayer();
-		if (me == null || me.getWorldLocation() == null)
+		// Beyond the minimap's reach no projection can yield a dot, and a tile-distance test is
+		// two subtractions against a matrix transform — this runs every frame with hundreds of
+		// golems. Measured in the main world, aboard a boat too; see PlayerPosition.
+		WorldPoint me = PlayerPosition.of(client);
+		if (me == null)
 		{
 			return null;
 		}
-		int playerX = me.getWorldLocation().getX();
-		int playerY = me.getWorldLocation().getY();
+		int playerX = me.getX();
+		int playerY = me.getY();
 
 		Shape original = graphics.getClip();
 		graphics.setClip(minimap);
@@ -125,9 +114,8 @@ class GolemMinimapOverlay extends Overlay
 		{
 			for (Golem golem : golems)
 			{
-				// Only golems actually being drawn in the scene. One that has wandered
-				// out of it is off the minimap anyway, and its local coordinates would
-				// be meaningless.
+				// Only golems in the scene: one that has wandered out is off the minimap
+				// anyway, and its local coordinates would be meaningless.
 				if (golem.getRenderer() == null || golem.getPlane() != wv.getPlane())
 				{
 					continue;
@@ -168,7 +156,7 @@ class GolemMinimapOverlay extends Overlay
 	}
 
 	/**
-	 * The on-screen rectangle of whichever minimap widget is currently live.
+	 * The on-screen rectangle of whichever minimap widget is live.
 	 *
 	 * @return the bounds, or null if no minimap is showing
 	 */

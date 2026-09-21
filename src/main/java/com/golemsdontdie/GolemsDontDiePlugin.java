@@ -48,55 +48,42 @@ import net.runelite.client.util.ImageUtil;
  * Keeps crafted golems alive by replacing each one with a client-side copy, so it
  * wanders Wyrmscraig indefinitely instead of crumbling after half a minute.
  *
- * <p>The handover happens as the golem finishes stepping off its plinth — the one
- * moment it is reliably standing still, so the copy inherits a position and heading
- * with no half-finished step to reconcile. The original is hidden from that point on
- * and crumbles unseen.
+ * <p>The handover happens as the golem finishes stepping off its plinth, the one moment it is
+ * reliably standing still; the original is then hidden and crumbles unseen.
  *
- * <p>Copies are simulated in world coordinates, walking and pausing and turning under
- * their own steam, and are drawn only while inside the loaded scene. That separation
- * is what lets a golem wander off the edge of what is loaded and come back later:
- * leaving the scene costs it its renderer, not its existence.
+ * <p>Copies are simulated in world coordinates and drawn only inside the loaded scene, so
+ * leaving it costs a golem its renderer, not its existence. They are not confined to
+ * Wyrmscraig: cost scales with what the player can see, and one out of view is a route and a
+ * departure time, never stepped.
  *
- * <p>Golems are not confined to Wyrmscraig. They use the game's transport network —
- * ladders, shortcuts, gangplanks — and sail between ports, so a golem made on the island
- * may turn up anywhere. What keeps that affordable is that cost scales with what the
- * player can see rather than with how many golems exist: a golem outside the scene is
- * stored as a route and a departure time and is not stepped at all. See {@link GolemTier}.
- *
- * <p>Purely cosmetic. Nothing here sends anything to the server, and the copies are
- * visible only to the player running the plugin.
+ * <p>Purely cosmetic: nothing is sent to the server, and the copies are visible only to the
+ * player running the plugin.
  *
  * @see GolemTier for how much of a golem is simulated
  * @see WorldMesh for where a golem may walk
- * @see Golem for the simulation
- * @see FakeGolem for the drawing
+ * @see Golem for the simulation, FakeGolem for the drawing
  */
 @Slf4j
 @PluginDescriptor(
 	name = "Golems Don't Die",
-	description = "Makes Golems live and wander around forever instead of dying",
-	tags = {"golem", "crafting", "wyrmscraig", "skilling", "cosmetic", "npc"}
+	description = "Golems should live forever.",
+	tags = {"golem", "crafting", "wyrmscraig", "skilling", "cosmetic", "npc", "sailing", "exploration", "shortcuts"}
 )
 public class GolemsDontDiePlugin extends Plugin
 {
-	/** Game ticks between position saves. Two minutes: cheap, and bounds what a crash costs. */
+	/** Game ticks between position saves. Two minutes bounds what a crash costs. */
 	private static final int SAVE_INTERVAL_TICKS = 200;
 
 	/**
-	 * Path searches allowed per frame across all golems. At 50fps this is 200 a
-	 * second, far more than a roaming population actually asks for, while still
-	 * capping the worst frame.
+	 * Path searches allowed per frame across all golems: 200 a second at 50fps, more than a
+	 * roaming population asks for, while capping the worst frame.
 	 */
 	private static final int PATH_SEARCHES_PER_FRAME = 4;
 
 	/**
-	 * Routes planned per frame for golems out of view.
-	 *
-	 * <p>A plan is about half a millisecond, and several times that where it has to flood a
-	 * dungeon for somewhere to go. A thousand golems replan every fifteen ticks or so between
-	 * them, which is plenty spread out on average and not at all when a crowd arrives
-	 * somewhere together. A golem over budget stands where it arrived for another frame.
+	 * Routes planned per frame for golems out of view. A plan is about half a millisecond, more
+	 * when it floods a dungeon, and a crowd arriving together replans at once. One over budget
+	 * waits a frame.
 	 */
 	private static final int FAR_PLANS_PER_FRAME = 6;
 
@@ -149,10 +136,8 @@ public class GolemsDontDiePlugin extends Plugin
 	private RaftFactory raftFactory;
 
 	/**
-	 * Watches the player use obstacles and teaches the plugin what each one does.
-	 *
-	 * <p>Not a developer tool any more. Golems may only use obstacles whose animation is
-	 * known, and this is what makes that set grow: see {@link ObstacleKnowledge}.
+	 * Watches the player use obstacles and teaches the plugin what each does. Golems may only
+	 * use obstacles whose animation is known; this grows that set.
 	 */
 	@Inject
 	private ObstacleObserver obstacleObserver;
@@ -160,8 +145,12 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private ObstacleKnowledge obstacleKnowledge;
 
+	/**
+	 * The obstacle data file, for a later update to offer to send. Everything about it is in
+	 * the {@code telemetry} package.
+	 */
 	@Inject
-	private ObstacleTelemetry obstacleTelemetry;
+	private ObstacleDataBridge obstacleData;
 
 	/** Built once at start-up and reused every frame. See {@link RoamContext}. */
 	private RoamContext roamContext;
@@ -196,17 +185,18 @@ public class GolemsDontDiePlugin extends Plugin
 	private ObstacleHighlightOverlay obstacleHighlightOverlay;
 
 	@Inject
+	private GolemNameplateOverlay nameplateOverlay;
+
+	@Inject
 	private ObstacleIndex obstacleIndex;
 
 	private GolemListPanel panel;
 	private NavigationButton navButton;
 
 	/**
-	 * Hides the real golem once its copy has taken over.
-	 *
-	 * <p>Registered once at start-up and unregistered once at shutdown, never from an
-	 * event handler — a registration that outlives the plugin because an event did not
-	 * fire as expected would leave NPCs invisible with nothing left to un-hide them.
+	 * Hides the real golem once its copy has taken over. Registered at start-up and
+	 * unregistered at shutdown, never from an event handler: one outliving the plugin would
+	 * leave NPCs invisible for good.
 	 */
 	private final RenderCallback drawCallback = new RenderCallback()
 	{
@@ -220,7 +210,43 @@ public class GolemsDontDiePlugin extends Plugin
 	private boolean callbackRegistered = false;
 
 	private int lastGameCycle = -1;
+
+	/** The client cycle this game tick began on, for how far through it a frame is. */
+	private int tickStartCycle = -1;
 	private int ticksSinceSave = 0;
+
+	/**
+	 * True from start-up until shutdown has saved. Anything arriving after, such as a name
+	 * typed into a chatbox prompt left open, must not save: the roster is empty by then, and
+	 * saving it replaced every golem the player had.
+	 */
+	private volatile boolean running;
+
+	/** The tick an asked-for roster save is due, or -1. Renames ask; the save waits a moment for more. */
+	private int saveGolemsAt = -1;
+
+	/** Ticks a rename waits before saving, so typing a name is one save, not one a keystroke. */
+	private static final int RENAME_SAVE_DELAY = 2;
+
+	/** Set when a sighting was recorded this tick; routes rebuild once, at its end. */
+	private boolean routesChanged;
+
+	/**
+	 * Whether a learned route is an obstacle. The answer can take a path search, and every
+	 * route used to be re-asked on every sighting — one search per stone of a crossing.
+	 */
+	private final java.util.Map<String, Boolean> obstacleVerdicts = new java.util.HashMap<>();
+
+	@Inject
+	private Voyage voyage;
+
+	@Inject
+	private GolemCensus census;
+
+	/** How often golems are counted by region, in game ticks. See GolemCensus. */
+	private static final int CENSUS_TICKS = 10;
+
+	private int ticksSinceCensus;
 
 	/** Set when a golem is added, removed or restored, so the panel redraws once. */
 	private boolean rosterChanged = true;
@@ -228,64 +254,78 @@ public class GolemsDontDiePlugin extends Plugin
 	// ------------------------------------------------------------------ obstacles
 
 	/**
-	 * Takes one sighting from the observer and does something with it.
-	 *
-	 * <p>The player is told only when an obstacle actually unlocks, not on every sighting.
-	 * A message per traversal would be chat spam for somebody running an agility course,
-	 * and the interesting moment is the one where golems gained something.
+	 * Takes one sighting from the observer. The player is told only when an obstacle unlocks:
+	 * a message per traversal would be chat spam on an agility course.
 	 */
 	private void onObstacleSighting(ObstacleSighting sighting)
 	{
-		if (!config.learnObstacles())
-		{
-			return;
-		}
-
-		// Only obstacles. Chopping a tree, using a bank booth and picking sweetcorn were all
-		// learned as shortcuts: an object clicked, an animation, and the player somewhere
-		// else afterwards is all a watcher can see. Not learned, and not sent.
-		if (!isObstacle(sighting.objectId, sighting.fromX, sighting.fromY, sighting.fromPlane,
-			sighting.toX, sighting.toY, sighting.toPlane))
+		// Only obstacles: chopping a tree, using a bank booth and picking sweetcorn were all
+		// learned as shortcuts, since an object clicked, an animation and the player elsewhere
+		// afterwards is all a watcher can see.
+		//
+		// In a rotated instance no route is usable, but what the obstacle plays is as true
+		// there, so it is still recorded; the route filter refuses the route.
+		boolean inInstance = sighting.fromX >= INSTANCE_X || sighting.toX >= INSTANCE_X;
+		boolean obstacle = inInstance
+			? obstacleIndex.knows(sighting.objectId) || transports.isShippedObstacle(sighting.objectId)
+			: isObstacle(sighting.objectId, sighting.fromX, sighting.fromY, sighting.fromPlane,
+				sighting.toX, sighting.toY, sighting.toPlane);
+		if (!obstacle)
 		{
 			log.debug("Not an obstacle: {}", sighting);
 			return;
 		}
 
-		// Deliberately silent. Learning happens constantly during ordinary play and
-		// announcing it would be chat spam for anybody running an agility course — and
-		// worse, it would make a background nicety feel like something the player is
-		// supposed to be doing. Anyone who wants to see the state of it can turn on the
-		// highlight overlay.
+		// Deliberately silent: learning happens constantly during ordinary play, and
+		// announcing it would make a background nicety feel like a chore.
 		if (obstacleKnowledge.record(sighting))
 		{
 			log.debug("Obstacle unlocked: {}", sighting);
 		}
 
-		// Routes go in as they are earned rather than at the next start-up. Somebody who
-		// has just shown the plugin a staircase twice should see golems use it, not be
-		// told to log out first.
-		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
-		// A new route can lead onto a floor nothing else reaches; it is ground from now on.
-		worldMesh.admitTransportEnds(transports.all());
-		saveLearnedObstacles();
+		// Routes go in as they are earned, not at the next start-up: somebody who has shown the
+		// plugin a staircase twice should see golems use it. Once per tick, however many hops.
+		routesChanged = true;
 
-		obstacleTelemetry.offer(sighting);
+		// And kept on disk, for a later update to offer to send.
+		obstacleData.playerCrossed(sighting);
+	}
+
+	/** Puts what this tick's sightings taught into the network, and saves it. */
+	private void applyLearnedRoutes()
+	{
+		routesChanged = false;
+		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
+		// A new route can lead onto a floor nothing else reaches: ground from now on.
+		worldMesh.admitTransportEnds(transports.all());
+		setHomeRegions(transports.homeRegions());
+		// A new route into an instance can mean a new room golems may stand in.
+		instanceRoomTiles = instanceRooms();
+		saveLearnedObstacles();
+	}
+
+	/** {@link #isObstacle}, remembered per route for the session. */
+	private boolean isObstacleRoute(int[] r)
+	{
+		String key = r[0] + "," + r[1] + "," + r[2] + "," + r[3] + ">" + r[4] + "," + r[5] + "," + r[6];
+		Boolean known = obstacleVerdicts.get(key);
+		if (known == null)
+		{
+			known = isObstacle(r[0], r[1], r[2], r[3], r[4], r[5], r[6]);
+			obstacleVerdicts.put(key, known);
+		}
+		return known;
 	}
 
 	/** Coordinates this far east are an instance's, never the world's. */
 	private static final int INSTANCE_X = 6400;
 
 	/**
-	 * Whether something the player used is an obstacle — a way across — rather than
-	 * anything else they clicked and then moved away from.
-	 *
-	 * <p>Yes if the cache lists it as one, or the transport tables do. Otherwise only if it
-	 * took the player somewhere they could not simply have walked: another floor, a long
-	 * way off, or a place their own map has no short walk to. A tree fails that — the player
-	 * walked up to it and walked on — and so does a door, once open.
-	 *
-	 * <p>Routes still in an instance's own coordinates are refused whatever they are: they
-	 * point at a room that no longer exists.
+	 * Whether something the player used is a way across, rather than anything else they clicked
+	 * and walked away from. Yes if the cache or the transport tables say so; otherwise only if
+	 * it took them somewhere they could not have walked — another floor, a long way off, or
+	 * somewhere their map has no short walk to. A tree fails that, as does an open door. Routes
+	 * in an instance's own coordinates point at a room that no longer exists.
 	 */
 	private boolean isObstacle(int objectId, int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane)
 	{
@@ -293,7 +333,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return false;
 		}
-		if (obstacleIndex.knows(objectId) || transports.archetypeFor(objectId) >= 0)
+		if (obstacleIndex.knows(objectId) || transports.isShippedObstacle(objectId))
 		{
 			return true;
 		}
@@ -323,14 +363,9 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/**
 	 * Writes what every golem near the player is doing, for reading against the journal.
-	 *
-	 * <p>Confined to golems in the scene, which is both the only place their behaviour can
-	 * be watched and the only place the volume is bearable — there are four hundred and
-	 * fifty of them and a row each per tick for all of them would be megabytes a minute.
-	 *
-	 * <p>The point is the comparison. The same file already holds the player's position at
-	 * 20ms and every animation they start, so a golem crossing the same stepping stone can
-	 * be held against the real thing on the same clock rather than described from memory.
+	 * Confined to the scene: a row per tick for four hundred and fifty golems would be megabytes
+	 * a minute. The same file holds the player's position at 20ms and every animation they
+	 * start, so the two can be compared on one clock.
 	 */
 	private void logGolemState()
 	{
@@ -356,9 +391,8 @@ public class GolemsDontDiePlugin extends Plugin
 	/** Pushes the obstacle settings into the pieces that act on them. */
 	private void applyObstacleSettings()
 	{
-		obstacleTelemetry.configure(config.sendObstacleTelemetry(), config.telemetryEndpoint());
-		obstacleObserver.setExplaining(config.highlightObstacles());
-		obstacleObserver.setLoggingGolems(config.logGolemState());
+		obstacleObserver.setExplaining(DevOptions.HIGHLIGHT_OBSTACLES);
+		obstacleObserver.setLoggingGolems(DevOptions.LOG_GOLEM_STATE);
 	}
 
 	@Provides
@@ -370,9 +404,12 @@ public class GolemsDontDiePlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		// Obstacles the player has already taught us, and the settings that govern
-		// learning. Loaded before the transport network, because the network's usability
-		// gate consults it the first time a golem considers a shortcut.
+		running = true;
+		// Before anything below writes a key, or every install looks like an update.
+		checkForUpdate();
+
+		// Obstacles already taught, and the settings governing learning. Before the transport
+		// network, whose usability gate consults it.
 		obstacleKnowledge.deserialise(
 			configManager.getConfiguration(GolemsDontDieConfig.GROUP, ObstacleKnowledge.LEARNED_KEY));
 		obstacleKnowledge.deserialiseConfirmed(
@@ -387,27 +424,29 @@ public class GolemsDontDiePlugin extends Plugin
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
 		obstacleObserver.startUp();
+		obstacleData.startUp();
 
-		// Saved map first, then the shipped baseline underneath it — anything the
-		// player has actually walked beats a static export of the same ground.
+		// Saved map first, shipped baseline underneath: what the player has walked beats a
+		// static export of the same ground.
 		islandMemory.deserialise(configManager.getConfiguration(GolemsDontDieConfig.GROUP, IslandMemory.MAP_KEY));
 		islandMemory.loadBundled();
-		// Anywhere a transport from the island leads is ground golems will walk, so it is
-		// mapped too — a basement, a cave. Resolved lazily, after the network has loaded.
+		// Anywhere a transport from the island leads is ground golems will walk; resolved
+		// lazily, after the network has loaded.
 		islandMemory.setAlsoIsland(transports::leadsToRegion);
 
-		// The transport table is read-only and shared by every golem, so it is loaded
-		// once here rather than lazily on first use — a first-use load would land in the
-		// middle of a frame, which is the one place a few milliseconds is noticeable.
+		// Read-only and shared, so loaded once here: a first-use load would land mid-frame,
+		// the one place a few milliseconds shows.
 		worldMesh.load();
 		propFactory.load();
 		transports.load();
 		// The index before the routes, because the routes are filtered by it.
 		obstacleIndex.load();
-		obstacleKnowledge.setRouteFilter(r -> isObstacle(r[0], r[1], r[2], r[3], r[4], r[5], r[6]));
+		obstacleVerdicts.clear();
+		obstacleKnowledge.setRouteFilter(this::isObstacleRoute);
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
-		// Floors reached only by transports the land fill was never given. See WorldMesh.
+		// Floors reached only by transports the land fill never had. See WorldMesh.
 		worldMesh.admitTransportEnds(transports.all());
+		setHomeRegions(transports.homeRegions());
 		roamContext = new RoamContext(islandMemory, pathfinder, transports, abilities);
 		roamContext.setKnowledge(obstacleKnowledge);
 		roamContext.setObstacles(obstacleIndex);
@@ -419,6 +458,8 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 		});
 		roamContext.setPlanner(roamPlanner);
+		roamContext.setCensus(census);
+		roamContext.setTraversals(obstacleData::golemCrossed);
 		roamContext.setModels(modelFactory);
 
 		pendingRestore.addAll(store.deserialise(
@@ -426,16 +467,29 @@ public class GolemsDontDiePlugin extends Plugin
 
 		tally.load();
 
-		// Enabling the plugin mid-session skips the login the count would have arrived
-		// at, and the client is holding it either way.
+		// Enabling mid-session skips the login the count would have arrived at.
 		clientThread.invokeLater(this::syncTally);
 
-		// All three panel callbacks arrive on the Swing thread and touch the roster, so
-		// each hops to the client thread — the list is owned there.
+		// All three panel callbacks arrive on the Swing thread and touch the roster, which the
+		// client thread owns, so each hops across.
 		panel = new GolemListPanel(
 			golem -> clientThread.invoke(() -> removeGolem(golem)),
-			() -> clientThread.invoke(this::saveGolems),
+			(golem, name) -> clientThread.invoke(() ->
+			{
+				golem.setNickname(name);
+				saveGolemsSoon();
+			}),
 			() -> clientThread.invoke(this::reviveMissing));
+		menu.setOnRenamed(golem ->
+		{
+			if (!running || panel == null)
+			{
+				return;
+			}
+			saveGolemsSoon();
+			List<Golem> living = livingGolems();
+			panel.refresh(living, tally.getTotal() - living.size(), true);
+		});
 		navButton = NavigationButton.builder()
 			.tooltip("Golems")
 			.icon(ImageUtil.loadImageResource(GolemsDontDiePlugin.class, "/golem-icon.png"))
@@ -445,6 +499,7 @@ public class GolemsDontDiePlugin extends Plugin
 		clientToolbar.addNavigation(navButton);
 		overlayManager.add(minimapOverlay);
 		overlayManager.add(obstacleHighlightOverlay);
+		overlayManager.add(nameplateOverlay);
 
 		renderCallbacks.register(drawCallback);
 		callbackRegistered = true;
@@ -456,32 +511,60 @@ public class GolemsDontDiePlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		// Closed first, because a measuring session that is never repeated must not lose
-		// its last rows to something going wrong further down this method.
-		obstacleObserver.shutDown();
-		obstacleTelemetry.flush();
-		saveLearnedObstacles();
-
-		// Save before tearing down, or a shutdown would be indistinguishable from
-		// deleting every golem the player has.
-		saveGolems();
-		saveIslandMemory();
-
-		clientThread.invoke(() ->
+		// Nothing drawn from here on, so nothing reads what is cleared below.
+		if (callbackRegistered)
 		{
-			for (Golem golem : golems)
+			renderCallbacks.unregister(drawCallback);
+			callbackRegistered = false;
+		}
+
+		// Golems and their maps belong to the client thread and this runs on Swing's: saving
+		// here iterated the roster while a frame could be moving it.
+		onClientThreadAndWait(() ->
+		{
+			// Each step on its own, so one failing cannot stop the rest: the old shutdown's
+			// first line threw, the roster stayed in memory, and re-enabling doubled every
+			// golem. Save before tearing down.
+			safely("closing the journal", obstacleObserver::shutDown);
+			safely("saving obstacle data", obstacleData::save);
+			safely("saving learned routes", () ->
 			{
-				detachRenderer(golem);
-			}
+				if (routesChanged)
+				{
+					applyLearnedRoutes();
+				}
+				saveLearnedObstacles();
+			});
+
+			// Or shutdown is indistinguishable from deleting every golem the player has.
+			safely("saving golems", this::saveGolems);
+			safely("saving the island map", this::saveIslandMemory);
+			running = false;
+
+			safely("removing golems", () ->
+			{
+				for (Golem golem : golems)
+				{
+					detachRenderer(golem);
+				}
+			});
 			golems.clear();
-			clearProps();
-			clearRafts();
+			pendingRestore.clear();
+			safely("removing props", this::clearProps);
+			safely("removing rafts", this::clearRafts);
 			propFactory.clear();
 			raftFactory.clear();
+			census.clear();
+			hiddenNpcs.clear();
+			detector.reset();
+			modelFactory.clear();
+			saveGolemsAt = -1;
 		});
+		voyage.shutDown();
 
 		overlayManager.remove(minimapOverlay);
 		overlayManager.remove(obstacleHighlightOverlay);
+		overlayManager.remove(nameplateOverlay);
 
 		if (navButton != null)
 		{
@@ -489,16 +572,75 @@ public class GolemsDontDiePlugin extends Plugin
 			navButton = null;
 		}
 		panel = null;
+	}
 
-		pendingRestore.clear();
-		hiddenNpcs.clear();
-		detector.reset();
-		modelFactory.clear();
-
-		if (callbackRegistered)
+	/** Runs one step of shutdown, logging rather than throwing if it fails. */
+	private void safely(String what, Runnable step)
+	{
+		try
 		{
-			renderCallbacks.unregister(drawCallback);
-			callbackRegistered = false;
+			step.run();
+		}
+		catch (RuntimeException | AssertionError e)
+		{
+			log.warn("Failed {} while shutting down; carrying on", what, e);
+		}
+	}
+
+	/** How long shutdown waits for the client thread before doing the work here. */
+	private static final long SHUTDOWN_WAIT_MILLIS = 3000;
+
+	/**
+	 * Runs a task on the client thread and waits, or here if that thread does not get to it in
+	 * time — closing the client may have stopped it, and the saves must still happen. Once.
+	 */
+	private void onClientThreadAndWait(Runnable task)
+	{
+		if (client.isClientThread())
+		{
+			task.run();
+			return;
+		}
+		java.util.concurrent.atomic.AtomicBoolean claimed = new java.util.concurrent.atomic.AtomicBoolean();
+		java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+		clientThread.invoke(() ->
+		{
+			try
+			{
+				if (claimed.compareAndSet(false, true))
+				{
+					task.run();
+				}
+			}
+			finally
+			{
+				done.countDown();
+			}
+		});
+		try
+		{
+			if (done.await(SHUTDOWN_WAIT_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS))
+			{
+				return;
+			}
+		}
+		catch (InterruptedException e)
+		{
+			Thread.currentThread().interrupt();
+		}
+		if (claimed.compareAndSet(false, true))
+		{
+			log.warn("Client thread did not run shutdown in time; saving from here");
+			task.run();
+		}
+	}
+
+	/** Saves the roster shortly, folding in any other change asked for before then. */
+	private void saveGolemsSoon()
+	{
+		if (saveGolemsAt < 0)
+		{
+			saveGolemsAt = client.getTickCount() + RENAME_SAVE_DELAY;
 		}
 	}
 
@@ -531,18 +673,14 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Keeps the tally level with the game's own count of golems crafted.
-	 *
-	 * <p>This is the half of the tally that does not need the plugin to have been
-	 * running: the count arrives with the player's variables at login, so golems crafted
-	 * on mobile or with the plugin off are already counted by the time anyone looks.
+	 * Keeps the tally level with the game's own count of golems crafted: the half that works
+	 * without the plugin having run, since the count arrives at login.
 	 */
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
-		// A change can be reported against the varbit or against the varp holding it,
-		// so both are worth waking for — and neither event's value is read, because the
-		// varp's is the count with sixteen bits of carving state underneath it.
+		// A change can be reported against the varbit or the varp holding it, so both wake this.
+		// Neither value is read: the varp's is the count over sixteen bits of carving state.
 		if (event.getVarbitId() == GolemContent.GOLEM_COUNT_VARBIT
 			|| event.getVarpId() == GolemContent.GOLEM_COUNT_VARP)
 		{
@@ -551,11 +689,8 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Reads the game's count of golems crafted into the tally.
-	 *
-	 * <p>Safe to call whenever there is any chance the count has moved, including before
-	 * the server has sent it: an unsent variable reads 0, and the tally ignores anything
-	 * below what it already has.
+	 * Reads the game's count of golems crafted into the tally. Safe before the server has sent
+	 * it: an unsent variable reads 0, which the tally ignores.
 	 */
 	private void syncTally()
 	{
@@ -564,19 +699,84 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
-		if (tally.observeCount(client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT)))
+		int count = client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT);
+		if (tally.observeCount(count))
 		{
 			rosterChanged = true;
 		}
+		if (count > 0)
+		{
+			gameCount = count;
+			trimToGameCount();
+		}
+	}
+
+	/** Golems the game says have been crafted, as read this session, or -1 if unread. */
+	private int gameCount = -1;
+
+	/**
+	 * Removes unnamed golems beyond the number the game says were ever crafted. Any beyond it
+	 * are copies, and there have been: a failed shutdown left the roster in memory, and
+	 * re-enabling loaded the save on top, making one player's 451 golems 902. Only the game's
+	 * own count is trusted. Unnamed golems go first, out of view before in view, then duplicate
+	 * names; a golem with a name of its own is never removed.
+	 */
+	private void trimToGameCount()
+	{
+		if (gameCount <= 0 || !pendingRestore.isEmpty())
+		{
+			return;
+		}
+		int excess = countLiving() - gameCount;
+		if (excess <= 0)
+		{
+			return;
+		}
+		int removed = 0;
+
+		// Unnamed first, newest first: a doubled roster's copies are the later half.
+		for (int pass = 0; pass < 2 && removed < excess; pass++)
+		{
+			for (int i = golems.size() - 1; i >= 0 && removed < excess; i--)
+			{
+				Golem golem = golems.get(i);
+				if (golem.isDying() || isNamed(golem) || pass == 0 && golem.getTier() != GolemTier.FAR)
+				{
+					continue;
+				}
+				golem.startDying();
+				removed++;
+			}
+		}
+
+		// Then, if still over, every golem after the first with each name.
+		java.util.Set<String> names = new java.util.HashSet<>();
+		for (Golem golem : golems)
+		{
+			if (removed >= excess)
+			{
+				break;
+			}
+			if (golem.isDying() || !isNamed(golem))
+			{
+				continue;
+			}
+			if (!names.add(golem.getNickname().trim().toLowerCase()))
+			{
+				golem.startDying();
+				removed++;
+			}
+		}
+
+		rosterChanged = true;
+		saveGolems();
+		log.debug("Removed {} golems beyond the {} the game says were crafted{}", removed, gameCount,
+			removed < excess ? "; " + (excess - removed) + " more are named and kept" : "");
 	}
 
 	/**
-	 * Brings the roster back up to the number of golems ever crafted.
-	 *
-	 * <p>Revived golems are placed on the plinth and disperse on their own, exactly as
-	 * a freshly made one would. They are new golems standing in for lost ones rather
-	 * than the originals restored — nothing about a golem that was culled or never
-	 * tracked survives to be brought back.
+	 * Brings the roster back up to the number of golems ever crafted: new golems on the plinth,
+	 * dispersing as freshly made ones would, since nothing of a culled golem survives.
 	 */
 	private void reviveMissing()
 	{
@@ -601,10 +801,10 @@ public class GolemsDontDiePlugin extends Plugin
 				break;
 			}
 
-			// Seeded off a counter as well as the tile so a batch revived onto one
-			// square does not walk away in lockstep.
-			long seed = ((long) plinth.getX() << 32) ^ ((long) plinth.getY() << 8)
-				^ ((golems.size() + i) * 0x9E3779B9L);
+			// Seeded off a counter as well as the tile, so a batch revived onto one square
+			// does not walk away in lockstep.
+			long seed = uniqueSeed(((long) plinth.getX() << 32) ^ ((long) plinth.getY() << 8)
+				^ ((golems.size() + i) * 0x9E3779B9L));
 			golems.add(Golem.onTile(snapshot, plinth, seed, plinth));
 			revived++;
 		}
@@ -638,15 +838,8 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
-		// The handover happens as the golem finishes stepping off its plinth, not when
-		// it crumbles.
-		//
-		// Waiting for the crumble meant taking over from a golem that was usually
-		// mid-stride, and a copy handed a walk it did not start has to reconcile a
-		// position, a heading and a half-finished step all at once. Taking over at the
-		// one moment the golem is reliably standing still — the tick the plinth
-		// animation ends — means there is nothing to reconcile. The original is hidden
-		// for the rest of its short life and crumbles unseen.
+		// As the golem finishes stepping off its plinth, not when it crumbles: waiting meant
+		// taking over mid-stride, with a position, heading and half-step to reconcile.
 		if (animation == -1 && detector.hasLeftPlinth(npc))
 		{
 			replace(npc);
@@ -658,9 +851,8 @@ public class GolemsDontDiePlugin extends Plugin
 			detector.noteLeftPlinth(npc);
 		}
 
-		// Fallback. If a golem is somehow never seen stepping off — the player arrived
-		// mid-life, or the spawn animation was missed — the crumble is still a valid
-		// moment to take over, and a jump is better than losing the golem.
+		// Fallback: if a golem is never seen stepping off, a jump at the crumble beats losing
+		// it.
 		if (detector.isDeathAnimation(animation))
 		{
 			replace(npc);
@@ -681,22 +873,15 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Takes over from a live golem: builds the copy, and hides the original from this
-	 * moment on.
-	 *
-	 * <p>The copy is placed at the NPC's <i>local</i> location, not its world tile.
-	 * That distinction is the whole difference between a seamless handover and a
-	 * visible jump: {@link NPC#getWorldLocation()} returns the tile the golem is
-	 * moving onto, so a golem caught mid-step hands over a destination it has not
-	 * reached yet and the copy appears to teleport there. {@link NPC#getLocalLocation()}
-	 * is the interpolated position actually being drawn.
+	 * Takes over from a live golem: builds the copy and hides the original. The copy goes at the
+	 * NPC's <i>local</i> location, not its world tile, which is the tile it is moving onto — one
+	 * caught mid-step would appear to teleport.
 	 */
 	private void replace(NPC npc)
 	{
 		if (!hasRoomForAnother())
 		{
-			// Every slot is spoken for by a named golem. Leave this one alone and let
-			// the game play out its own death.
+			// Every slot is spoken for by a named golem; leave this one to the game.
 			detector.markReplaced(npc);
 			return;
 		}
@@ -724,10 +909,10 @@ public class GolemsDontDiePlugin extends Plugin
 		int fineY = local.getY() + wv.getBaseY() * Golem.TILE;
 
 		WorldPoint home = npc.getWorldLocation();
-		long seed = ((long) home.getX() << 32) ^ ((long) home.getY() << 8) ^ npc.getIndex();
+		long seed = uniqueSeed(((long) home.getX() << 32) ^ ((long) home.getY() << 8) ^ npc.getIndex());
 
-		// Orientation is taken live rather than from the snapshot, so the copy starts
-		// facing exactly where the original was facing on this frame.
+		// Taken live, not from the snapshot, so the copy starts facing where the original
+		// faced this frame.
 		GolemSnapshot posed = snapshot.facing(npc.getCurrentOrientation());
 		Golem golem = new Golem(posed, home, seed, fineX, fineY);
 
@@ -741,19 +926,13 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Retires the oldest unnamed golems until the roster is inside the limit.
+	 * Retires the oldest unnamed golems until the roster is inside the limit. Unlimited by
+	 * default: a golem costs an animated model every frame, so a cap is worth offering, but
+	 * choosing one would quietly delete golems collected on purpose.
 	 *
-	 * <p>Unlimited by default. A golem costs an animated model drawn each frame, so a
-	 * cap is worth having available, but choosing it for the player would quietly
-	 * delete golems they had collected on purpose.
-	 *
-	 * <p><b>Named golems are never culled</b>, even when that leaves the roster over
-	 * the limit. A name is the one unambiguous signal that the player cares about a
-	 * particular golem, and a performance setting silently deleting the one they called
-	 * Dave would be indefensible. Better to sit above the cap.
-	 *
-	 * <p>Retired golems crumble rather than vanishing; the roster is trimmed when the
-	 * animation finishes.
+	 * <p><b>Named golems are never culled</b>, even over the limit: a name is the one
+	 * unambiguous signal the player cares. Retired golems crumble, and leave the roster when
+	 * the animation finishes.
 	 */
 	private void enforceGolemLimit()
 	{
@@ -781,12 +960,9 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * The roster as anything outside the client thread should see it: a copy, with
-	 * golems that are mid-crumble already gone.
-	 *
-	 * <p>A copy because the panel reads it on the Swing thread while this one keeps
-	 * changing it. Crumbling golems are excluded so that pressing ✕ removes the entry
-	 * at once rather than leaving it listed for the two seconds it takes to fall apart.
+	 * The roster as anything outside the client thread should see it: a copy, because the panel
+	 * reads it on the Swing thread while this one changes it, with mid-crumble golems left out
+	 * so pressing ✕ removes the entry at once.
 	 */
 	private List<Golem> livingGolems()
 	{
@@ -801,7 +977,7 @@ public class GolemsDontDiePlugin extends Plugin
 		return living;
 	}
 
-	/** Golems not already crumbling. A dying golem is on its way out and does not count. */
+	/** Golems not already crumbling: a dying one is on its way out and does not count. */
 	private int countLiving()
 	{
 		int alive = 0;
@@ -822,13 +998,8 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Whether a new golem can be taken over.
-	 *
-	 * <p>False when the roster is full of golems the player has named: there is nothing
-	 * to make room with, and culling a named golem is not on the table. In that case the
-	 * plugin stands aside entirely and lets the real golem live out its twenty seconds
-	 * and crumble, which is the honest outcome — better than taking one over and
-	 * immediately killing something else to pay for it.
+	 * Whether a new golem can be taken over. False when the roster is full of named golems:
+	 * nothing can make room, so the plugin stands aside rather than killing one to pay.
 	 */
 	private boolean hasRoomForAnother()
 	{
@@ -851,11 +1022,8 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Retires one golem, from the side panel's X button. Client thread only.
-	 *
-	 * <p>It crumbles rather than vanishing, and leaves the roster when the animation
-	 * finishes. The panel drops it from the list straight away so the button feels
-	 * immediate — the golem the player is watching is on its way out either way.
+	 * Retires one golem, from the side panel's X button. Client thread only. It crumbles rather
+	 * than vanishing, but the panel drops it at once so the button feels immediate.
 	 */
 	private void removeGolem(Golem golem)
 	{
@@ -864,13 +1032,96 @@ public class GolemsDontDiePlugin extends Plugin
 		saveGolems();
 	}
 
+	/**
+	 * A seed, and so an id, that no golem has. Seeding from the plinth and the game's NPC slot
+	 * gave golems crafted minutes apart the same seed, because the game reuses slots; a seed is
+	 * everything a golem decides, so twins walked in lockstep and shared one raft, and four
+	 * hundred ids were in two places at once in one session. Now mixed with a counter and the
+	 * clock, and checked against the roster.
+	 */
+	private long uniqueSeed(long base)
+	{
+		long seed = base ^ (++seedsIssued * 0x9E3779B97F4A7C15L) ^ System.nanoTime();
+		while (seedInUse(seed))
+		{
+			seed += 0x9E3779B97F4A7C15L;
+		}
+		return seed;
+	}
+
+	private long seedsIssued;
+
+	private boolean seedInUse(long seed)
+	{
+		for (Golem golem : golems)
+		{
+			if (golem.getId() == seed)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// ---- simulation ----
+
+	/**
+	 * Ticks between looks at a golem out of view. Three seconds: the near ring a golem must
+	 * cross to reach the scene is over a hundred tiles wide, and a teleport rechecks everything
+	 * anyway.
+	 */
+	private static final int FAR_CHECK_TICKS = 5;
+
+	/** Tiles the player can move in one frame before it counts as a teleport. */
+	private static final int TELEPORT_TILES = 8;
+
+	/** What the view was last frame, to notice it changing at a stroke. */
+	private int lastViewX = Integer.MIN_VALUE;
+	private int lastViewY;
+	private int lastViewPlane;
+	private int lastBaseX;
+	private int lastBaseY;
+	private boolean lastInstance;
+	private boolean lastRestrict;
+
+	/**
+	 * True if something since last frame could have brought golems into view, or sent them home,
+	 * all at once, so every golem is looked at now rather than in turn.
+	 */
+	private boolean farViewChanged(WorldView wv, WorldPoint playerAt, boolean restrict)
+	{
+		int x = playerAt == null ? Integer.MIN_VALUE : playerAt.getX();
+		int y = playerAt == null ? 0 : playerAt.getY();
+		int plane = playerAt == null ? -1 : playerAt.getPlane();
+		int baseX = wv == null ? Integer.MIN_VALUE : wv.getBaseX();
+		int baseY = wv == null ? Integer.MIN_VALUE : wv.getBaseY();
+		boolean instance = wv != null && wv.isInstance();
+
+		boolean changed = lastViewX == Integer.MIN_VALUE || x == Integer.MIN_VALUE
+			|| Math.abs(x - lastViewX) > TELEPORT_TILES || Math.abs(y - lastViewY) > TELEPORT_TILES
+			|| plane != lastViewPlane || baseX != lastBaseX || baseY != lastBaseY
+			|| instance != lastInstance || restrict != lastRestrict;
+
+		lastViewX = x;
+		lastViewY = y;
+		lastViewPlane = plane;
+		lastBaseX = baseX;
+		lastBaseY = baseY;
+		lastInstance = instance;
+		lastRestrict = restrict;
+		return changed;
+	}
+
+	/** Golems standing on, and drawn on, each tile; refilled every frame. */
+	private final TileMap occupancy = new TileMap(256);
+	private final TileMap drawnPerTile = new TileMap(256);
 
 	@Subscribe
 	public void onBeforeRender(BeforeRender event)
 	{
 		if (golems.isEmpty())
 		{
+			drawnGolems.clear();
 			return;
 		}
 
@@ -878,59 +1129,77 @@ public class GolemsDontDiePlugin extends Plugin
 		int elapsed = lastGameCycle < 0 ? 0 : cycle - lastGameCycle;
 		lastGameCycle = cycle;
 
-		// A negative or absurd delta means the cycle counter was reset by a world hop
-		// or a reconnect. Skip that frame rather than teleporting every golem.
+		// A negative or absurd delta means a world hop or reconnect reset the cycle counter;
+		// skip the frame rather than teleporting every golem.
 		if (elapsed < 0 || elapsed > 200)
 		{
 			elapsed = 0;
 		}
 
-		// Path searches are rationed per frame. A golem only searches when it finishes
-		// a walk, which is rare individually — but with hundreds of them the arrivals
-		// bunch up, and a frame that runs fifty breadth-first searches is a visible
-		// stutter. Golems denied a search simply stand still for a frame and ask again,
-		// which is indistinguishable from the pause they take between walks anyway.
+		// Rationed per frame: a golem only searches when it finishes a walk, but with hundreds
+		// the arrivals bunch up and fifty breadth-first searches in a frame stutters. One
+		// denied waits, indistinguishable from its usual pause.
 		int searchBudget = PATH_SEARCHES_PER_FRAME;
 		int farPlanBudget = FAR_PLANS_PER_FRAME;
 
-		// Resolved once rather than per golem. Both of these were being fetched or
-		// built five hundred times a frame to produce the same answer.
+		// Resolved once rather than per golem: both were built five hundred times a frame for
+		// the same answer.
 		WorldView wv = client.getTopLevelWorldView();
 
-		// One context for the whole frame. Only the two per-golem knobs change as the
-		// roster is walked; everything else in it is the same for every golem.
+		// One context for the whole frame; only the two per-golem knobs change as the
+		// roster is walked.
 		roamContext.setTick(client.getTickCount());
+		// Thirty client cycles to a tick.
+		roamContext.setTickFraction(tickStartCycle < 0 ? 0f
+			: Math.min(0.999f, Math.max(0f, (client.getGameCycle() - tickStartCycle) / 30f)));
 		roamContext.setMaySearchSea(true);
+		// Read once for the frame rather than through the config proxy for every golem.
+		boolean restrictAmbition = config.restrictGolemAmbition();
+		roamContext.setAmbitionRestricted(restrictAmbition);
 
-		Player local = client.getLocalPlayer();
-		WorldPoint playerAt = local == null ? null : local.getWorldLocation();
+		// In the main world even aboard a boat, whose coordinates would put golems out of range.
+		WorldPoint playerAt = PlayerPosition.of(client);
 
-		// Where golems are standing, for keeping them from piling onto one tile.
-		Map<Long, Integer> occupancy = new HashMap<>();
+		// Where golems are standing, to keep them off one tile. The same map every frame,
+		// emptied and refilled, so a pen of golems does not box a key each.
+		occupancy.clear();
 		for (Golem golem : golems)
 		{
 			if (golem.getTier() != GolemTier.FAR)
 			{
-				occupancy.merge(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
-					golem.getFineY() / Golem.TILE, golem.getPlane()), 1, Integer::sum);
+				occupancy.addTo(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
+					golem.getFineY() / Golem.TILE, golem.getPlane()), 1);
 			}
 		}
 		roamContext.setOccupancy(occupancy);
 
 		// Golems drawn per tile this frame. See updateRenderer.
-		Map<Long, Integer> drawnPerTile = new HashMap<>();
+		drawnPerTile.clear();
 
-		// Inside an instance, which template chunks it is built from and where the player is
-		// in template terms. Golems live in the template; see tierFor.
+		// Inside an instance: which template chunks it is built from, and where the player is in
+		// template terms. Golems live in the template; see tierFor.
 		Map<Long, int[]> sceneChunks = wv != null && wv.isInstance() ? InstanceMap.sceneChunks(wv) : null;
 		WorldPoint playerTemplate = sceneChunks == null ? playerAt : InstanceMap.templateOf(wv, playerAt);
 
+		// Golems out of view are looked at every few ticks; see Golem.scheduleFarCheck. All at
+		// once after a teleport, a new scene, a change of floor or the ambition setting.
+		int tick = client.getTickCount();
+		boolean lookAtAll = farViewChanged(wv, playerAt, restrictAmbition);
+
 		for (Golem golem : golems)
 		{
-			// Which tier this golem is in is a question about this golem, not about the
-			// player's proximity to Wyrmscraig. That distinction is the whole change: the
-			// old gate switched every golem off at once whenever the player walked away
-			// from the island, which was correct only while the island was all there was.
+			if (!lookAtAll && golem.getTier() == GolemTier.FAR && golem.getRenderer() == null
+				&& !golem.farCheckDue(tick))
+			{
+				continue;
+			}
+			if (golem.getTier() == GolemTier.FAR)
+			{
+				golem.catchUpFar(tick);
+			}
+
+			// A question about this golem, not the player's proximity to Wyrmscraig: the old
+			// gate switched every golem off when the player left the island.
 			GolemTier tier = tierFor(golem, wv, playerAt, playerTemplate, sceneChunks);
 
 			golem.setTier(tier, roamContext, roamPlanner);
@@ -941,6 +1210,7 @@ public class GolemsDontDiePlugin extends Plugin
 				{
 					farPlanBudget--;
 				}
+				golem.scheduleFarCheck(tick, FAR_CHECK_TICKS);
 			}
 			else if (elapsed > 0)
 			{
@@ -951,14 +1221,17 @@ public class GolemsDontDiePlugin extends Plugin
 				}
 			}
 
+			if (restrictAmbition)
+			{
+				sendHomeIfAway(golem);
+			}
 			rescueIfStuck(golem, tier);
 
 			updateRenderer(golem, wv, tier == GolemTier.SCENE, drawnPerTile);
 			updateRaft(golem, tier == GolemTier.SCENE);
 
-			// Scenery is only animated for a golem the player can actually see. A prop
-			// request from a golem three regions away is dropped rather than queued —
-			// nobody watched the plank lower, so there is nothing to catch up on.
+			// Scenery is only animated for a golem the player can see; a request from three
+			// regions away is dropped, not queued, as nobody watched the plank lower.
 			GolemTransport prop = golem.claimPendingProp();
 			if (prop != null && tier == GolemTier.SCENE)
 			{
@@ -968,56 +1241,54 @@ public class GolemsDontDiePlugin extends Plugin
 
 		advanceProps();
 		reapCrumbled();
+
+		// Golems with a model in the scene, in roster order, for the overlays and the menu. A
+		// renderer is only attached above, so nothing outside this list is drawn before it is
+		// rebuilt; one detached since is skipped by their own checks.
+		drawnGolems.clear();
+		for (Golem golem : golems)
+		{
+			if (golem.getRenderer() != null)
+			{
+				drawnGolems.add(golem);
+			}
+		}
 	}
 
 	/**
-	 * Moves a golem that has stopped getting anywhere.
-	 *
-	 * <p>The watchdog on {@link Golem} decides <em>whether</em>; this decides <em>where</em>,
-	 * because only the plugin has the mesh. The golem is put on the nearest tile it could
-	 * walk out of, and if the mesh offers nothing within range it goes home to the plinth —
-	 * which always exists and is always walkable, and is where golems come from anyway.
-	 *
-	 * <p>It is moved, never replaced. Same name, same id, same seed, same gait. Deleting a
-	 * golem to resolve a navigation problem would be a death, and the plugin is called
-	 * Golems Don't Die.
-	 *
-	 * <p>Relocation while the golem is on screen is deliberately still allowed. Sliding a
-	 * visible golem a few tiles is odd; leaving it frozen in scenery forever is worse, and
-	 * a stuck golem is nearly always somewhere nobody is looking anyway.
+	 * Moves a golem that has stopped getting anywhere. The watchdog on {@link Golem} decides
+	 * <em>whether</em>; this decides <em>where</em>, because only the plugin has the mesh. The
+	 * golem goes to the nearest tile it could walk out of, or home to the plinth, which always
+	 * exists and is always walkable. Moved, never replaced: same name, id, seed and gait.
+	 * Allowed even on screen, since a golem frozen in scenery is worse than one that slides.
 	 */
 	private void rescueIfStuck(Golem golem, GolemTier tier)
 	{
 		int tick = roamContext.getTick();
 
-		// A golem the player can see, standing somewhere it could not have walked to, is
-		// wrong now rather than in five minutes' time — so it is put right immediately
-		// instead of waiting for the watchdog's patience to run out.
+		// A visible golem somewhere it could not have walked to is wrong now, not in five
+		// minutes, so it is put right rather than waiting for the watchdog — a net under
+		// everything else. A stepping stone is the legitimate exception: blocked ground the
+		// network says you may stand on.
 		//
-		// This is a net under everything else: however a golem came to be on water or
-		// inside scenery, it does not stay there while being looked at. A stepping stone
-		// is the one legitimate exception, being blocked ground the network says you may
-		// stand on.
-		// A golem mid-obstacle is exempt, because half of them are legitimately standing on
-		// nothing. A stepping-stone hop passes over open water, a vault crosses a ditch, and
-		// a climb hangs off a cliff face — all of them unwalkable ground the golem is
-		// supposed to be over.
-		//
+		// A golem mid-obstacle is exempt, because half of them legitimately stand on nothing.
 		// Without this the watchdog fired every tick of every crossing and called relocate,
-		// which drops the path, the step and the itinerary. That is what was hauling golems
-		// out of hops and leaving them sliding: they were not escaping the stones, they were
-		// being pulled off them by the thing meant to rescue them. The journal shows one
-		// golem triggering it 8,855 times on a single tile between two basalt stones.
+		// dropping the path, the step and the itinerary: golems were pulled off the stones by
+		// the thing meant to rescue them, 8,855 times on one tile in the journal. isStuck()
+		// below exempts transitions; this check simply ran before it.
 		//
-		// isStuck() below already exempts transitions. This check simply ran before it.
-		// Nor is a golem at sea: it is on water because it is in a boat. Without this every
-		// golem that sailed in view was pulled back onto the nearest beach the frame it left.
+		// Nor a golem at sea, which is on water because it is in a boat: without this every
+		// golem that sailed in view was pulled back onto the nearest beach.
 		if (tier != GolemTier.FAR && !golem.isDying() && !golem.inTransition() && !golem.isSailing(tick))
 		{
-			WorldPoint on = golem.currentTile();
-			if (!islandMemory.isKnownWalkable(on.getX(), on.getY(), on.getPlane())
-				&& !transports.hasOrigin(on.getX(), on.getY()))
+			// The tile as numbers first: this runs for every golem in view every frame, and the
+			// point is only needed once one turns out to be somewhere it should not be.
+			int x = golem.getFineX() / Golem.TILE;
+			int y = golem.getFineY() / Golem.TILE;
+			if (!islandMemory.isKnownWalkable(x, y, golem.getPlane())
+				&& !transports.hasOrigin(x, y))
 			{
+				WorldPoint on = golem.currentTile();
 				WorldPoint safe = roamPlanner.snapToMesh(on);
 				if (!safe.equals(on))
 				{
@@ -1036,8 +1307,8 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
-		// Try the cheap, invisible things first — spin, back out, re-plan. Only when all
-		// of those have been exhausted does the golem get picked up and put somewhere.
+		// The cheap, invisible things first — spin, back out, re-plan — before the golem is
+		// picked up and put somewhere.
 		if (golem.workFree(roamContext, roamPlanner))
 		{
 			return;
@@ -1048,8 +1319,8 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (safe.equals(at))
 		{
-			// The mesh says this tile is fine, so the golem is stuck for some reason the
-			// map cannot see. Home is the fallback that cannot fail.
+			// The mesh says this tile is fine, so the golem is stuck for a reason the map
+			// cannot see; home is the fallback that cannot fail.
 			safe = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		}
 
@@ -1061,17 +1332,13 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Puts a rescue in the journal.
-	 *
-	 * <p>A rescue is the plugin admitting a golem got somewhere it could not get out of,
-	 * and that is exactly what cannot be seen from the journal otherwise: the golem simply
-	 * reappears at the plinth. Ninety golems were lifted off the top of one ladder in a
-	 * single session with nothing but a debug line to show for it.
+	 * Puts a rescue in the journal, where it is otherwise invisible: the golem simply reappears
+	 * at the plinth. Ninety came off one ladder in a single session.
 	 */
 	/** The plane last harvested for, so moving to another floor harvests that one. */
 	private int harvestedPlane = -1;
 
-	/** A door opened: the wall object for the shut door went and one for the open door came. */
+	/** A door opened: the shut door's wall object went and the open door's came. */
 	@Subscribe
 	public void onWallObjectSpawned(net.runelite.api.events.WallObjectSpawned event)
 	{
@@ -1088,19 +1355,16 @@ public class GolemsDontDiePlugin extends Plugin
 	private final Map<Long, Integer> loggedSteps = new HashMap<>();
 
 	/**
-	 * Logs a golem that has just walked across an edge the live game says is blocked.
-	 *
-	 * <p>The game's own collision, read at the moment of the step — not the island memory
-	 * the golem planned with, which is exactly the thing that might be stale. A golem
-	 * walking through a shut door is invisible to every other check: its path was valid
-	 * when it was planned, and it arrives on walkable ground.
+	 * Logs a golem that has just walked across an edge the live game says is blocked, judged by
+	 * the game's own collision at the moment of the step rather than the island memory the golem
+	 * planned with, which is the thing that might be stale. A golem through a shut door is
+	 * invisible to every other check: its path was valid when planned.
 	 */
 	private void checkStep(Golem golem)
 	{
-		// The step the golem actually began, checked once — not the tile it was logged on a
-		// tick ago. Comparing logged tiles called a landing from a stepping-stone hop, and
-		// the corner of a diagonal step caught halfway, steps through walls: most of the
-		// first 169 reports were exactly that.
+		// The step the golem actually began, not the tile it was logged on a tick ago:
+		// comparing logged tiles called stepping-stone landings and half-finished diagonals
+		// steps through walls, which was most of the first 169 reports.
 		int serial = golem.getStepSerial();
 		Integer checked = loggedSteps.put(golem.getId(), serial);
 		if (checked == null || checked == serial || golem.lastStepClimbing())
@@ -1128,8 +1392,8 @@ public class GolemsDontDiePlugin extends Plugin
 		int[][] flags = wv.getCollisionMaps()[now.getPlane()].getFlags();
 		int sx = before.getX() - wv.getBaseX();
 		int sy = before.getY() - wv.getBaseY();
-		// Not near the edge of the loaded scene, where the client marks a border of tiles as
-		// blocked whatever is really there. Steps along it were reported as walls.
+		// Not near the scene edge, where the client marks a border blocked whatever is really
+		// there; steps along it were reported as walls.
 		int margin = 6;
 		if (sx < margin || sy < margin || sx >= wv.getSizeX() - margin || sy >= wv.getSizeY() - margin
 			|| sx + dx < margin || sy + dy < margin
@@ -1148,13 +1412,10 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Logs a golem standing on a tile the live game says nothing can stand on — the water,
-	 * or inside scenery — outside a traversal and off any transport's starting tile.
-	 *
-	 * <p>Judged by the game's own collision at that moment, because the golems' map is the
-	 * very thing that can be wrong: a map with false walls in it and a map with holes in it
-	 * both look fine from inside the plugin. Marked when the golem is following a route,
-	 * which is how a golem out of view gets placed without walking.
+	 * Logs a golem standing on a tile the live game says nothing can stand on — water, or inside
+	 * scenery — outside a traversal and off any transport's starting tile. Judged by the game's
+	 * own collision, because the golems' map is the thing that can be wrong: false walls and
+	 * holes both look fine from inside the plugin.
 	 */
 	private void checkStanding(Golem golem)
 	{
@@ -1191,7 +1452,7 @@ public class GolemsDontDiePlugin extends Plugin
 		| net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
 		| net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
 
-	/** The game's rule for one step, on raw scene flags: both ways round a corner must be clear. */
+	/** The game's rule for one step, on raw scene flags: both ways round a corner clear. */
 	private static boolean liveStepBlocked(int[][] flags, int x, int y, int dx, int dy)
 	{
 		if (dx != 0 && dy != 0)
@@ -1231,6 +1492,106 @@ public class GolemsDontDiePlugin extends Plugin
 		return (flags[x][y] & out) != 0 || (flags[nx][ny] & (in | LIVE_UNWALKABLE)) != 0;
 	}
 
+	/**
+	 * Wyrmscraig, its caves and floors, and everywhere its own transports lead; recomputed
+	 * whenever a route is learned. See {@link TransportNetwork#homeRegions}.
+	 */
+	private java.util.Set<Integer> homeRegions = java.util.Collections.emptySet();
+
+	/** {@link #homeRegions} by region id, for the check made of every golem every frame. */
+	private boolean[] homeRegionBits = new boolean[1 << 16];
+
+	private void setHomeRegions(java.util.Set<Integer> regions)
+	{
+		boolean[] bits = new boolean[1 << 16];
+		for (int regionId : regions)
+		{
+			if (regionId >= 0 && regionId < bits.length)
+			{
+				bits[regionId] = true;
+			}
+		}
+		// Bits before the set: a check between the two sees the old set's emptiness with the new
+		// bits, never a non-empty set with no bits, which would send every golem home.
+		homeRegionBits = bits;
+		homeRegions = regions;
+	}
+
+	/**
+	 * Puts a golem back on the plinth if it is anywhere but home, for "Restrict Golem ambition".
+	 * By region, which is all home is: the island, its caves and its upper floors are regions,
+	 * and an instance is simulated at its template.
+	 */
+	private void sendHomeIfAway(Golem golem)
+	{
+		// Every golem every frame while the setting is on, so the region comes from the
+		// golem's own numbers, exactly as WorldPoint.getRegionID does, rather than a new one.
+		int regionId = ((golem.getFineX() / Golem.TILE >> 6) << 8) | (golem.getFineY() / Golem.TILE >> 6);
+		if (homeRegions.isEmpty() || (regionId >= 0 && regionId < homeRegionBits.length
+			? homeRegionBits[regionId] : homeRegions.contains(regionId)))
+		{
+			return;
+		}
+		WorldPoint at = golem.currentTile();
+		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
+		noteRescue(golem, at, plinth, "ambition");
+		golem.relocate(plinth);
+		golem.setInInstance(false);
+		golem.noteUnstuck(roamContext.getTick());
+	}
+
+	/**
+	 * This release, as the plugin's own files record it. It sits beside
+	 * {@code runelite-plugin.properties} and {@code build.gradle}, which the Plugin Hub reads;
+	 * this one is what the plugin writes into the data it keeps.
+	 */
+	static final String VERSION = "2.0";
+
+	/** Set once an update has been announced, or on a new install with nothing to say. */
+	private static final String ANNOUNCED_KEY = "announcedSailing";
+
+	/** Keys the version before sailing wrote; any of them means this is an update, not an install. */
+	private static final String[] OLD_VERSION_KEYS = {
+		GolemsDontDieConfig.SAVED_GOLEMS_KEY, GolemTally.TOTAL_KEY, IslandMemory.MAP_KEY,
+	};
+
+	/** True if this launch is an update from the version before sailing, not yet announced. */
+	private boolean announcementPending;
+
+	/**
+	 * Decides, once, whether this is an update worth announcing. A new install has none of the
+	 * old version's keys and is marked announced straight away; an update has some, and hears
+	 * about it at its next login.
+	 */
+	private void checkForUpdate()
+	{
+		if (configManager.getConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY) != null)
+		{
+			return;
+		}
+		for (String key : OLD_VERSION_KEYS)
+		{
+			if (configManager.getConfiguration(GolemsDontDieConfig.GROUP, key) != null)
+			{
+				announcementPending = true;
+				return;
+			}
+		}
+		configManager.setConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY, true);
+	}
+
+	/** Says it once, on the first tick logged in, and marks it only once said. */
+	private void announceUpdate()
+	{
+		if (!announcementPending || client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		announcementPending = false;
+		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>The Golems have learned to sail...</col>", null);
+		configManager.setConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY, true);
+	}
+
 	private void noteRescue(Golem golem, WorldPoint from, WorldPoint to, String reason)
 	{
 		if (obstacleObserver.isLoggingGolems())
@@ -1245,31 +1606,38 @@ public class GolemsDontDiePlugin extends Plugin
 	/** Animated scenery currently on screen. Short-lived: each plays once and goes. */
 	private final List<FakeProp> props = new ArrayList<>();
 
-	/** Hulls drawn under golems that are at sea, keyed by golem id. */
-	private final Map<Long, FakeRaft> rafts = new HashMap<>();
+	/**
+	 * Hulls drawn under golems at sea, keyed by the golem itself. Not by id: ids come from the
+	 * crafting site and the game's NPC slot, which the game reuses, so two golems could share
+	 * one raft — whichever was updated last had it, and if the other was ashore it took the
+	 * raft away again, leaving a golem at the helm of nothing.
+	 */
+	private final Map<Golem, FakeRaft> rafts = new java.util.IdentityHashMap<>();
 
 	/**
-	 * Gives a golem a boat if it is standing on open water, and takes it away otherwise.
-	 *
-	 * <p>The rule is deliberately about position rather than about intent. A golem is
-	 * drawn on a raft when it is on an ocean tile, full stop — which covers a crossing, a
-	 * golem the player has sailed out to meet, and a golem that ended up on water by some
-	 * route nobody anticipated. Tying it to a "is sailing" flag instead would leave every
-	 * unanticipated case as a golem standing on the sea.
+	 * Gives a golem a boat if it is standing on open water, and takes it away otherwise. About
+	 * position, not intent: an "is sailing" flag would leave every unanticipated case standing
+	 * on the sea.
 	 */
 	private void updateRaft(Golem golem, boolean visible)
 	{
-		FakeRaft raft = rafts.get(golem.getId());
+		if (!visible && rafts.isEmpty())
+		{
+			// Not afloat and no hull to take away: the usual case, no id boxed.
+			return;
+		}
+		FakeRaft raft = rafts.get(golem);
 
-		boolean afloat = visible && worldMesh.isOcean(
-			golem.getFineX() / Golem.TILE, golem.getFineY() / Golem.TILE, golem.getPlane());
+		// On the sea, or anywhere else a crossing goes: the cave's lake is not the sea.
+		boolean afloat = visible && (golem.isAfloat() || worldMesh.isOcean(
+			golem.getFineX() / Golem.TILE, golem.getFineY() / Golem.TILE, golem.getPlane()));
 
 		if (!afloat)
 		{
 			if (raft != null)
 			{
 				client.removeRuneLiteObject(raft);
-				rafts.remove(golem.getId());
+				rafts.remove(golem);
 			}
 			return;
 		}
@@ -1284,15 +1652,30 @@ public class GolemsDontDiePlugin extends Plugin
 			raft = new FakeRaft(client, hull, modelFactory,
 				golem.getFineX(), golem.getFineY(), golem.getOrientation());
 			client.registerRuneLiteObject(raft);
-			rafts.put(golem.getId(), raft);
+			rafts.put(golem, raft);
 		}
 
-		// The hull follows the golem rather than the other way round. The golem is the
-		// thing being simulated; the boat is scenery that keeps up with it.
-		raft.steer(golem.getFineX(), golem.getFineY(), golem.getOrientation());
+		// The hull follows the golem, which is at the helm at the stern, so the raft's middle is
+		// a tile ahead — the way it faces: 0 south, 512 west, 1024 north, 1536 east.
+		double facing = golem.getOrientation() * Math.PI / 1024;
+		int aheadX = (int) Math.round(-Math.sin(facing) * GolemContent.RAFT_HELM_OFFSET);
+		int aheadY = (int) Math.round(-Math.cos(facing) * GolemContent.RAFT_HELM_OFFSET);
+		// At the golem's ground height, always in the scene when the golem is drawn.
+		WorldView view = client.getTopLevelWorldView();
+		int localX = golem.getFineX() - (view == null ? 0 : view.getBaseX() * Golem.TILE);
+		int localY = golem.getFineY() - (view == null ? 0 : view.getBaseY() * Golem.TILE);
+		if (view != null && Golem.isInScene(view, localX, localY))
+		{
+			int ground = Perspective.getTileHeight(client, new LocalPoint(localX, localY, view), 0);
+			raft.steer(golem.getFineX() + aheadX, golem.getFineY() + aheadY, golem.getOrientation(), ground);
+		}
+		else
+		{
+			raft.steer(golem.getFineX() + aheadX, golem.getFineY() + aheadY, golem.getOrientation());
+		}
 	}
 
-	/** Drops every hull. Scene coordinates are about to change, or the plugin is stopping. */
+	/** Drops every hull: scene coordinates are changing, or the plugin is stopping. */
 	private void clearRafts()
 	{
 		for (FakeRaft raft : rafts.values())
@@ -1303,12 +1686,9 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Draws an animated copy of the object a golem is using.
-	 *
-	 * <p>The copy sits on top of the real object rather than replacing it. That is
-	 * deliberate and it is why doors are excluded: for something that is already open, or
-	 * that another player is operating, a second copy would read as a ghost. For a plank
-	 * being crossed or a ring being stepped into, the motion is the whole point.
+	 * Draws an animated copy of the object a golem is using. It sits on top of the real object
+	 * rather than replacing it, which is why doors are excluded: over one already open, a
+	 * second copy reads as a ghost.
 	 */
 	private void spawnProp(GolemTransport transport, WorldView wv)
 	{
@@ -1362,7 +1742,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 	}
 
-	/** Drops every scenery copy, whether or not its animation has finished. */
+	/** Drops every scenery copy, finished or not. */
 	private void clearProps()
 	{
 		for (FakeProp prop : props)
@@ -1373,10 +1753,8 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Drops golems whose crumble has finished.
-	 *
-	 * <p>Separate from the loop above so the roster is not modified while it is being
-	 * walked.
+	 * Drops golems whose crumble has finished. Separate from the loop above so the roster is
+	 * not modified while being walked.
 	 */
 	private void reapCrumbled()
 	{
@@ -1393,39 +1771,48 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Attaches or detaches a golem's drawn object as it crosses the scene boundary.
-	 *
-	 * <p>This is what lets a golem wander off the edge of what is loaded and come back
-	 * later: leaving the scene costs it its renderer, not its existence.
+	 * Attaches or detaches a golem's drawn object as it crosses the scene boundary, which is
+	 * what lets one wander off the edge of what is loaded and come back: leaving the scene
+	 * costs it its renderer, not its existence.
 	 */
 	/**
-	 * Most golems drawn on one tile.
-	 *
-	 * <p>The game draws only a few objects per tile. With more golems than that standing on
-	 * one, it chose a different few each frame and they flashed in and out. The same golems
-	 * are drawn every frame instead — the roster is walked in a fixed order, so the first
-	 * few on a tile keep their place — and any beyond simply are not shown until there is room.
+	 * Most golems drawn on one tile. The game draws only a few objects per tile, and with more
+	 * than that on one it chose a different few each frame and they flashed; the roster is
+	 * walked in a fixed order instead, so the first few keep their place and the rest wait.
 	 */
 	private static final int MAX_DRAWN_PER_TILE = 4;
 
 	/**
-	 * Which tier a golem is in, and where it is drawn.
-	 *
-	 * <p>Outside an instance, as it always was. Inside one, a golem standing in a chunk the
-	 * instance was built from is in the scene — drawn at the matching place in the instance,
-	 * on the instance's plane — and every other golem is judged by its distance from where
-	 * the player is in template terms, which puts the whole overworld out of range.
+	 * Which tier a golem is in, and where it is drawn. Inside an instance, a golem standing in a
+	 * chunk it was built from is in the scene, drawn at the matching place on the instance's
+	 * plane; every other golem is judged by its distance from the player in template terms,
+	 * which puts the overworld out of range.
 	 */
 	private GolemTier tierFor(Golem golem, WorldView wv, WorldPoint playerAt, WorldPoint playerTemplate,
 		Map<Long, int[]> sceneChunks)
 	{
 		int tileX = golem.getFineX() / Golem.TILE;
 		int tileY = golem.getFineY() / Golem.TILE;
+
+		// Where a golem stands says whether it is in an instance, whatever it was told on the
+		// way: the room exists only as a copy walked in template coordinates. Told wrongly, it
+		// was drawn in the wrong world — golems that had climbed out of the Mad Angel's room
+		// went on walking the instance's copy of the island. The flag was only set by the
+		// crossing, and one performed as a walk, or cut short by going out of view, never set
+		// it.
+		if (!instanceRoomTiles.isEmpty())
+		{
+			boolean inRoom = instanceRoomTiles.contains(RoamContext.tileKey(tileX, tileY, golem.getPlane()));
+			if (golem.isInInstance() != inRoom && !golem.inTransition())
+			{
+				golem.setInInstance(inRoom);
+			}
+		}
 		if (sceneChunks == null)
 		{
 			golem.setDrawOffset(0, 0, -1);
-			// A golem in an instance is somewhere the overworld cannot see, even though it is
-			// simulated in the template room — a real, sealed room on the island.
+			// A golem in an instance is somewhere the overworld cannot see, even though it
+			// is simulated in the template room — a real, sealed room on the island.
 			if (golem.isInInstance())
 			{
 				return GolemTier.FAR;
@@ -1434,9 +1821,8 @@ public class GolemsDontDiePlugin extends Plugin
 				: GolemTier.of(wv, tileX, tileY, golem.getPlane(), playerAt.getX(), playerAt.getY(), playerAt.getPlane());
 		}
 
-		// Only golems in the instance are in it. The instance is built from the chunks around
-		// the room as well as the room, and golems on the island in those chunks were drawn
-		// inside it; every other golem waits out of range until the player leaves.
+		// The instance is built from the chunks around the room as well as the room, and golems
+		// on the island in those chunks were drawn inside it; the rest wait out of range.
 		int[] scene = golem.isInInstance()
 			? sceneChunks.get(InstanceMap.chunkKey(tileX >> 3, tileY >> 3, golem.getPlane()))
 			: null;
@@ -1453,15 +1839,14 @@ public class GolemsDontDiePlugin extends Plugin
 		return GolemTier.FAR;
 	}
 
-	private void updateRenderer(Golem golem, WorldView wv, boolean inSceneTier,
-		Map<Long, Integer> drawnPerTile)
+	private void updateRenderer(Golem golem, WorldView wv, boolean inSceneTier, TileMap drawnPerTile)
 	{
 		boolean visible = inSceneTier
 			&& wv != null
 			&& wv.getPlane() == golem.getDrawPlane()
 			&& inScene(wv, golem)
-			&& drawnPerTile.merge(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
-				golem.getFineY() / Golem.TILE, golem.getPlane()), 1, Integer::sum) <= MAX_DRAWN_PER_TILE;
+			&& drawnPerTile.addTo(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
+				golem.getFineY() / Golem.TILE, golem.getPlane()), 1) <= MAX_DRAWN_PER_TILE;
 
 		if (!visible)
 		{
@@ -1484,7 +1869,7 @@ public class GolemsDontDiePlugin extends Plugin
 				{
 					obstacleObserver.writeGolemFrame(traceId, line);
 				}
-			});
+			}, obstacleObserver::isLoggingGolems);
 			golem.setRenderer(renderer);
 			client.registerRuneLiteObject(renderer);
 		}
@@ -1505,16 +1890,21 @@ public class GolemsDontDiePlugin extends Plugin
 			client.removeRuneLiteObject(renderer);
 			golem.setRenderer(null);
 		}
+		// Its raft goes with it: a golem removed or crumbled at sea is never updated again,
+		// so nothing else would take the raft away.
+		FakeRaft raft = rafts.remove(golem);
+		if (raft != null)
+		{
+			client.removeRuneLiteObject(raft);
+		}
 	}
 
 	// ---- per-tick upkeep ----
 
 	/**
-	 * Development only: records what a shortcut actually does when the player uses one.
-	 *
-	 * <p>Which clip an obstacle plays, and how long it takes, is decided server-side and
-	 * is in no cache anywhere — so the only way to know is to use one and watch. Remove
-	 * this and its two siblings before release.
+	 * Development only: records what a shortcut actually does when the player uses one. Which
+	 * clip it plays, and how long it takes, is server-side and in no cache, so the only way to
+	 * know is to use one and watch. Remove this and its two siblings before release.
 	 */
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
@@ -1523,13 +1913,25 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onHitsplatApplied(net.runelite.api.events.HitsplatApplied event)
+	{
+		// A hit while using an obstacle means it failed; a fall is not the way across.
+		if (event.getActor() == client.getLocalPlayer())
+		{
+			obstacleObserver.onPlayerHurt();
+		}
+	}
+
+	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		tickStartCycle = client.getGameCycle();
+		announceUpdate();
 		obstacleObserver.onGameTick();
 		logGolemState();
-		// Snapshots are refreshed continuously rather than read once at spawn: a golem
-		// steps off its plinth and starts walking, and the pose animations it is given
-		// are not necessarily the ones it had while standing on it.
+		// Refreshed continuously rather than read once at spawn: a golem steps off its
+		// plinth and starts walking, and its pose animations need not be the ones it had
+		// while standing on it.
 		WorldView topLevel = client.getTopLevelWorldView();
 		if (topLevel != null)
 		{
@@ -1542,14 +1944,12 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 		}
 
-		// A new floor is ground to learn even though no scene was loaded.
-		//
-		// The harvest reads the plane the player is on, and only ran when a scene loaded —
-		// climbing a ladder does not load one, so the floor at the top was never recorded.
-		// Every golem that climbed it arrived on ground it knew nothing about, could find
-		// nowhere to walk, and was lifted back to the plinth: 217 times in one session.
-		net.runelite.api.Player me = client.getLocalPlayer();
-		int plane = me == null ? -1 : me.getWorldLocation().getPlane();
+		// A new floor is ground to learn even though no scene was loaded: the harvest reads the
+		// player's plane and only ran on a scene load, which a ladder does not trigger, so
+		// golems that climbed arrived on unknown ground and were lifted back to the plinth —
+		// 217 times in one session.
+		WorldPoint me = PlayerPosition.of(client);
+		int plane = me == null ? -1 : me.getPlane();
 		if (plane != harvestedPlane)
 		{
 			harvestedPlane = plane;
@@ -1557,9 +1957,8 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		islandMemory.harvestLoadedRegions();
 
-		// Only when the roster has actually changed. Copying five hundred golems every
-		// tick to hand the panel a list it would find identical is work for nothing,
-		// and the roster changes when a golem is made or removed — not on a timer.
+		// Only when the roster has actually changed: copying five hundred golems every tick
+		// to hand the panel an identical list is work for nothing.
 		if (panel != null && rosterChanged)
 		{
 			rosterChanged = false;
@@ -1567,20 +1966,39 @@ public class GolemsDontDiePlugin extends Plugin
 			panel.refresh(living, tally.getTotal() - living.size());
 		}
 
+		if (routesChanged)
+		{
+			applyLearnedRoutes();
+			obstacleData.save();
+		}
+
+		if (++ticksSinceCensus >= CENSUS_TICKS)
+		{
+			ticksSinceCensus = 0;
+			census.recount(golems);
+		}
+
+		if (saveGolemsAt >= 0 && client.getTickCount() >= saveGolemsAt)
+		{
+			saveGolemsAt = -1;
+			saveGolems();
+		}
+
 		if (++ticksSinceSave >= SAVE_INTERVAL_TICKS)
 		{
 			ticksSinceSave = 0;
 			saveGolems();
 			saveIslandMemory();
+			// Golems crossing obstacles add to the record constantly; written with the rest.
+			obstacleData.save();
 		}
 	}
 
 	/**
 	 * Offers the hovered golem's menu entries.
 	 *
-	 * <p>On client tick rather than game tick: this is when the client rebuilds its
-	 * menu, and a golem that had to wait up to 600ms to become hoverable would feel
-	 * broken next to a real NPC.
+	 * <p>On client tick rather than game tick: this is when the client rebuilds its menu, and
+	 * a golem waiting up to 600ms to become hoverable would feel broken beside a real NPC.
 	 */
 	@Subscribe
 	public void onClientTick(ClientTick event)
@@ -1589,7 +2007,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (!golems.isEmpty())
 		{
-			menu.addEntries(golems);
+			menu.addEntries(drawnGolems);
 		}
 	}
 
@@ -1600,16 +2018,15 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (state == GameState.LOADING)
 		{
-			// The scene is being rebuilt, so every registered object is about to refer
-			// to coordinates that no longer mean what they did. Drop the renderers; the
-			// golems themselves are in world space and are unaffected.
+			// The scene is being rebuilt, so every registered object is about to refer to
+			// coordinates that no longer mean what they did. Drop the renderers; the golems
+			// themselves are in world space.
 			for (Golem golem : golems)
 			{
 				detachRenderer(golem);
 			}
-			// Scenery copies are registered objects too, and they hold scene-local
-			// coordinates that are about to mean something else entirely. A prop is
-			// short-lived, so there is nothing to preserve — drop them all.
+			// Scenery copies are registered objects too, holding scene-local coordinates
+			// about to mean something else. A prop is short-lived, so drop them all.
 			clearProps();
 			clearRafts();
 			lastGameCycle = -1;
@@ -1619,9 +2036,9 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (state == GameState.LOGGED_IN)
 		{
-			// The dock table is game data, not a bundled resource, so it cannot be read
-			// until there is a logged-in client to read it from. Doing it here rather than
-			// in startUp is what lets the plugin be enabled at the login screen.
+			// The dock table is game data, not a bundled resource, so it needs a logged-in
+			// client. Here rather than in startUp is what lets the plugin be enabled at the
+			// login screen.
 			sailingDocks.load();
 			// Belt and braces next to onVarbitChanged: whichever of the two sees the
 			// count first, the other is a no-op.
@@ -1632,10 +2049,15 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
 		{
-			// Golems are always permanent, so nothing is released here — only the
-			// renderers, which belong to a scene that is going away.
+			// Golems are permanent, so nothing is released here — only the renderers,
+			// which belong to a scene that is going away.
 			saveGolems();
 			saveIslandMemory();
+			// Quest progress is the account's, and the next login may be another account.
+			// Not on every LOGGED_IN, which also follows each loading screen.
+			sailingDocks.forgetQuests();
+			abilities.forgetQuests();
+			obstacleObserver.resetSession();
 			detector.reset();
 			hiddenNpcs.clear();
 			lastGameCycle = -1;
@@ -1664,30 +2086,27 @@ public class GolemsDontDiePlugin extends Plugin
 			});
 		}
 
-		// Telemetry in particular must take effect the moment it is switched off, not at
-		// the next restart. Somebody turning it off has decided they do not want the next
-		// request made, and configure() drops whatever was queued.
-		if ("sendObstacleTelemetry".equals(event.getKey())
-			|| "telemetryEndpoint".equals(event.getKey())
-			|| "highlightObstacles".equals(event.getKey())
-			|| "logGolemState".equals(event.getKey()))
-		{
-			applyObstacleSettings();
-		}
+		// The obstacle settings are developer options for now, not in the panel: see
+		// DevOptions. They must take effect the moment they change, so this returns with them.
+		// if ("highlightObstacles".equals(event.getKey()) || "logGolemState".equals(event.getKey()))
+		// {
+		// 	applyObstacleSettings();
+		// }
 	}
 
 	// ---- persistence ----
 
-	/** Tiles flooded from an instance route's landing before it counts as open ground rather than a room. */
+	/** Every tile of every instance room, from the last time routes changed. */
+	private java.util.Set<Long> instanceRoomTiles = java.util.Collections.emptySet();
+
+	/** Tiles flooded from an instance route's landing before it counts as open ground. */
 	private static final int ROOM_FLOOD = 4000;
 
 	/**
 	 * Tiles only a transport into an instance reaches: the template rooms golems walk while
-	 * inside one, as {@link RoamContext#tileKey} keys.
-	 *
-	 * <p>For golems saved before the plugin knew which golems were in an instance, and for
-	 * the ones that got into the Mad Angel's sealed room by walking before the planner learned
-	 * not to. They are standing in the instance's room, so that is where they are.
+	 * inside one, as {@link RoamContext#tileKey} keys. For golems saved before the plugin
+	 * tracked which were in an instance, and ones that walked into the Mad Angel's sealed room
+	 * before the planner learned not to.
 	 */
 	private java.util.Set<Long> instanceRooms()
 	{
@@ -1698,15 +2117,17 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				continue;
 			}
-			Map<Long, Long> reached = pathfinder.flood(t.getToX(), t.getToY(), t.getToPlane(), ROOM_FLOOD);
-			// A landing the golem could walk back from, or one that opens onto a whole island, is not a room.
+			TileMap reached = pathfinder.flood(t.getToX(), t.getToY(), t.getToPlane(), ROOM_FLOOD);
+			// A landing the golem could walk back from, or that opens onto a whole island,
+			// is not a room.
 			if (reached.size() >= ROOM_FLOOD || (t.getFromPlane() == t.getToPlane()
 				&& reached.containsKey(GolemPathfinder.pack(t.getFromX(), t.getFromY()))))
 			{
 				continue;
 			}
-			for (long tile : reached.keySet())
+			for (int i = 0; i < reached.size(); i++)
 			{
+				long tile = reached.keyAt(i);
 				rooms.add(RoamContext.tileKey(GolemPathfinder.unpackX(tile), GolemPathfinder.unpackY(tile), t.getToPlane()));
 			}
 		}
@@ -1720,18 +2141,29 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
+		// The saved roster replaces whatever is in memory, never adding on top: golems already
+		// here are left from a shutdown that did not finish, and are the same golems again.
+		if (!golems.isEmpty())
+		{
+			log.warn("Restoring over {} golems left from before; replacing them", golems.size());
+			for (Golem golem : golems)
+			{
+				detachRenderer(golem);
+			}
+			golems.clear();
+		}
+
 		List<GolemStore.SavedGolem> saved = new ArrayList<>(pendingRestore);
 		java.util.Set<Long> rooms = instanceRooms();
+		instanceRoomTiles = rooms;
 		for (int i = 0; i < saved.size(); i++)
 		{
 			Golem golem = store.revive(saved.get(i), i);
 			if (golem != null)
 			{
-				// A saved tile can have become unstandable since it was written — the
-				// world changes between updates, and a golem restored inside a new wall
-				// would never path anywhere again. Moving it now, while nothing is
-				// looking, costs a lookup and avoids a golem that is silently stuck for
-				// the rest of its life. It is moved, never replaced: same name, same id.
+				// A saved tile can have become unstandable, and a golem restored inside a new
+				// wall would never path anywhere again. Moved while nothing is looking, and
+				// moved rather than replaced: same name, same id.
 				WorldPoint at = golem.currentTile();
 				WorldPoint safe = roamPlanner.snapToMesh(at);
 				if (!safe.equals(at))
@@ -1752,17 +2184,30 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		pendingRestore.clear();
 		enforceGolemLimit();
+		// Now there is a whole roster to hold against the game's count.
+		trimToGameCount();
 		log.debug("Restored {} saved golems", golems.size());
 	}
 
 	/**
-	 * Writes the roster out.
-	 *
-	 * <p>Golems mid-crumble are excluded — they have been retired, and saving them
-	 * would bring them back alive on the next login.
+	 * Writes the roster out. Golems mid-crumble are excluded: they have been retired, and
+	 * saving them would bring them back alive on the next login.
 	 */
 	private void saveGolems()
 	{
+		if (!running)
+		{
+			log.debug("Not saving golems: the plugin is not running");
+			return;
+		}
+		// Nothing to write until the saved roster has been loaded: golems are restored at login,
+		// and saving the empty roster before that replaced every saved golem with nothing —
+		// launching the client and closing it without logging in was enough.
+		if (!pendingRestore.isEmpty())
+		{
+			log.debug("Not saving golems: {} saved golems are not restored yet", pendingRestore.size());
+			return;
+		}
 		configManager.setConfiguration(
 			GolemsDontDieConfig.GROUP, GolemsDontDieConfig.SAVED_GOLEMS_KEY, store.serialise(livingGolems()));
 	}
@@ -1780,11 +2225,8 @@ public class GolemsDontDiePlugin extends Plugin
 	// ---- hiding the original ----
 
 	/**
-	 * Hides a real golem once its copy has taken over.
-	 *
-	 * <p>Both exist for the rest of the original's short life — it steps off the
-	 * plinth, the copy takes over, and the original keeps walking and then crumbles
-	 * where the player cannot see it. Without this there would visibly be two.
+	 * Hides a real golem once its copy has taken over: both exist for the rest of the
+	 * original's short life, so without this there would visibly be two.
 	 */
 	private boolean shouldDraw(Renderable renderable)
 	{
@@ -1796,14 +2238,24 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * The current roster, for the overlays.
-	 *
-	 * <p>The live list, not a copy: this is read once per frame by the minimap overlay
-	 * and copying it every time would allocate for nothing. Both the overlay and the
-	 * list are touched only on the client thread.
+	 * The current roster, for the overlays. The live list, not a copy: the minimap overlay reads
+	 * it once per frame and copying would allocate for nothing. Both are touched only on the
+	 * client thread.
 	 */
 	List<Golem> activeGolems()
 	{
 		return golems;
+	}
+
+	/** Golems with a model in the scene this frame. See the end of onBeforeRender. */
+	private final List<Golem> drawnGolems = new ArrayList<>();
+
+	/**
+	 * The golems being drawn, for the overlays and the menu: everything else is off the scene
+	 * and would only be looked at to be skipped, thousands of times a frame.
+	 */
+	List<Golem> drawnGolems()
+	{
+		return drawnGolems;
 	}
 }

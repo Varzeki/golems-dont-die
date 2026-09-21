@@ -15,7 +15,7 @@ public class GolemsDontDiePluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(GolemsDontDiePlugin.class);
+		ExternalPluginManager.loadBuiltin(GolemsDontDiePlugin.class, BoatMotionRecon.class, BrandingExport.class);
 		RuneLite.main(args);
 	}
 }

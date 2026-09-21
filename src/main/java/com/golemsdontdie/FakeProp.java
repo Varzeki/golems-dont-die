@@ -11,19 +11,13 @@ import net.runelite.api.WorldView;
 /**
  * A one-shot animated object played beside a golem that is using something.
  *
- * <p>Some of the game's transport animations belong to the scenery rather than the person:
- * {@code DOCK_GANGPLANK01} is on framemap 2503 and the fairy ring's spin is the ring's own,
- * so neither can be played on the golem's human rig at all. They can be played on a copy of
- * the object itself, which is what this is — the plank lowering, the ring turning, drawn for
- * as long as the golem is interacting and then dropped.
+ * <p>Some transport animations belong to the scenery, not the person: {@code DOCK_GANGPLANK01}
+ * is on framemap 2503 and the fairy ring's spin is the ring's own, so neither can play on the
+ * golem's human rig. A copy of the object can, which is what this is.
  *
- * <p>Deliberately fire-and-forget. It owns no intention and is never reused: a prop is
- * created when a golem starts using something, plays once, and is unregistered when
- * {@link #isFinished()} says the clip has run out. Holding them open would mean tracking
- * scenery state across a scene reload for something that lasts under a second.
- *
- * <p>Nothing is sent anywhere and the real object is untouched — the copy is drawn on top
- * of wherever the real one stands, visible only to the player running the plugin.
+ * <p>Fire-and-forget and never reused; keeping props alive would mean tracking scenery state
+ * across a scene reload for under a second of animation. The real object is untouched; the
+ * copy is drawn over it, visible only to this player.
  */
 class FakeProp extends RuneLiteObjectController
 {
@@ -31,13 +25,13 @@ class FakeProp extends RuneLiteObjectController
 	private final Model model;
 	private final AnimationController animation;
 
-	/** World position in 128ths of a tile, matching the golems. */
+	/** World position in 128ths of a tile, as for golems. */
 	private final int fineX;
 	private final int fineY;
 	private final int plane;
 	private final int height;
 
-	/** Cycles left before this prop should be dropped. */
+	/** Cycles left before the prop is dropped. */
 	private int remaining;
 
 	@Getter
@@ -82,7 +76,7 @@ class FakeProp extends RuneLiteObjectController
 		return posed == null ? model : posed;
 	}
 
-	/** True once the clip has run its course and the prop should be unregistered. */
+	/** True once the clip has run out and the prop should be unregistered. */
 	boolean isFinished()
 	{
 		return remaining <= 0;
