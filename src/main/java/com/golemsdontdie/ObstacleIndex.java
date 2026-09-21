@@ -14,20 +14,13 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Where every obstacle in the game is, read from the cache and shipped.
  *
- * <p>Separate from {@link TransportNetwork} on purpose, because the two answer different
- * questions and only one of them is easy. <b>Where the obstacles are</b> is a fact: it comes
- * out of the map index exactly and completely. <b>Where each one leads</b> has to be derived
- * from collision components, and that derivation was wrong by one to three tiles on every
- * Wyrmscraig shortcut until somebody measured them.
+ * <p>Separate from {@link TransportNetwork} because only one of the two questions is easy. Where
+ * the obstacles are is a fact out of the map index; where each one leads is derived from collision
+ * components, and was wrong by one to three tiles on every Wyrmscraig shortcut until somebody
+ * measured them. So this index, claiming nothing about destinations, is what the overlay draws.
  *
- * <p>So the transport table stays as conservative as it needs to be, and this index — which
- * makes no claim about destinations — is what the highlight overlay draws. That is why the
- * overlay can honestly show an obstacle it knows nothing else about: red, meaning golems
- * cannot use this, which is exactly the obstacle worth walking over to.
- *
- * <p>Doors and gates are not here. They were excluded when the index was built, on the
- * game's own wall-versus-scenery classification: a golem cannot open a door, because opening
- * one changes an object every other player in the world can see.
+ * <p>Doors and gates are not here, excluded on the game's own wall-versus-scenery split: a golem
+ * cannot open a door, because that changes an object every other player can see.
  */
 @Slf4j
 @Singleton
@@ -35,34 +28,21 @@ class ObstacleIndex
 {
 	private static final String RESOURCE = "/obstacles.gz";
 
-	/** Bumped when the file format changes; an old file is refused rather than misread. */
+	/** Bumped when the format changes; an old file is refused rather than misread. */
 	private static final int VERSION = 4;
 
 	/**
-	 * Obstacles by the region they stand in.
-	 *
-	 * <p>Bucketed rather than held as one list because the overlay asks "what is near me"
-	 * every time the player moves, and a flat sweep of eight thousand entries per rebuild
-	 * is work for nothing when all but a handful are hundreds of tiles away.
+	 * Obstacles by the region they stand in, because the overlay asks "what is near me" every time
+	 * the player moves and all but a handful are hundreds of tiles off.
 	 */
 	private final Map<Integer, List<Obstacle> > byRegion = new HashMap<>();
 
-	/**
-	 * Cache traversal time per object id, built once at load.
-	 *
-	 * <p>Held apart from the placements because it is asked for on the hot path — every
-	 * time a golem starts through an obstacle — and walking twelve thousand placements to
-	 * find one number would be work for nothing.
-	 */
+	/** Cache traversal time per object id: asked for on the hot path, so kept apart from places. */
 	private final Map<Integer, Integer> ticksByObject = new HashMap<>();
 
 	/**
-	 * One obstacle, at one place, with the ground it actually stands on.
-	 *
-	 * <p>{@code x, y} is the south-west corner, which is how the cache records a placement,
-	 * and {@code sizeX, sizeY} is how far it extends from there. Both are needed: marking
-	 * only the corner lit one half of every two-tile object and left the other half looking
-	 * as though the plugin had never heard of it.
+	 * One obstacle, at one place. {@code x, y} is the south-west corner, as the cache records a
+	 * placement; marking only that lit one half of every two-tile object.
 	 */
 	static final class Obstacle
 	{
@@ -74,25 +54,16 @@ class ObstacleIndex
 		final int sizeY;
 
 		/**
-		 * True if this is mounted in a wall — a door or a gate.
-		 *
-		 * <p>Kept rather than dropped, because a handful of them are not doors at all. The
-		 * Wyrmscraig cathedral door does not swing open: clicking it puts you on the other
-		 * side, which makes it a transport wearing a door's clothes. Excluding every wall
-		 * object hid it completely.
-		 *
-		 * <p>Drawn only once something is actually known about it, so the three and a half
-		 * thousand ordinary doors stay out of the way.
+		 * True if this is mounted in a wall — a door or a gate. Kept rather than dropped, because a
+		 * handful are not doors at all: the Wyrmscraig cathedral door does not swing open, it puts you
+		 * on the other side. Drawn only once something is known about it.
 		 */
 		final boolean wall;
 
 		/**
-		 * How many game ticks this obstacle takes, from the cache, or 0 if it does not say.
-		 *
-		 * <p>The one number in this whole area that is neither measured nor guessed. Only
-		 * about fifty obstacles in the game carry it — params live on newer and reworked
-		 * content — but where it exists it is the game's own answer, and it lines up with
-		 * Shortest Path's independently hand-measured table.
+		 * How many game ticks this obstacle takes, from the cache, or 0 if it does not say. Neither
+		 * measured nor guessed: only about fifty obstacles carry it, and it lines up with Shortest
+		 * Path's hand-measured table.
 		 */
 		final int ticks;
 
@@ -146,9 +117,8 @@ class ObstacleIndex
 					boolean wall = in.readByte() != 0;
 					int ticks = in.readByte() & 0xff;
 
-					// Bucketed by the anchor's region. An object straddling a boundary is
-					// still found, because the search below widens by the largest footprint
-					// any object has.
+					// Bucketed by the anchor's region. An object straddling a boundary is still found,
+					// because the search below widens by the largest footprint any object has.
 					byRegion.computeIfAbsent(region(x, y), k -> new ArrayList<>())
 						.add(new Obstacle(objectId, x, y, plane, sizeX, sizeY, wall, ticks));
 					known.add(objectId);
@@ -164,17 +134,14 @@ class ObstacleIndex
 		}
 		catch (IOException e)
 		{
-			// Cosmetic data. A golem's behaviour does not depend on it, so a failure here
-			// costs the highlight overlay and nothing else.
+			// Cosmetic data: a failure here costs the highlight overlay and nothing else.
 			log.warn("Could not read the obstacle index", e);
 		}
 	}
 
 	/**
-	 * Every obstacle within {@code radius} tiles, on the given plane.
-	 *
-	 * <p>Searches only the regions the box touches. A radius of a hundred spans at most
-	 * nine of them, against the two-and-a-half thousand the index holds.
+	 * Every obstacle within {@code radius} tiles, on the given plane. Searches only the regions the
+	 * box touches: a radius of a hundred spans nine of the index's two and a half thousand.
 	 */
 	List<Obstacle> near(int x, int y, int plane, int radius)
 	{
@@ -205,27 +172,17 @@ class ObstacleIndex
 		return found;
 	}
 
+	/** The cache's traversal time for an object, in ticks, or 0: the same wherever it stands. */
 	/**
-	 * The cache's own traversal time for an object, in ticks, or 0 if it has none.
-	 *
-	 * <p>By object rather than by place: the same kind of obstacle takes the same time
-	 * wherever it stands, which is exactly the sort of thing a param describes.
-	 */
-	/**
-	 * True if the cache lists this object as something you traverse.
-	 *
-	 * <p>The first question asked of anything the player is seen using. Watching alone
-	 * cannot tell an obstacle from a tree: both are an object clicked, an animation, and the
-	 * player somewhere else afterwards. The index was built from the objects whose menu
-	 * offers a way across — climb, cross, squeeze, jump — so a tree or a bank booth is
-	 * simply not in it.
+	 * True if the cache lists this object as something you traverse: the first question asked of
+	 * anything the player is seen using, watching alone not telling an obstacle from a tree. The
+	 * index holds objects whose menu offers a way across — climb, cross, squeeze, jump.
 	 */
 	boolean knows(int objectId)
 	{
 		return known.contains(objectId);
 	}
 
-	/** Every object id in the index. */
 	private final java.util.Set<Integer> known = new java.util.HashSet<>();
 
 	int ticksFor(int objectId)

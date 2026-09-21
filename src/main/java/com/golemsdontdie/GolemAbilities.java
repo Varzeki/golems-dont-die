@@ -11,28 +11,22 @@ import net.runelite.api.Skill;
 /**
  * What a golem is allowed to do — the player's account, minus an inventory.
  *
- * <p>A golem made by a player who has done Plague City can use the Ardougne shortcuts
- * that quest opens, because the world the golem walks is the world the player unlocked.
- * It is the player's island, the player's game, and a golem finding a door locked that
- * the player walks through freely would read as a bug rather than as a rule.
- *
- * <p>Three deliberate departures from simply mirroring the player:
+ * <p>A golem made by a player who has done Plague City can use the Ardougne shortcuts that
+ * quest opens: a door locked to a golem that the player walks through freely would read as
+ * a bug. Three deliberate departures:
  *
  * <ul>
- *   <li><b>Real levels, never boosted.</b> A golem cannot drink a potion. A shortcut that
- *       worked only while the player happened to be boosted would strand golems on the
- *       far side of it an hour later, with nothing to explain why.</li>
+ *   <li><b>Real levels, never boosted.</b> A golem cannot drink a potion, and a shortcut
+ *       open only while the player was boosted would strand golems an hour later.</li>
  *   <li><b>No inventory, but a fixed purse.</b> Coins up to 500,000 and a dramen staff,
- *       granted flatly and never tracked. The most expensive single fare in the game is
- *       10,000, so the check always passes; it exists to say "a golem may take a ferry
- *       but may not chop a canoe" without modelling money.</li>
+ *       never tracked. The dearest fare is 10,000, so the check always passes; it says a
+ *       golem may take a ferry but not chop a canoe.</li>
  *   <li><b>No timers.</b> Conditions of the countdown form are never satisfied.</li>
  * </ul>
  *
- * <p>Evaluated against live client state each time rather than cached. The reads are
- * varbit and skill lookups — cheap — and caching them would mean a stale answer every
- * time the player levels up or flips a lever, which §12 of the plan calls out as the
- * thing most likely to strand a golem mid-journey.
+ * <p>Read live each time: the lookups are cheap, and a cached answer would go stale
+ * whenever the player levels up or flips a lever — §12 of the plan calls that the likeliest
+ * way to strand a golem mid-journey.
  */
 @Slf4j
 @Singleton
@@ -48,22 +42,15 @@ class GolemAbilities
 	private static final Quest[] QUESTS = Quest.values();
 
 	/**
-	 * True if a golem may use this transport right now.
-	 *
-	 * <p>Ordered cheapest test first. Most of the network is unconditional, so the common
-	 * case returns on the first line.
+	 * True if a golem may use this transport right now. Cheapest test first: most of the
+	 * network is unconditional, so the common case returns early.
 	 */
 	boolean canUse(GolemTransport transport)
 	{
-		// Can the golem be drawn doing this at all? Asked first, and separately from the
-		// requirements below, because it is a different question: not whether the golem is
-		// permitted through, but whether the plugin knows what using it looks like.
-		//
-		// The shipped animation for most obstacles is a guess made from the menu text, and
-		// measuring has overturned that guess on every obstacle anyone has stood in front
-		// of. So a golem routes around anything unproven rather than performing an
-		// invented animation on it, and the set it may use grows as the player is seen
-		// using obstacles themselves. See ObstacleKnowledge.
+		// Not whether the golem is permitted through, but whether the plugin knows what
+		// using it looks like. The shipped animation for most obstacles is a guess from
+		// menu text that measuring has overturned every time, so a golem routes around
+		// anything unproven.
 		if (!knowledge.isUnlocked(transport))
 		{
 			return false;
@@ -105,12 +92,40 @@ class GolemAbilities
 			{
 				continue;
 			}
-			if (QUESTS[ordinal].getState(client) != QuestState.FINISHED)
+			if (!questFinished(ordinal))
 			{
 				return false;
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * How long a quest's state is trusted before it is asked again, as SailingDocks does.
+	 * Asking runs a client script, once per candidate transport per tile a golem entered.
+	 * A quest opening its shortcut a few minutes late goes unnoticed.
+	 */
+	private static final long QUEST_RECHECK_MILLIS = 5 * 60 * 1000L;
+
+	/** Per quest ordinal: when it was last asked, and whether it was finished. */
+	private final long[] questAskedAt = new long[QUESTS.length];
+	private final boolean[] questDone = new boolean[QUESTS.length];
+
+	private boolean questFinished(int ordinal)
+	{
+		long now = System.currentTimeMillis();
+		if (questAskedAt[ordinal] == 0 || now - questAskedAt[ordinal] >= QUEST_RECHECK_MILLIS)
+		{
+			questDone[ordinal] = QUESTS[ordinal].getState(client) == QuestState.FINISHED;
+			questAskedAt[ordinal] = now;
+		}
+		return questDone[ordinal];
+	}
+
+	/** Forgets every quest state, for a login that may be another account. */
+	void forgetQuests()
+	{
+		java.util.Arrays.fill(questAskedAt, 0);
 	}
 
 	/**
@@ -128,8 +143,8 @@ class GolemAbilities
 
 			if (op == TransportNetwork.OP_AT)
 			{
-				// A wall-clock countdown — a home teleport cooling down, say. There is no
-				// sense in which a golem is waiting for one, so it never passes.
+				// A wall-clock countdown, a home teleport cooling down say: a golem is
+				// never waiting for one, so it never passes.
 				return false;
 			}
 

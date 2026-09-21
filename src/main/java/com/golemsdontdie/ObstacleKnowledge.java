@@ -12,38 +12,16 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * What is actually known about how each obstacle is traversed, and what golems may use.
  *
- * <p>The plugin ships a table of transports and a guess, per obstacle, at the animation a
- * player performs on it. The guess comes from the menu text and it is <b>often wrong</b>:
- * a basalt stepping stone is named "stepping stone" and there is an animation called
- * {@code HUMAN_STEPPINGSTONEJUMP}, but the game plays {@code HUMAN_SPOT_JUMP} instead. Every
- * obstacle measured so far has overturned its own guess at least once.
+ * <p>The shipped guess at each obstacle's animation comes from the menu text and is <b>often
+ * wrong</b>: a basalt stepping stone is named "stepping stone" and there is a
+ * {@code HUMAN_STEPPINGSTONEJUMP}, but the game plays {@code HUMAN_SPOT_JUMP}.
  *
- * <p>So guessing is no longer enough to act on, and this class answers two questions that
- * are easy to run together and should not be:
+ * <p>So two questions are kept apart: may a golem go through here, nearly always yes, and do we
+ * know what it looks like, where a no means it plays nothing, as at a door. Locking one direction
+ * of a two-way transport would strand golems upstairs.
  *
- * <ul>
- *   <li><b>May a golem go through here?</b> Nearly always yes. No is reserved for obstacles
- *       where moving without the right animation would look broken rather than plain — a
- *       leap over open water, a walk along a tightrope.</li>
- *   <li><b>Do we know what it looks like?</b> Far less often. Where the answer is no, the
- *       golem traverses in its ordinary pose and plays nothing, which is exactly what it
- *       already does for a door.</li>
- * </ul>
- *
- * <p>Keeping them apart is what stops the gate causing worse bugs than it fixes. Locking
- * one direction of a two-way transport — a ladder that can be climbed but not descended —
- * would strand golems upstairs for the rest of the session.
- *
- * <p>That makes the plugin improve by being played. {@link ObstacleObserver} watches every
- * obstacle the player uses; two consistent sightings of the same obstacle unlock it for
- * golems permanently, and a player who does a lap of an agility course has taught the plugin
- * a course's worth of shortcuts without being asked to do anything.
- *
- * <p>Two sightings rather than one on purpose. A single animation following a click is not
- * proof of anything — the player may have been attacked, eaten, or teleported between the
- * click and the clip. Requiring the same answer twice costs nothing in practice, because
- * anybody who uses an obstacle once uses it again, and it removes essentially all of the
- * noise a one-sample rule would admit.
+ * <p>{@link ObstacleObserver} watches the player, and two consistent sightings unlock an obstacle
+ * permanently — two rather than one because a single animation after a click proves nothing.
  */
 @Slf4j
 @Singleton
@@ -68,32 +46,16 @@ class ObstacleKnowledge
 	static final String LINES_KEY = "learnedLines";
 
 	/**
-	 * Tiles either side of a transport's origin that still count as the same obstacle.
-	 *
-	 * <p>A sighting records where the player <i>stood</i>; the index records where the
-	 * object <i>is</i>. Those are never the same tile — you stand beside a ladder to climb
-	 * it — and on Wyrmscraig's rocks they are three tiles apart, because a climb starts
-	 * from a distance.
-	 *
-	 * <p>Measured from the nearest tile of the object's footprint rather than its
-	 * south-west corner, which is what the earlier version compared against. A cave three
-	 * tiles wide was judged by one corner of itself, so entering it from the far end
-	 * counted as being nowhere near it and the obstacle stayed orange no matter how many
-	 * times it was used.
-	 *
-	 * <p>Three tiles is deliberately generous. Obstacles are sparse, and confirming one
-	 * that was actually used is worth far more than the remote chance of crediting its
-	 * neighbour.
+	 * Tiles either side of a transport's origin that still count as the same obstacle. A sighting
+	 * records where the player <i>stood</i>, the index where the object <i>is</i>, and on
+	 * Wyrmscraig's rocks those are three apart. Measured from the nearest tile of the object's
+	 * footprint, not its south-west corner, which put a three-tile cave nowhere near itself.
 	 */
 	private static final int CONFIRM_TOLERANCE = 3;
 
 	/**
-	 * How sure we are about one particular obstacle in the world.
-	 *
-	 * <p>Three states because they call for three different responses, and lumping the
-	 * middle one in either direction loses the thing worth knowing: an obstacle golems are
-	 * already using on inferred data is exactly the obstacle worth walking over to and
-	 * using once.
+	 * How sure we are about one particular obstacle. Three states because an obstacle golems
+	 * already use on inferred data is exactly the one worth walking over to and using once.
 	 */
 	enum Status
 	{
@@ -108,80 +70,48 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * What the player has been seen doing, by object id.
-	 *
-	 * <p>Outranks everything shipped. This is the live game on the player's own client, in
-	 * the current revision, which is a better authority than anything measured months ago
-	 * on a machine somewhere else.
+	 * What the player has been seen doing, by object id. Outranks everything shipped: the live
+	 * game on this client beats anything measured elsewhere months ago.
 	 */
 	private final Map<Integer, Learned> learned = new LinkedHashMap<>();
 
 	/**
-	 * The individual obstacles the player has personally used, by object id.
-	 *
-	 * <p>Kept apart from {@link #learned} because they answer different questions. What a
-	 * <i>kind</i> of object does is learned once and applies everywhere, which is what makes
-	 * one lap of an agility course worth anything. Which <i>particular</i> ladder somebody
-	 * has actually stood on is only ever used to colour it in.
+	 * The individual obstacles the player has personally used. Kept apart from {@link #learned}
+	 * because what a <i>kind</i> of object does applies everywhere, while a <i>particular</i>
+	 * ladder somebody stood on only gets coloured in.
 	 */
 	private final Map<Integer, List<int[]>> confirmed = new LinkedHashMap<>();
 
 	/**
-	 * Where an obstacle actually took the player, by the tile they used it from.
-	 *
-	 * <p>The other half of learning, and the half that was being thrown away. An animation
-	 * alone cannot make an obstacle usable: something has to say where it comes out, and
-	 * for most of the game nothing does. Wyrmscraig's stile and staircases have no row in
-	 * any published table, so golems walked past them no matter how well the plugin had
-	 * been taught what using one looks like.
-	 *
-	 * <p>Every sighting already carried this. A player who uses an obstacle demonstrates
-	 * both what it looks like and where it goes, in the same moment, for free.
-	 *
-	 * <p>Keyed by object <i>and</i> origin because one kind of object is many obstacles: a
-	 * ladder id appears two thousand times in the game and each one comes out somewhere
-	 * different. That is the opposite of the animation, which is learned once per kind and
-	 * applies everywhere.
+	 * Where an obstacle actually took the player, by the tile they used it from: the other half of
+	 * learning, since an animation alone cannot make an obstacle usable and for most of the game
+	 * nothing says where it comes out. Keyed by object <i>and</i> origin, one ladder id being two
+	 * thousand obstacles that each come out somewhere different.
 	 */
 	//
-	// Insertion-ordered, as every map here is. A HashMap's order shifts as keys are added,
-	// and routes are turned into transports in that order — so each new sighting quietly
-	// renumbered every learned transport, and anything held against the old numbers was
-	// now held against a different obstacle.
+	// Insertion-ordered, as every map here is: a HashMap's order shifts as keys are added, and
+	// routes become transports in that order, so each sighting renumbered every learned transport.
 	private final Map<String, List<int[]>> routes = new LinkedHashMap<>();
 
 	/**
-	 * The recent recordings of each kind of obstacle.
-	 *
-	 * <p>By object rather than by place, like the animation and unlike the route: what a
-	 * traversal looks like is a property of the obstacle, and is stored along its own axis
-	 * so one recording serves every copy of it whichever way it faces.
-	 *
-	 * <p>Several are kept, not one. Keeping only the latest let a single bad traversal
-	 * replace good ones: a player who went through the cathedral door and walked on
-	 * diagonally before stopping overwrote three clean recordings with one that drifted a
-	 * tile sideways, and every golem then performed the drift. With several in hand, the
-	 * one performed is the one the others most agree with — see {@link #consensus}.
+	 * The recent recordings of each kind of obstacle, by object rather than by place: what a
+	 * traversal looks like is a property of the obstacle, so one recording serves every copy.
+	 * Several are kept, since keeping only the latest let one bad traversal replace good ones; the
+	 * one performed is the one the others most agree with, see {@link #consensus}.
 	 */
 	private final Map<Integer, List<MotionCurve>> curves = new LinkedHashMap<>();
 
 	/**
-	 * The line each obstacle moves the player along, by object id, as counts of each
-	 * direction seen — "0,1" for a stile crossed north or south, at any length.
-	 *
-	 * <p>Counted rather than taken from the first sighting so one odd traversal cannot fix
-	 * an obstacle's line for good. Routes are held to the most common one; see
-	 * {@link RouteGeometry}.
+	 * The line each obstacle moves the player along, as counts of each direction seen — "0,1" for
+	 * a stile crossed north or south. Counted, not taken from the first sighting, so one odd
+	 * traversal cannot fix a line for good; see {@link RouteGeometry}.
 	 */
 	private final Map<Integer, Map<String, Integer>> lines = new LinkedHashMap<>();
 
 	/**
-	 * Which saved routes may be offered at all, as {objectId, fromX, fromY, fromPlane, toX,
-	 * toY, toPlane}. Set by the plugin, which has the map and the obstacle index.
-	 *
-	 * <p>So that what was learned before a rule existed is held to it without anybody
-	 * finding and deleting it: trees and bank booths recorded as obstacles, routes stored in
-	 * the coordinates of an instance that no longer exists.
+	 * Which saved routes may be offered at all, as {objectId, fromX, fromY, fromPlane, toX, toY,
+	 * toPlane}. Set by the plugin, so that what was learned before a rule existed is held to it:
+	 * trees recorded as obstacles, routes in the coordinates of a vanished instance.
 	 */
 	@lombok.Setter
 	private java.util.function.Predicate<int[]> routeFilter;
@@ -190,10 +120,8 @@ class ObstacleKnowledge
 	private final Map<Integer, MotionCurve> chosenCurves = new HashMap<>();
 
 	/**
-	 * Recent {ticks, delay, span} per object, for the same reason.
-	 *
-	 * <p>Only in memory. The saved value is itself the consensus of a previous session and
-	 * seeds the history when it is next added to.
+	 * Recent {ticks, delay, span} per object, for the same reason. Only in memory: the saved value
+	 * is itself a previous session's consensus, and seeds the history when next added to.
 	 */
 	private final Map<Integer, List<int[]>> timings = new HashMap<>();
 
@@ -201,21 +129,15 @@ class ObstacleKnowledge
 	private static final int CURVES_KEPT = 5;
 
 	/**
-	 * How far two arrivals can differ and still count as the same route.
-	 *
-	 * <p>Small, because a stepping stone in the middle of a line leads two ways and those
-	 * must stay apart. Two tiles separates "landed slightly differently" from "went
-	 * somewhere else".
+	 * How far two arrivals can differ and still count as the same route. Small, because a stepping
+	 * stone mid-line leads two ways and those must stay apart.
 	 */
 	private static final int DESTINATION_TOLERANCE = 2;
 
 	/**
-	 * Bumped whenever anything here changes.
-	 *
-	 * <p>Exists for the highlight overlay, which caches its tiles and would otherwise have
-	 * no way to notice that an obstacle the player just used has changed colour. Using an
-	 * obstacle leaves you standing next to it, so a cache keyed only on the player moving
-	 * never refreshes at the one moment it matters.
+	 * Bumped whenever anything here changes, for the highlight overlay: using an obstacle leaves
+	 * you standing next to it, so its cache, keyed on the player moving, never refreshes when an
+	 * obstacle changes colour.
 	 */
 	@lombok.Getter
 	private int version;
@@ -250,12 +172,8 @@ class ObstacleKnowledge
 	// ------------------------------------------------------------------- the policy
 
 	/**
-	 * True if a golem may use this transport.
-	 *
-	 * <p>The shipped defaults below are the archetypes whose animation has either been
-	 * measured or is corroborated well enough to act on. The rest are locked until somebody
-	 * is seen using one — which is the whole point, and is why this list is deliberately
-	 * short rather than optimistic.
+	 * True if a golem may use this transport. The shipped defaults below are the archetypes whose
+	 * animation has been measured or corroborated well enough to act on; the rest stay locked.
 	 */
 	boolean isUnlocked(GolemTransport transport)
 	{
@@ -274,27 +192,12 @@ class ObstacleKnowledge
 	/**
 	 * Whether a golem may traverse this at all, on the shipped data alone.
 	 *
-	 * <p>Locked means a golem routes around the obstacle as though it were not there. That
-	 * is reserved for the cases where using it without knowing the animation would look
-	 * broken rather than merely plain — a leap across open water, a walk along a tightrope.
-	 * A golem that slides across a chasm in its walking pose is worse than a golem that
-	 * never went near the chasm.
-	 *
-	 * <ul>
-	 *   <li><b>Jumps longer than two tiles.</b> Only the short hop has been measured; the
-	 *       thresholds above it were invented, and there is reason to think the split does
-	 *       not exist at all.</li>
-	 *   <li><b>Balances, tightropes, squeezes and stiles.</b> Plausible names, no
-	 *       measurements, and the one external source covering stiles disagrees with what
-	 *       we ship.</li>
-	 * </ul>
-	 *
-	 * <p>Ladders going down are deliberately <i>not</i> locked, despite the animation being
-	 * disputed. Blocking one direction of a two-way transport is worse than a plain-looking
-	 * one: a golem that can climb a ladder but not descend it is stranded upstairs, and the
-	 * watchdog would spend the rest of the session hauling it out. It traverses silently
-	 * instead — see {@link #clipsFor} — which is what a door already does and what eight
-	 * thousand unclassified rows already do.
+	 * <p>Locked means routing around the obstacle as though it were not there, reserved for cases
+	 * where using it without the animation would look broken rather than plain: jumps over two
+	 * tiles, only the short hop having been measured, and balances, tightropes, squeezes and
+	 * stiles, which have plausible names and no measurements. Ladders going down are deliberately
+	 * not locked despite the disputed animation, since blocking one direction of a two-way
+	 * transport strands a golem upstairs; it traverses silently instead, see {@link #clipsFor}.
 	 */
 	private boolean shippedConfidence(GolemTransport transport)
 	{
@@ -313,31 +216,22 @@ class ObstacleKnowledge
 				return false;
 
 			case GolemTransport.ARCHETYPE_DOOR:
-				// A golem cannot open a door. Opening one changes a real object that every
-				// other player in the world can see, and these golems exist on a single
-				// client and must never touch anything shared. The transport tables carry
-				// door rows because a *player* can open them, which is right for a
-				// pathfinder and wrong here.
-				//
-				// A golem may still walk through a doorway that is already open: that is
-				// ordinary walking on ground the collision map says is clear, and needs no
-				// transport at all.
+				// A golem cannot open a door: that changes a real object every other player can see.
+				// The tables carry door rows because a *player* can open them; walking through an
+				// open doorway needs no row at all.
 				return false;
 
 			default:
-				// Doors, gangplanks, ditches, climbs, ladders and the great mass of
-				// unclassified rows. Either measured, corroborated, or animating nothing.
+				// Gangplanks, ditches, climbs, ladders and the great mass of unclassified rows:
+				// measured, corroborated, or animating nothing.
 				return true;
 		}
 	}
 
 	/**
-	 * True if the shipped archetype's animation is trustworthy enough to play.
-	 *
-	 * <p>Separate from {@link #shippedConfidence} on purpose, and the distinction is the
-	 * heart of this class: <i>may the golem go through here</i> is a different question
-	 * from <i>do we know what it looks like</i>. Where the answer to the second is no, the
-	 * golem goes through playing nothing rather than performing an invented animation.
+	 * True if the shipped archetype's animation is trustworthy enough to play. Separate from
+	 * {@link #shippedConfidence}: not knowing what an obstacle looks like means playing nothing
+	 * rather than inventing an animation.
 	 */
 	private boolean shippedAnimationKnown(GolemTransport transport)
 	{
@@ -355,9 +249,8 @@ class ObstacleKnowledge
 				return true;
 
 			case GolemTransport.ARCHETYPE_LADDER:
-				// Up is 828 and agreed everywhere. Down is 833 here, never measured, and
-				// three independent reimplementations of the server say 827 instead — so
-				// it is played silently until somebody is seen doing it.
+				// Up is 828 and agreed everywhere. Down is 833 here, never measured, and three
+				// server reimplementations say 827, so it plays silently until somebody is seen.
 				return transport.getToPlane() >= transport.getFromPlane();
 
 			case GolemTransport.ARCHETYPE_JUMP:
@@ -372,30 +265,20 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * How sure we are about one obstacle standing at one place in the world.
-	 *
-	 * <p>Drives the highlight overlay and nothing else. Golem behaviour is decided by
-	 * {@link #isUnlocked} and {@link #clipsFor}, which do not care where the obstacle is.
+	 * How sure we are about one obstacle standing at one place. Drives the highlight overlay only;
+	 * golem behaviour is decided by {@link #isUnlocked} and {@link #clipsFor}.
 	 */
 	/**
-	 * How sure we are about an obstacle known only by what and where it is.
-	 *
-	 * <p>This is the overlay's question. It works from the obstacle index, which holds
-	 * every obstacle in the game and nothing about where any of them lead, so there may be
-	 * no transport row for this thing at all — and that is itself the answer: an obstacle
-	 * the plugin has never heard of is one golems cannot use.
+	 * How sure we are about an obstacle known only by what and where it is. The overlay works from
+	 * the obstacle index, which knows nothing about where obstacles lead, so there may be no row
+	 * at all — itself the answer.
 	 */
 	Status statusAt(int objectId, int x, int y, int plane, int sizeX, int sizeY,
 		int archetype)
 	{
-		// Knowing the animation is not enough to use an obstacle. Something also has to
-		// say where it comes out, and for a great many obstacles nothing does: the stile
-		// and the staircases on Wyrmscraig have no transport row anywhere, so a golem
-		// cannot take them however well it has been taught what they look like.
-		//
-		// This check comes first because the colour has to mean "will a golem use this".
-		// It did not, and an obstacle that had been used repeatedly showed green while
-		// golems walked past it all day.
+		// Knowing the animation is not enough: something also has to say where an obstacle comes
+		// out, and for many nothing does. First, because the colour has to mean "will a golem use
+		// this", which it did not.
 		boolean routed = archetype >= 0 || hasRoute(objectId, x, y, plane, sizeX, sizeY);
 		if (!routed)
 		{
@@ -420,13 +303,9 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * Everything known about one obstacle, in one line, for reading in game.
-	 *
-	 * <p>Exists because "it is orange and I do not know why" was costing whole testing
-	 * sessions. Four things decide the colour and any one of them can be the missing piece:
-	 * the animation, the confirmation that it was this obstacle, the route, and whether
-	 * anything in the table describes it at all. Guessing which from the colour alone is
-	 * what turned several fixes into the next bug.
+	 * Everything known about one obstacle, in one line, for reading in game. Four things decide
+	 * the colour: the animation, the confirmation that it was this obstacle, the route, and
+	 * whether the table describes it at all.
 	 */
 	String explain(int objectId, int x, int y, int plane, int sizeX, int sizeY, int archetype)
 	{
@@ -465,12 +344,9 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * Whether golems will take this kind of obstacle on shipped data alone.
-	 *
-	 * <p>The same set {@link #shippedConfidence} locks, minus the parts that need a
-	 * transport row to decide. A ladder is usable in both directions here even though only
-	 * the upward clip is trusted, because it is used either way — it simply plays nothing
-	 * going down until somebody is watched doing it.
+	 * Whether golems will take this kind of obstacle on shipped data alone: the set
+	 * {@link #shippedConfidence} locks, minus the parts needing a transport row. A ladder is
+	 * usable both ways, simply playing nothing going down.
 	 */
 	private boolean usableArchetype(int archetype)
 	{
@@ -488,11 +364,9 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * Whether an archetype alone is enough, where no transport row is to hand.
-	 *
-	 * <p>Coarser than {@link #shippedAnimationKnown}, which can also see the plane change
-	 * and the distance. Ladders come out unknown here rather than "known going up", because
-	 * without a row there is no direction to ask about.
+	 * Whether an archetype alone is enough, where no transport row is to hand. Coarser than
+	 * {@link #shippedAnimationKnown}, which sees the plane change and distance: ladders come out
+	 * unknown here, there being no direction to ask about.
 	 */
 	private boolean shippedAnimationForArchetype(int archetype)
 	{
@@ -514,10 +388,8 @@ class ObstacleKnowledge
 		{
 			return Status.UNUSABLE;
 		}
-		// Confirmed means two things at once: this kind of object has been watched enough
-		// to be trusted, and this particular one is the one that was watched. A single
-		// sighting is neither — it has not cleared the noise bar, so calling it confirmed
-		// would put a green outline on an obstacle whose animation is not yet being used.
+		// Confirmed means both that this kind of object has been watched enough to be trusted and
+		// that this particular one is what was watched; a single sighting is neither.
 		Learned known = learned.get(transport.getObjectId());
 		if (known != null && known.unlocked()
 			&& isConfirmedAt(transport.getObjectId(), transport.getFromX(),
@@ -554,11 +426,8 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * Records where an obstacle led, when that is worth anything.
-	 *
-	 * <p>Instances are refused. They are rebuilt with fresh coordinates every time, so a
-	 * destination recorded inside one describes a room that no longer exists — the church
-	 * pew gave three different exits on three consecutive uses.
+	 * Records where an obstacle led, when that is worth anything. Instances are refused: rebuilt
+	 * with fresh coordinates each time, so a destination inside one describes a vanished room.
 	 */
 	private void noteRoute(ObstacleSighting sighting)
 	{
@@ -576,22 +445,15 @@ class ObstacleKnowledge
 
 		for (int[] seen : here)
 		{
-			// Near enough is the same route. Where a traversal puts you down is not exact
-			// — a rock climb landed on 2555 one time and 2556 the next — and demanding the
-			// same tile every time meant the count went back to one after every use, so
-			// the obstacle could never reach two however many times it was climbed.
+			// Near enough is the same route: a rock climb landed on 2555 one time and 2556 the next,
+			// and demanding the same tile reset the count after every use.
 			if (seen[2] == sighting.toPlane
 				&& Math.abs(seen[0] - sighting.toX) <= DESTINATION_TOLERANCE
 				&& Math.abs(seen[1] - sighting.toY) <= DESTINATION_TOLERANCE)
 			{
-				// The same route, and the newest sighting's end is the one kept.
-				//
-				// Keeping the first end let a route be taught once under old rules and never
-				// corrected: the way out of the stile's pen was saved ending on the stile
-				// itself, every later crossing that ended correctly on the far side only added
-				// to its count, and golems could not use a route that set them down on a tile
-				// with nowhere to go. Hundreds went in and none came out. A route's ends are
-				// decided by the obstacle, so the latest decision is the best one.
+				// The same route, and the newest sighting's end is kept: keeping the first left the
+				// way out of the stile's pen saved ending on the stile itself, so golems went in and
+				// never came out.
 				seen[0] = sighting.toX;
 				seen[1] = sighting.toY;
 				seen[3]++;
@@ -600,23 +462,18 @@ class ObstacleKnowledge
 			}
 		}
 
-		// Genuinely somewhere else, so it is a second route from this tile rather than a
-		// contradiction of the first. The middle of a line of stepping stones really does
-		// lead two ways, and both are true.
+		// Genuinely somewhere else, so a second route from this tile rather than a contradiction
+		// of the first: the middle of a line of stepping stones really does lead two ways.
 		here.add(new int[]{sighting.toX, sighting.toY, sighting.toPlane, 1, flags});
 	}
 
-	/** How far apart two origins of the same move can be and still be one obstacle used from two spots. */
+	/** How far apart two origins of the same move can be and still be one obstacle. */
 	private static final int NEIGHBOUR_ORIGIN = 2;
 
 	/**
-	 * Sightings behind a route, counting its neighbours.
-	 *
-	 * <p>A church pew is two tiles long and a player climbs it from whichever end is nearer,
-	 * so its routes — the same hop, a tile apart — were each seen once and none ever reached
-	 * the two sightings a route needs. Golems never used the pew however often the player did.
-	 * Routes of one object that make the same move from origins a tile or two apart are the
-	 * same obstacle used from a different spot, and vouch for each other.
+	 * Sightings behind a route, counting its neighbours. A church pew is climbed from whichever end
+	 * is nearer, so its routes, the same hop a tile apart, were each seen once and never reached
+	 * two.
 	 *
 	 * @param to {toX, toY, toPlane, count, flags}
 	 */
@@ -644,6 +501,35 @@ class ObstacleKnowledge
 		return total;
 	}
 
+	/**
+	 * A route's flags, taken with its neighbours' as its sightings are: the Mad Angel's pew was
+	 * learned from two tiles a row apart, and the route that did not know it led into the instance
+	 * was unlocked without the flag.
+	 */
+	private int flagsFor(int objectId, int fromX, int fromY, int fromPlane, int[] to)
+	{
+		int flags = to[4];
+		for (Map.Entry<String, List<int[]>> e : routes.entrySet())
+		{
+			String[] key = e.getKey().split(",");
+			int otherX = Integer.parseInt(key[1]);
+			int otherY = Integer.parseInt(key[2]);
+			if (Integer.parseInt(key[0]) != objectId || Integer.parseInt(key[3]) != fromPlane
+				|| Math.abs(otherX - fromX) > NEIGHBOUR_ORIGIN || Math.abs(otherY - fromY) > NEIGHBOUR_ORIGIN)
+			{
+				continue;
+			}
+			for (int[] other : e.getValue())
+			{
+				if (other[2] == to[2] && other[0] - otherX == to[0] - fromX && other[1] - otherY == to[1] - fromY)
+				{
+					flags |= other[4];
+				}
+			}
+		}
+		return flags;
+	}
+
 	/** Every obstacle the player has used and where, as {objectId, x, y, plane}. */
 	List<int[]> confirmedPlaces()
 	{
@@ -664,43 +550,70 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * Every route seen often enough to act on, as {objectId, fromX, fromY, fromPlane,
-	 * toX, toY, toPlane, ticks}.
-	 *
-	 * <p>The tick count matters as much as the coordinates. A learned transport used to be
-	 * created with a duration of one, which is how watching a player climb a rockslide made
-	 * golems stop climbing it: the shipped row said four ticks and was walked, the learned
-	 * row said one and was compressed into a single tick of gliding. Being taught an
-	 * obstacle made the golems worse at it.
+	 * Every route seen often enough to act on, as {objectId, fromX, fromY, fromPlane, toX, toY,
+	 * toPlane, ticks}. The ticks matter as much as the coordinates: a duration of one compressed
+	 * a rockslide's four ticks into one tick of gliding.
 	 */
 	List<int[]> learnedRoutes()
 	{
-		List<int[]> out = new ArrayList<>();
+		// Every tile a learned route along its obstacle's line starts or ends on; see jumpsOver.
+		// Routes off the line are no evidence, an old diagonal stile route ending beside the right
+		// one.
+		java.util.Set<Long> ends = new java.util.HashSet<>();
+		// Each key read as numbers once, not once per use.
+		List<int[]> keys = new ArrayList<>(routes.size());
+		for (String key : routes.keySet())
+		{
+			String[] parts = key.split(",");
+			keys.add(new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
+				Integer.parseInt(parts[3])});
+		}
+		int entry = 0;
 		for (Map.Entry<String, List<int[]>> e : routes.entrySet())
 		{
-			String[] from = e.getKey().split(",");
+			int[] from = keys.get(entry++);
+			int objectId = from[0];
+			int fromX = from[1];
+			int fromY = from[2];
+			int fromPlane = from[3];
 			for (int[] to : e.getValue())
 			{
-				if (to[3] < SIGHTINGS_TO_UNLOCK && sightingsFor(Integer.parseInt(from[0]), Integer.parseInt(from[1]),
-					Integer.parseInt(from[2]), Integer.parseInt(from[3]), to) < SIGHTINGS_TO_UNLOCK)
+				if (followsObjectLine(objectId, fromX, fromY, fromPlane, to))
+				{
+					ends.add(RoamContext.tileKey(fromX, fromY, fromPlane));
+					ends.add(RoamContext.tileKey(to[0], to[1], to[2]));
+				}
+			}
+		}
+
+		List<int[]> out = new ArrayList<>();
+		entry = 0;
+		for (Map.Entry<String, List<int[]>> e : routes.entrySet())
+		{
+			int[] from = keys.get(entry++);
+			for (int[] to : e.getValue())
+			{
+				if (jumpsOver(from[1], from[2], from[3], to, ends))
 				{
 					continue;
 				}
-				// And a route saved before its obstacle's line was known is held to it now,
-				// so the diagonal stile routes already in a profile stop being used as soon
-				// as the stile is crossed once — nobody has to find and delete them.
-				if (!followsObjectLine(Integer.parseInt(from[0]), Integer.parseInt(from[1]),
-					Integer.parseInt(from[2]), Integer.parseInt(from[3]), to))
+				if (to[3] < SIGHTINGS_TO_UNLOCK && sightingsFor(from[0], from[1], from[2], from[3], to) < SIGHTINGS_TO_UNLOCK)
 				{
 					continue;
 				}
-				Learned known = learned.get(Integer.parseInt(from[0]));
+				// A route saved before its obstacle's line was known is held to it now, so the
+				// diagonal stile routes already in a profile stop being used once the stile is
+				// crossed, without anybody deleting them.
+				if (!followsObjectLine(from[0], from[1], from[2], from[3], to))
+				{
+					continue;
+				}
+				Learned known = learned.get(from[0]);
 				int[] route = {
-					Integer.parseInt(from[0]), Integer.parseInt(from[1]),
-					Integer.parseInt(from[2]), Integer.parseInt(from[3]),
+					from[0], from[1], from[2], from[3],
 					to[0], to[1], to[2],
 					known == null ? 1 : Math.max(1, known.ticks),
-					to[4],
+					flagsFor(from[0], from[1], from[2], from[3], to),
 				};
 				if (routeFilter == null || routeFilter.test(route))
 				{
@@ -711,14 +624,38 @@ class ObstacleKnowledge
 		return out;
 	}
 
+	/**
+	 * True if a route leaps over a tile some other learned route starts or ends on — a stepping
+	 * stone. A hop recorded wrongly came out two tiles long, over the stone the true hops use;
+	 * held out rather than deleted, the next correct crossing overwriting it in place.
+	 */
+	private static boolean jumpsOver(int fromX, int fromY, int plane, int[] to, java.util.Set<Long> ends)
+	{
+		int dx = to[0] - fromX;
+		int dy = to[1] - fromY;
+		int span = Math.max(Math.abs(dx), Math.abs(dy));
+		if (to[2] != plane || span < 2 || dx != 0 && dy != 0 && Math.abs(dx) != Math.abs(dy))
+		{
+			return false;
+		}
+		for (int step = 1; step < span; step++)
+		{
+			if (ends.contains(RoamContext.tileKey(fromX + Integer.signum(dx) * step, fromY + Integer.signum(dy) * step, plane)))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** True if the player has shown us where this obstacle goes from near this tile. */
 	boolean hasRoute(int objectId, int x, int y, int plane, int sizeX, int sizeY)
 	{
 		for (Map.Entry<String, List<int[]>> e : routes.entrySet())
 		{
 			String[] from = e.getKey().split(",");
-			// Which obstacle first, because it is cheap and nearly always no: the overlay asks
-			// this of every obstacle in range, and counting a route's sightings is not free.
+			// Which obstacle first, because it is cheap and nearly always no: the overlay asks this
+			// of every obstacle in range, and counting a route's sightings is not free.
 			if (Integer.parseInt(from[0]) != objectId
 				|| Integer.parseInt(from[3]) != plane)
 			{
@@ -852,8 +789,8 @@ class ObstacleKnowledge
 
 	String serialiseCurves()
 	{
-		// One entry per recording, oldest first, so an object with several simply repeats its
-		// id. Files written when only one was kept read back unchanged.
+		// One entry per recording, oldest first, so an object with several repeats its id. Files
+		// written when only one was kept read back unchanged.
 		StringBuilder sb = new StringBuilder();
 		for (Map.Entry<Integer, List<MotionCurve>> e : curves.entrySet())
 		{
@@ -904,15 +841,14 @@ class ObstacleKnowledge
 	private void addCurve(int objectId, MotionCurve curve)
 	{
 		List<MotionCurve> kept = curves.computeIfAbsent(objectId, k -> new ArrayList<>());
-		// A recording that knows which way the player faced supersedes every one that does
-		// not. Otherwise the older recordings outvote it and the golem keeps facing forwards
-		// down the rockslide for as long as they are kept.
+		// A recording that knows which way the player faced supersedes every one that does not,
+		// or the older ones outvote it and the golem keeps facing forwards down the rockslide.
 		if (curve.hasFacing())
 		{
 			kept.removeIf(old -> !old.hasFacing());
 		}
-		// Likewise the player's keyframes: an older recording without them would play the
-		// clip at its authored speed and hop before the jump.
+		// Likewise keyframes: an older recording without them plays the clip at its authored
+		// speed and hops before the jump.
 		if (curve.hasKeyframes())
 		{
 			kept.removeIf(old -> !old.hasKeyframes());
@@ -926,15 +862,9 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * The recording the others most agree with.
-	 *
-	 * <p>A medoid rather than an average: averaging two recordings of a door produces a
-	 * glide neither of them contains. Recordings are compared on what a person watching
-	 * would notice — how long, how far, how far off the line, and how many separate
-	 * movements.
-	 *
-	 * <p>Two recordings cannot outvote each other, so there the more ordinary one wins: the
-	 * one that stays on its axis and moves once. Ties go to the newer.
+	 * The recording the others most agree with: a medoid, not an average, since averaging two
+	 * recordings of a door produces a glide neither contains. Compared on length, reach, lateral
+	 * drift and number of movements; with two, the more ordinary wins.
 	 */
 	static MotionCurve consensus(List<MotionCurve> kept)
 	{
@@ -1022,6 +952,17 @@ class ObstacleKnowledge
 			{
 				String[] halves = entry.split(">");
 				String[] to = halves[1].split(",");
+				// The key is read back as numbers whenever routes are listed, outside any try, so
+				// one bad key saved here would stop the plugin starting.
+				String[] from = halves[0].split(",");
+				if (from.length != 4)
+				{
+					throw new IllegalArgumentException("route key " + halves[0]);
+				}
+				for (String part : from)
+				{
+					Integer.parseInt(part);
+				}
 				routes.computeIfAbsent(halves[0], k -> new ArrayList<>())
 					.add(new int[]{Integer.parseInt(to[0]), Integer.parseInt(to[1]),
 						Integer.parseInt(to[2]), Integer.parseInt(to[3]),
@@ -1048,18 +989,12 @@ class ObstacleKnowledge
 	// ------------------------------------------------------------- what to play
 
 	/**
-	 * The clips a golem should play for this transport, best source first.
-	 *
-	 * <p>What the player was seen doing beats what was shipped, which beats the archetype's
-	 * guess. A sighting counts here as soon as it exists, even before it has unlocked the
-	 * obstacle — if the golem is allowed to use it at all, it may as well use the best
-	 * animation available for it.
+	 * The clips a golem should play for this transport, best source first: what the player was
+	 * seen doing beats what was shipped, which beats the archetype's guess.
 	 */
 	/**
-	 * True if the player has been watched using this obstacle, whatever the outcome.
-	 *
-	 * <p>Distinguishes "seen, and it plays nothing" from "never seen", which an empty clip
-	 * set cannot do on its own.
+	 * True if the player has been watched using this obstacle, whatever the outcome. Tells "seen,
+	 * and it plays nothing" from "never seen", which an empty clip set cannot do on its own.
 	 */
 	boolean isLearned(int objectId)
 	{
@@ -1069,15 +1004,12 @@ class ObstacleKnowledge
 
 	int[] clipsFor(GolemTransport transport)
 	{
-		// Only once it has cleared the same bar everything else clears. A single sighting
-		// can be a player who was attacked between clicking a ladder and reaching it, and
-		// handing that animation straight to every golem in the game is exactly the kind
-		// of confident wrongness this class exists to stop.
+		// Only once it has cleared the bar everything else clears: a single sighting can be a
+		// player attacked between clicking a ladder and reaching it.
 		Learned known = learned.get(transport.getObjectId());
 		if (known != null && known.unlocked())
 		{
-			// Including when it is empty: that is a measured "plays nothing", and playing
-			// nothing is the correct thing to do with it.
+			// Including when it is empty: that is a measured "plays nothing".
 			return known.clips;
 		}
 		if (MeasuredShortcuts.animationFor(transport.getObjectId()) != -1
@@ -1086,9 +1018,8 @@ class ObstacleKnowledge
 			return transport.animations();
 		}
 
-		// Not known. The golem goes through in its ordinary pose rather than performing
-		// something invented — which is the same thing it already does for a door, and is
-		// the failure worth choosing: plain, not wrong.
+		// Not known, so the golem goes through in its ordinary pose rather than performing
+		// something invented, as it already does for a door: plain, not wrong.
 		return NOTHING;
 	}
 
@@ -1116,16 +1047,10 @@ class ObstacleKnowledge
 
 
 	/**
-	 * How long the traversal should take, or 0 to fall back to the clip and the table.
-	 *
-	 * <p>A learned duration is the time from the first clip starting to the player standing
-	 * still, and for a single-clip motion that includes the pause afterwards. Applying it
-	 * to a hop stretched a 38-cycle jump across 60 cycles: the clip finished early and
-	 * started again, so golems hopped twice while gliding over at two thirds speed.
-	 *
-	 * <p>So a single clip is left to run at its own length. Only a motion built in parts
-	 * takes the observed duration, because there the middle clip is a loop and stretching
-	 * it is what it is for.
+	 * How long the traversal should take, or 0 to fall back to the clip and the table. A learned
+	 * duration runs from the first clip to the player standing still, which for a single clip
+	 * includes the pause afterwards and stretched a 38-cycle hop over 60, so a single clip is left
+	 * at its own length and only a motion built in parts takes it.
 	 */
 	int ticksFor(GolemTransport transport)
 	{
@@ -1140,31 +1065,21 @@ class ObstacleKnowledge
 	// ---------------------------------------------------------------- learning
 
 	/**
-	 * Records one sighting, and reports whether it has just unlocked the obstacle.
-	 *
-	 * <p>A sighting that disagrees with what was already learned resets the count rather
-	 * than averaging. Two different answers mean one of them was noise, and starting again
-	 * is the honest response — averaging two animation ids produces a third that is not an
-	 * animation at all.
+	 * Records one sighting, and reports whether it has just unlocked the obstacle. A sighting that
+	 * disagrees with what was learned resets the count rather than averaging: averaging two
+	 * animation ids produces a third that is not an animation.
 	 */
 	boolean record(ObstacleSighting sighting)
 	{
-		// An empty clip set is not a failed observation. It is the observation that this
-		// obstacle animates nobody — which is what a staircase does, and what more than
-		// fifteen hundred rows of the network do. Discarding it made every one of them
-		// permanently unlearnable, because the only evidence they will ever produce is the
-		// absence of an animation.
+		// An empty clip set is not a failed observation but the observation that this obstacle
+		// animates nobody, as a staircase and fifteen hundred other rows do.
 		version++;
 		noteConfirmed(sighting);
 		noteLine(sighting);
 
-		// Only a route that lies along the obstacle is learned — along this traversal's own
-		// movement, and along the line this obstacle is known to move players. A route off
-		// the line is performed off the line: that was the stile crossed on a slant. Its
-		// recording goes with it, having been captured along the same wrong axis.
-		//
-		// The animation is still learned. What the player played is not in question, only
-		// where the route's ends were taken from.
+		// Only a route lying along the obstacle is learned — along this traversal's movement and the
+		// line the obstacle is known to move players — since a route off the line is performed off
+		// it, as with the stile crossed on a slant. The animation is still learned.
 		if (followsLine(sighting))
 		{
 			noteRoute(sighting);
@@ -1178,18 +1093,9 @@ class ObstacleKnowledge
 			log.debug("Refused route off the line of {}: {}", sighting.objectId, sighting);
 		}
 
-		// One crossing is not one use.
-		//
-		// A sighting covers everything between the click and the arrival, and a stepping
-		// stone crossing is several hops from a single click — three stones came back as
-		// clips 741,741,741 over six ticks. But the transport table stores a stone
-		// crossing as one row per hop, so that whole crossing was then replayed at every
-		// individual stone: three jumps and six ticks to cross one two-tile gap, which is
-		// a golem hopping on the spot and sliding through the air at a third of the speed.
-		//
-		// A run of the same clip is one motion performed repeatedly, so it collapses to
-		// that motion and its share of the time. Genuinely multi-part traversals — take
-		// hold, haul, step off — have different ids and are left alone.
+		// One crossing is not one use: a sighting covers click to arrival, so three stepping stones
+		// came back as 741,741,741 over six ticks while the table stores one row per hop. A run of
+		// the same clip collapses to that motion and its share of the time.
 		int[] clips = collapseRepeats(sighting.clips);
 		int ticks = clips.length == sighting.clips.length || clips.length == 0
 			? sighting.ticks
@@ -1209,12 +1115,9 @@ class ObstacleKnowledge
 		boolean wasUnlocked = existing.unlocked();
 		existing.sightings++;
 
-		// The middle of the recent sightings, not the latest one.
-		//
-		// Taking the latest let one unusual traversal rewrite what every golem does: a
-		// door that takes two ticks was stored as three because the last player through it
-		// kept walking. What is already saved seeds the history, so a restart does not
-		// hand the next sighting the same power.
+		// The middle of the recent sightings, not the latest: one unusual traversal otherwise
+		// rewrites what every golem does, a two-tick door being stored as three. What is saved
+		// seeds the history across a restart.
 		List<int[]> history = timings.computeIfAbsent(sighting.objectId, k ->
 		{
 			List<int[]> seeded = new ArrayList<>();
@@ -1235,10 +1138,9 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * Reduces a run of one repeated clip to a single instance of it.
-	 *
-	 * <p>Only when every clip is the same. A mixed set is a motion with parts, and losing
-	 * the parts would leave a golem playing a mount and then standing still.
+	 * Reduces a run of one repeated clip to a single instance. Only when every clip is the same:
+	 * a mixed set is a motion with parts, and losing them leaves a golem playing a mount and
+	 * standing still.
 	 */
 	private static int[] collapseRepeats(int[] clips)
 	{
@@ -1294,11 +1196,9 @@ class ObstacleKnowledge
 	// -------------------------------------------------------------- persistence
 
 	/**
-	 * Everything learned, as one line.
-	 *
-	 * <p>{@code objectId:clip|clip|clip:ticks:sightings}, semicolon separated. Compact
-	 * because it lives in the RuneLite config alongside everything else, and a config value
-	 * is not a database.
+	 * Everything learned, as one line: {@code objectId:clip|clip|clip:ticks:sightings},
+	 * semicolon separated. Compact because it lives in the RuneLite config, which is not a
+	 * database.
 	 */
 	String serialise()
 	{
@@ -1322,10 +1222,8 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * The obstacles the player has personally used, as one line.
-	 *
-	 * <p>{@code objectId,x,y,plane} groups separated by semicolons. Purely cosmetic data —
-	 * losing it costs the player some green outlines, not any golem behaviour.
+	 * The obstacles the player has personally used, as one line: {@code objectId,x,y,plane}
+	 * groups separated by semicolons. Purely cosmetic — losing it costs some green outlines.
 	 */
 	String serialiseConfirmed()
 	{
@@ -1393,10 +1291,8 @@ class ObstacleKnowledge
 					continue;
 				}
 
-				// An empty clip field is a learned "plays nothing", not a broken row.
-				// Parsing it as a number throws, which sent the whole entry to the catch
-				// below as unreadable — so every silent obstacle a player taught the plugin
-				// would have been quietly forgotten the next time they logged in.
+				// An empty clip field is a learned "plays nothing", not a broken row: parsing it as a
+				// number throws, and every silent obstacle taught was forgotten at the next login.
 				int[] clips;
 				if (parts[1].isEmpty())
 				{
@@ -1412,10 +1308,8 @@ class ObstacleKnowledge
 					}
 				}
 
-				// Repaired on the way in as well as on the way out. Entries written before
-				// the repeat collapse existed hold a whole crossing where they should hold
-				// one hop, and a player who already taught the plugin a stepping stone
-				// should not have to unlearn it by hand.
+				// Repaired on the way in as well as out: entries written before the repeat collapse
+				// existed hold a whole crossing where they should hold one hop.
 				int ticks = Integer.parseInt(parts[2]);
 				int[] collapsed = collapseRepeats(clips);
 				if (collapsed.length != clips.length && clips.length > 0)
@@ -1423,9 +1317,8 @@ class ObstacleKnowledge
 					ticks = Math.max(1, Math.round(ticks / (float) clips.length));
 				}
 
-				// Rows written before the movement window was recorded have four fields;
-				// they load with zeroes and are filled in the next time anybody uses the
-				// obstacle, rather than being discarded.
+				// Rows written before the movement window was recorded have four fields; they load
+				// with zeroes and are filled the next time anybody uses the obstacle.
 				int delay = parts.length > 4 ? Integer.parseInt(parts[4]) : 0;
 				int span = parts.length > 5 ? Integer.parseInt(parts[5]) : 0;
 				learned.put(Integer.parseInt(parts[0]),
@@ -1433,8 +1326,7 @@ class ObstacleKnowledge
 			}
 			catch (RuntimeException e)
 			{
-				// One malformed entry must not cost the player everything else they have
-				// taught the plugin.
+				// One malformed entry must not cost everything else the player has taught.
 				log.debug("Skipping unreadable learned obstacle: {}", entry);
 			}
 		}

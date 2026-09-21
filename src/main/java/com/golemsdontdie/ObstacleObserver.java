@@ -26,34 +26,17 @@ import net.runelite.api.events.MenuOptionClicked;
 /**
  * Watches the player use obstacles, and teaches the plugin what it sees.
  *
- * <p>Which animation a shortcut plays, and how long it takes, is <b>not in the cache</b>.
- * Agility obstacles are resolved server-side: the server plays the animation and moves the
- * player, so the client holds no record of the pairing. Object definitions carry the
- * object's own animation — a swinging rope, a turning ring — but not the person's. Client
- * scripts are interface logic and do not decide it either, and three open reimplementations
- * of the server were checked and none is current enough to trust.
+ * <p>Which animation a shortcut plays, and how long it takes, is <b>not in the cache</b>:
+ * agility obstacles are resolved server-side, object definitions carry the object's own
+ * animation but not the person's, and of three open server reimplementations none is current
+ * enough to trust. So it watches: every obstacle used becomes an {@link ObstacleSighting} for
+ * {@link ObstacleKnowledge}, and two consistent sightings unlock it for golems permanently.
  *
- * <p>That leaves watching somebody do it. Which is fine, because somebody is playing the
- * game anyway.
- *
- * <p>This runs all the time and costs nothing when nothing is happening. Every obstacle the
- * player uses is correlated into an {@link ObstacleSighting} and handed to
- * {@link ObstacleKnowledge}; two consistent sightings unlock that obstacle for golems
- * permanently. A player who runs an agility course has taught the plugin a course's worth
- * of animations without being asked to do anything, and golems in that player's game become
- * able to use shortcuts that golems elsewhere still route around.
- *
- * <p>It always keeps a raw journal as well — every click, every animation, every tick, and
- * the player's exact position at 20ms resolution while a traversal is under way. The
- * correlation below has to decide in the moment what belongs to what; a journal can be
- * re-read as many times as it takes, so it catches what the live pass gets wrong and is the
- * only way to improve the live pass afterwards. A session cannot be repeated; a parse can.
- *
- * <p>Always on is affordable because the expensive rows are tied to the rare event. Per-tick
- * rows are around 360KB an hour; the 20ms rows run only while an obstacle is actually being
- * traversed, not after every click, which is what separates a few hundred rows per obstacle
- * from tens of megabytes an hour of somebody walking around a city. Old journals are pruned
- * so the folder cannot grow without bound.
+ * <p>It always keeps a raw journal too, down to the player's position at 20ms resolution
+ * during a traversal, because the correlation below must decide in the moment what belongs to
+ * what whereas a journal can be re-read. Always on is affordable because the expensive rows
+ * are tied to the rare event: per-tick rows are about 360KB an hour, the 20ms rows only
+ * mid-traversal.
  */
 @Slf4j
 @Singleton
@@ -63,11 +46,8 @@ class ObstacleObserver
 	private static final int SCHEMA = 1;
 
 	/**
-	 * Ticks after a click within which an animation is taken to belong to it.
-	 *
-	 * <p>Generous, because a click on an obstacle is not the moment it is used: the player
-	 * walks there first, and across a clearing that is easily ten seconds. An earlier
-	 * three-tick window expired during the walk every single time and recorded nothing.
+	 * Ticks after a click within which an animation is taken to belong to it. Generous because an
+	 * earlier three-tick window expired during the walk to the obstacle, easily ten seconds.
 	 */
 	private static final int CLAIM_WINDOW = 60;
 
@@ -75,11 +55,8 @@ class ObstacleObserver
 	private static final int PATIENCE = 40;
 
 	/**
-	 * Tiles the player can cover in one tick before it must have been a transport.
-	 *
-	 * <p>Two is already generous — running covers two tiles a tick and walking one — so
-	 * anything past it is not locomotion. A staircase moves you several thousand tiles in a
-	 * single tick, so the test is nowhere near the margin in the cases that matter.
+	 * Tiles the player can cover in one tick before it must have been a transport. Running covers
+	 * two a tick and a staircase several thousand, so the test is nowhere near the margin.
 	 */
 	private static final int TELEPORT_TILES = 3;
 
@@ -87,17 +64,8 @@ class ObstacleObserver
 	private static final int TAIL_CYCLES = 100;
 
 	/**
-	 * Client ticks of position kept in hand before a traversal is recognised.
-	 *
-	 * <p>Because the interesting part happens before the animation event arrives. An
-	 * obstacle does not start moving you the moment it starts animating you — the player
-	 * leans, gathers themselves, and only then goes — and recording from the animation
-	 * onwards captures the jump while missing the wind-up entirely.
-	 *
-	 * <p>It cannot be recovered afterwards, so it is held continuously and written out only
-	 * when a traversal turns out to have begun. A second and a bit of positions costs sixty
-	 * entries of nothing and is the difference between knowing an obstacle's shape and
-	 * guessing at it.
+	 * Client ticks of position kept in hand before a traversal is recognised: the wind-up happens
+	 * before the animation event and cannot be recovered, so it is held continuously.
 	 */
 	private static final int LOOKBACK_CYCLES = 60;
 
@@ -125,12 +93,8 @@ class ObstacleObserver
 	private boolean explaining;
 
 	/**
-	 * Whether to record what the golems are doing alongside what the player is doing.
-	 *
-	 * <p>Very loud — a row per visible golem per tick — and only worth it while something
-	 * is being diagnosed. Its value is that the two halves land in the same file on the
-	 * same clock, so a golem's animation and position can be held against the player's
-	 * doing the same obstacle rather than described from memory.
+	 * Whether to record what the golems are doing too: very loud, a row per visible golem per tick,
+	 * but both halves land in one file on one clock and can be held against each other.
 	 */
 	@Setter
 	private boolean loggingGolems;
@@ -152,12 +116,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * One golem as it was drawn on one client frame, while it is mid-obstacle.
-	 *
-	 * <p>The per-tick row cannot see what goes wrong inside a traversal: a door crossed in
-	 * one cycle and a door crossed in three look identical at 600ms, and so does an
-	 * animation that finishes before the golem leaves the ground. These rows are written
-	 * only during transitions, so they cost nothing while golems are walking.
+	 * One golem as it was drawn on one client frame, while it is mid-obstacle: at 600ms a door
+	 * crossed in one cycle and in three look identical. Written during transitions only.
 	 */
 	void writeGolemFrame(String id, String state)
 	{
@@ -191,10 +151,7 @@ class ObstacleObserver
 	private String clickedMenu = "";
 	private int clickedTick = -1;
 
-	/**
-	 * An object clicked while another was still animating the player, held until that one
-	 * finishes. See onMenuOptionClicked.
-	 */
+	/** An object clicked while another was still animating; see onMenuOptionClicked. */
 	private int queuedObject = -1;
 	private String queuedName = "";
 	private String queuedMenu = "";
@@ -214,10 +171,8 @@ class ObstacleObserver
 	private WorldPoint previousTile;
 
 	/**
-	 * The client cycle the traversal's first clip began on, or -1.
-	 *
-	 * <p>Everything about the movement window is measured from here, because that is the
-	 * moment a golem's own transition starts and so the only origin the two can share.
+	 * The client cycle the traversal's first clip began on, or -1. The movement window is measured
+	 * from here: a golem's own transition starts there, so it is the only origin the two share.
 	 */
 	private int clipStartCycle = -1;
 
@@ -226,34 +181,25 @@ class ObstacleObserver
 	private int moveEnd = -1;
 
 	/**
-	 * When the last animation of the traversal ended, and where the player's tile was then.
-	 *
-	 * <p>The traversal is over when the obstacle has finished with the player, not when
-	 * the player next stands still. Those were treated as the same moment, and they are not
-	 * whenever somebody clicks onward: a player who went through the cathedral door and kept
-	 * walking produced a recording of the door followed by a diagonal walk, a destination two
-	 * tiles off the door, and three ticks instead of two — and every golem performed all of
-	 * it.
+	 * When the last animation of the traversal ended, and where the player's tile was then. The
+	 * traversal is over when the obstacle has finished with the player, not when the player next
+	 * stands still: as one, that recorded the cathedral door plus the walk after it, two tiles off
+	 * and three ticks instead of two.
 	 */
 	private int animEndCycle = -1;
 	private WorldPoint animEndTile;
 
 	/**
-	 * Cycles of complete stillness on a tile centre that mark the end of one step.
-	 *
-	 * <p>A crossing of several stones is one click in the current game, and the stones come
-	 * back as one animation after another with a rest between. Measured between two basalt
-	 * hops at about fifteen cycles; a climb's quantised stalls last one or two.
+	 * Cycles of complete stillness on a tile centre that mark the end of one step: a crossing is
+	 * one click, and basalt hops rest about fifteen cycles, where a climb's stalls last two.
 	 */
 	private static final int REST_CYCLES = 6;
 
 	private static final int CYCLES_PER_TICK = 30;
 
 	/**
-	 * The traversal being recorded: {cycle, worldFineX, worldFineY} per client tick.
-	 *
-	 * <p>World fine units rather than local, because a scene can shift underneath a
-	 * recording and local coordinates would jump with it.
+	 * The traversal being recorded: {cycle, worldFineX, worldFineY} per client tick. World fine
+	 * units, because a scene can shift underneath a recording and take local coordinates with it.
 	 */
 	private final List<int[]> samples = new ArrayList<>();
 
@@ -264,15 +210,9 @@ class ObstacleObserver
 	private LocalPoint previousFine;
 
 	/**
-	 * A move that looked like a silent traversal, held back one tick.
-	 *
-	 * <p>Because the two events race. A ladder that plays 828 can deliver the position
-	 * change before the animation, and judging it on the tick of the move alone recorded
-	 * the same ladder as animated sometimes and silent other times. Each disagreement
-	 * threw away the count, so it never reached two and the obstacle stayed orange no
-	 * matter how often it was climbed.
-	 *
-	 * <p>One tick of patience costs nothing and lets the animation arrive.
+	 * A move that looked like a silent traversal, held back one tick because the two events race:
+	 * a ladder playing 828 can move first, so it was called animated sometimes and silent others,
+	 * and every disagreement voided the count.
 	 */
 	private WorldPoint silentFrom;
 	private WorldPoint silentTo;
@@ -297,6 +237,11 @@ class ObstacleObserver
 
 	void startUp()
 	{
+		resetSession();
+		if (!DevOptions.JOURNAL)
+		{
+			return;
+		}
 		try
 		{
 			String stamp = LocalDateTime.now()
@@ -310,7 +255,7 @@ class ObstacleObserver
 			out.println("#cycle\ttick\ttype\tx\ty\tplane\tanim\tpose\torient\tdetail");
 			out.flush();
 
-			log.info("Obstacle journal: {}", file.getAbsolutePath());
+			log.debug("Obstacle journal: {}", file.getAbsolutePath());
 			pruneOldJournals();
 		}
 		catch (IOException e)
@@ -322,11 +267,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Deletes all but the most recent journals.
-	 *
-	 * <p>Only files this class wrote, matched on its own prefix and suffix, and only in
-	 * RuneLite's own folder. The names carry a sortable timestamp, so the newest are simply
-	 * the last ones alphabetically.
+	 * Deletes all but the most recent journals: only files this class wrote, matched on its prefix
+	 * and suffix, in RuneLite's own folder. Their timestamps sort, so the newest are the last.
 	 */
 	private void pruneOldJournals()
 	{
@@ -357,17 +299,17 @@ class ObstacleObserver
 
 	void shutDown()
 	{
+		resetSession();
 		if (out != null)
 		{
 			write("SESSION", "end");
 			out.flush();
 			out.close();
 			out = null;
-			log.info("Obstacle journal closed: {}", file);
+			log.debug("Obstacle journal closed: {}", file);
 		}
 	}
 
-	/** Where the journal is being written, or null if it is not. */
 	String journalPath()
 	{
 		return file == null ? null : file.getAbsolutePath();
@@ -396,22 +338,24 @@ class ObstacleObserver
 
 		if (!isObjectAction(event.getMenuAction()))
 		{
-			// Only scene objects are obstacles. Looking up a definition for a walk target
-			// returns whatever object happens to share that number, which would attach a
-			// plausible and wrong name to a great many rows.
+			// Only scene objects are obstacles: a definition looked up for a walk target returns
+			// whatever object shares that number. A click on anything else drops the object being
+			// walked to, as the game does — a door clicked and then a teleport cast was learned as a
+			// door to the teleport's destination — but a traversal already started is left to finish.
+			if (startedAt == null && clips.isEmpty() && posing == -1)
+			{
+				clickedObject = -1;
+				clickedTick = -1;
+				clearSilent();
+			}
 			return;
 		}
 
 		Player local = client.getLocalPlayer();
 		WorldPoint at = local == null ? null : local.getWorldLocation();
 
-		// A click while an obstacle is still animating the player is held, not acted on.
-		//
-		// Players click ahead as a matter of course — onto the far side of a stile while
-		// still climbing it, onto the next thing mid-hop — and the game finishes the obstacle
-		// before it does anything with the click. Finishing the recording on that click
-		// instead cut it off partway through the animation. So it waits until the obstacle is
-		// done, and then becomes the click the next traversal belongs to.
+		// A click while an obstacle is still animating is held, not acted on: players click ahead as
+		// a matter of course, and ending the recording there cut it off mid-animation.
 		if (startedAt != null && !clips.isEmpty() && local != null && local.getAnimation() != -1)
 		{
 			queuedObject = event.getId();
@@ -425,22 +369,28 @@ class ObstacleObserver
 			return;
 		}
 
-		// A traversal already under way is finished by the next click, not thrown away.
-		//
-		// Chained obstacles are one action per step: a line of stepping stones takes a
-		// fresh click at every stone, and the click for the second arrives before the
-		// first has settled. Discarding the one in flight merged both hops into a single
-		// sighting and taught a four-tile route across three stones — a golem following it
-		// would clear the whole crossing in one jump and skip the middle stone entirely.
+		// A traversal already under way is finished by the next click, not thrown away: chained
+		// obstacles are one action per step, and discarding the one in flight merged both hops into
+		// a four-tile route a golem cleared in a single jump.
 		if (startedAt != null && !clips.isEmpty() && at != null && !at.equals(startedAt))
 		{
-			complete(at, client.getTickCount());
+			// The next stone of the same crossing ends the hop on the stone it landed on, and the
+			// next starts there. Any other click is somewhere new, and the hop ends as usual.
+			boolean sameObstacle = event.getId() == clickedObject
+				|| objectName(event.getId()).equals(clickedName) && !clickedName.isEmpty();
+			complete(at, client.getTickCount(), sameObstacle);
+			if (sameObstacle)
+			{
+				chainTile = at;
+			}
 		}
 
 		clickedObject = event.getId();
 		clickedMenu = (option + " " + stripTags(event.getMenuTarget())).trim();
 		clickedName = objectName(clickedObject);
 		clickedTick = client.getTickCount();
+		hurt = false;
+		ordinaryPoses = local == null ? null : ordinaryPosesOf(local);
 
 		clips.clear();
 		startedAt = null;
@@ -457,11 +407,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Says what the plugin currently believes about the obstacle just clicked.
-	 *
-	 * <p>Tied to the highlight setting, because it answers the question the highlight
-	 * raises and cannot: not what colour this is, but which of the four things the colour
-	 * depends on is missing.
+	 * Says what the plugin currently believes about the obstacle just clicked. Tied to the
+	 * highlight setting: it answers which of the four things the colour depends on is missing.
 	 */
 	private void explain(int objectId)
 	{
@@ -475,8 +422,7 @@ class ObstacleObserver
 		WorldPoint at = local == null ? null : local.getWorldLocation();
 		if (at != null)
 		{
-			// The index entry nearest the player, so the footprint and position used are
-			// the same ones the overlay colours.
+			// The index entry nearest the player, so the footprint and position match the overlay's.
 			for (ObstacleIndex.Obstacle o : index.near(at.getX(), at.getY(), at.getPlane(), 12))
 			{
 				if (o.objectId == objectId)
@@ -504,12 +450,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Notes each clip the player begins, and the moment the traversal starts.
-	 *
-	 * <p>Every clip is kept, not just the first. OSRS builds a traversal in parts — take
-	 * hold, haul, step off — and a stepping-stone crossing is several animations from a
-	 * single click. Recording only the first would have golems playing a mount and then
-	 * standing still for the rest of the obstacle.
+	 * Notes each clip the player begins, and the moment the traversal starts. Every clip is kept:
+	 * OSRS builds a traversal in parts, and only the first would be a mount and then stillness.
 	 */
 	void onAnimationChanged(AnimationChanged event)
 	{
@@ -532,33 +474,24 @@ class ObstacleObserver
 			animEndCycle = client.getGameCycle();
 			animEndTile = local.getWorldLocation();
 			animEndTileTemplate = templateOf(animEndTile);
-			// Kept in the recording, so a golem stops animating when the player did. The
-			// stile ends its clip and then the player steps off; without this the golem
-			// stepped off frozen in the last frame of the climb.
+			// Kept so a golem stops animating when the player did; without it the golem stepped
+			// off a stile frozen in the last frame of the climb.
 			animTimeline.add(new int[]{client.getGameCycle(), -1});
 		}
 
 		if (playing == -1 || clickedTick < 0 || tick - clickedTick > CLAIM_WINDOW)
 		{
-			// Not attributable to anything the player clicked on — an emote, combat, a
-			// skill. Nothing to learn from it.
+			// An emote, combat, a skill: not attributable to a click, so nothing to learn.
 			return;
 		}
 
 		// An animation turned up after all, so the move was not silent.
 		clearSilent();
 
-		// The next step of a chained crossing, rather than more of the same one.
-		//
-		// One click crosses a whole line of stones, so the recording ran from the first bank
-		// to the last and was stored as a single traversal: two hops, four tiles, one curve.
-		// The table has a row per hop, so every hop then performed both — and a learned
-		// route from bank to bank let golems clear the crossing without touching the middle
-		// stone.
-		//
-		// The same clip starting again while the player rests on a tile they did not start
-		// from is a new step. The same clip only, because a multi-part obstacle — mount,
-		// cross, dismount — legitimately pauses between different clips and is one thing.
+		// The next step of a chained crossing, not more of the same one: one click crosses a whole
+		// line of stones, and storing that as one traversal let golems cross without touching the
+		// middle stone. The same clip again, while the player rests on a tile they did not start
+		// from, is a new step; a multi-part obstacle pauses between *different* clips.
 		WorldPoint splitAt = null;
 		List<int[]> restRun = null;
 		if (startedAt != null && !clips.isEmpty() && clips.get(clips.size() - 1) == playing)
@@ -572,7 +505,8 @@ class ObstacleObserver
 				String menu = clickedMenu;
 				int clicked = clickedTick;
 
-				complete(resting, tick);
+				complete(resting, tick, true);
+				chainTile = resting;
 
 				clickedObject = object;
 				clickedName = name;
@@ -586,21 +520,20 @@ class ObstacleObserver
 			}
 		}
 
+		beginClip(playing, splitAt, restRun, local, tick);
+	}
+
+	/**
+	 * Notes a clip starting: the first of a traversal, which anchors it, or another part of the one
+	 * under way. Played animations come here, and so does a pose that moves the player silently.
+	 */
+	private void beginClip(int playing, WorldPoint splitAt, List<int[]> restRun, Player local, int tick)
+	{
 		if (startedAt == null)
 		{
-			// Where the traversal began is where the player was a tick ago, not where
-			// they are now.
-			//
-			// Movement and animation are separate things and arrive in either order. A
-			// rock climb moves you first: by the time the clip fires you are already at
-			// the far end, so anchoring on the current position recorded a traversal that
-			// started and finished on the same tile and therefore never finished at all —
-			// which is why one side of that climb learned nothing however many times it
-			// was used.
-			//
-			// A tick earlier is the last place the player certainly was before whatever
-			// the obstacle did to them. It is also close enough when they walked here
-			// instead, being one tile back along the approach.
+			// Where the traversal began is where the player was a tick ago: movement and animation
+			// arrive in either order, and a rock climb moves you first, so anchoring on the current
+			// position recorded a traversal that never left its own tile.
 			startedAt = splitAt != null ? splitAt
 				: previousTile != null ? previousTile : local.getWorldLocation();
 			startedAtTemplate = splitAt != null ? templateOf(splitAt)
@@ -620,14 +553,10 @@ class ObstacleObserver
 			animEndTile = null;
 		}
 
-		// Everything held from before this moment is now known to matter.
 		flushLookback();
 
-		// Cycle-level recording starts here rather than at the click, and this is the
-		// difference between a journal that can be left on forever and one that cannot.
-		// Keyed to the click it followed every walk across every town: a click is common
-		// and a traversal is rare, so tying the expensive rows to the rare event costs
-		// almost nothing across a session and loses none of the interesting part.
+		// Cycle-level recording starts here rather than at the click, which is what lets the journal
+		// be left on forever: keyed to the click it followed every walk across every town.
 		fineRemaining = TAIL_CYCLES;
 
 		clips.add(playing);
@@ -636,11 +565,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Finishes a traversal once the player has stopped moving somewhere new.
-	 *
-	 * <p>The end is as informative as the start. A looping clip hides its own length — a
-	 * rock climb reports one animation change and then loops silently — so the only way to
-	 * know how long it ran is the moment the player arrives.
+	 * Finishes a traversal once the player has stopped moving somewhere new. A looping clip hides
+	 * its own length — a rock climb loops silently — so only the arrival gives it.
 	 */
 	void onGameTick()
 	{
@@ -660,17 +586,17 @@ class ObstacleObserver
 		WorldPoint wasTemplate = previousTileTemplate;
 		previousTileTemplate = templateOf(at);
 
+		// A pose the obstacle put the player in, playing nothing. See posedTraversal.
+		if (posedTraversal(local, at, was, wasTemplate, tick))
+		{
+			return;
+		}
+
 		if (startedAt == null && clips.isEmpty())
 		{
-			// Nothing is animating, so watch for the other kind of traversal: the kind
-			// that plays no animation at all.
-			//
-			// Staircases are the large case and they were invisible to this class
-			// entirely. A player clicks one, and a few ticks later they are several
-			// thousand tiles away underground, having played nothing. Because capture only
-			// ever began on an animation, no staircase in the game could be learned — and
-			// "plays nothing" is a fact worth knowing, not an absence of one. A golem that
-			// walks up a staircase in its ordinary pose is doing exactly the right thing.
+			// Nothing is animating, so watch for the traversal that plays no animation at all.
+			// Staircases are the large case and were invisible here, capture having only ever begun
+			// on an animation; "plays nothing" is itself a fact worth knowing.
 			silentTraversal(was, at, tick, wasTemplate, previousTileTemplate);
 			return;
 		}
@@ -680,18 +606,10 @@ class ObstacleObserver
 			return;
 		}
 
-		// Finished means stopped, not merely between animations.
-		//
-		// A looping clip reports -1 between repeats, and a multi-tile traversal was being
-		// declared over on its first tile because of it: a rock climb recorded a route of
-		// 2550,2209 -> 2550,2208, one tile, which is not a climb at all. Requiring the
-		// player to have actually settled — no animation and no movement since last tick —
-		// waits for the whole obstacle.
-		//
-		// Or two ticks after the animation ended, moving or not. A player who clicks away the
-		// moment an obstacle lets go of them never stands still, and waiting for them to kept
-		// the traversal open until patience ran out and threw it away. What they do after
-		// that point is not the obstacle, and the recording is cut where the obstacle ended.
+		// Finished means stopped, not merely between animations: a looping clip reports -1 between
+		// repeats, and a rock climb was declared over on its first tile, recording 2550,2209 ->
+		// 2550,2208. Or two ticks after the animation ended, moving or not, since a player who
+		// clicks away the moment an obstacle lets go never stands still.
 		boolean stillMoving = was == null || !was.equals(at);
 		boolean released = animEndCycle >= 0
 			&& client.getGameCycle() - animEndCycle >= 2 * CYCLES_PER_TICK;
@@ -709,50 +627,71 @@ class ObstacleObserver
 		}
 	}
 
-	/** Turns the watched traversal into a sighting and hands it on. */
 	private void complete(WorldPoint at, int tick)
 	{
+		complete(at, tick, false);
+	}
+
+	/**
+	 * Turns the watched traversal into a sighting and hands it on.
+	 *
+	 * @param continues true if the same obstacle carries straight on, as the next hop of a line of
+	 *                  stepping stones does, so the part ends on the stone it landed on.
+	 */
+	private void complete(WorldPoint at, int tick, boolean continues)
+	{
+		// A fall is not the way across: washed downstream off a stepping stone the player still
+		// moves, and learned, that teaches golems to cross by swimming. So hurt means failed.
+		if (hurt)
+		{
+			if (out != null)
+			{
+				write("SIGHTING", "discarded: hurt during " + clickedName);
+			}
+			hurt = false;
+			chainTile = null;
+			reset();
+			return;
+		}
+
+		// Started on the stone a previous hop of the same crossing landed on.
+		boolean fromChain = chainTile != null && chainTile.equals(startedAt);
+		chainTile = null;
+
 		int[] played = new int[clips.size()];
 		for (int i = 0; i < played.length; i++)
 		{
 			played[i] = clips.get(i);
 		}
 
-		// Where the obstacle put the player, which is not always where they came to rest.
-		// See animEndTile. A tile equal to the start is a clip that ended before its own
-		// teleport — a ladder — and says nothing about the destination.
+		// Where the obstacle put the player, not always where they came to rest; see animEndTile.
+		// A tile equal to the start is a clip that ended before its own teleport — a ladder.
 		WorldPoint to = at;
 		if (animEndTile != null && !animEndTile.equals(startedAt) && !animEndTile.equals(at))
 		{
 			to = animEndTile;
 		}
 
-		// Where a golem gets on and off, which for some obstacles is not where the obstacle
-		// itself begins and ends. The stile walks the player onto its own blocked tile before
-		// climbing them and puts them down on another; routes learned between those two
-		// tiles started and ended where no golem can stand. See wayIn and wayOut.
+		// Where a golem gets on and off, which for some obstacles is not where the obstacle begins
+		// and ends: the stile puts the player on its own blocked tile first. See wayIn, wayOut.
 		WorldPoint landing = to;
-		// The direction and the line in lasting coordinates. Across the edge of an instance the
-		// raw tiles are thousands apart — the pew into the Mad Angel's room recorded a line of
-		// 11486,5792 — while their templates are the tiles either side of the pew.
+		// The direction and line in lasting coordinates. Across an instance edge the raw tiles are
+		// thousands apart — the pew to the Mad Angel's room recorded a line of 11486,5792.
 		WorldPoint landingTemplate = landing.equals(animEndTile) ? animEndTileTemplate : templateOf(landing);
 		WorldPoint lineFrom = startedAtTemplate != null ? startedAtTemplate : startedAt;
 		WorldPoint lineTo = landingTemplate != null ? landingTemplate : landing;
 		int dirX = Integer.signum(lineTo.getX() - lineFrom.getX());
 		int dirY = Integer.signum(lineTo.getY() - lineFrom.getY());
 		boolean level = landing.getPlane() == startedAt.getPlane();
-		WorldPoint origin = level ? wayIn(startedAt, dirX, dirY) : startedAt;
-		to = level ? wayOut(landing, dirX, dirY) : landing;
+		// Not in the middle of a crossing. Stepping back to walkable ground is right for a stile but
+		// wrong for a stone mid-river, which was learned as a jump over the stone beside it.
+		WorldPoint origin = level && !fromChain ? wayIn(startedAt, dirX, dirY) : startedAt;
+		to = level && !continues ? wayOut(landing, dirX, dirY) : landing;
 
-		// The recording is the obstacle and nothing else: from the moment the player stands
-		// on the tile it starts them from to the moment it puts them down.
-		//
-		// Everything either side is the player, not the obstacle — the walk up to it, the
-		// click that sent them off the far side, the way a player spam-clicks their way
-		// across an agility course. Those were being recorded, and a golem replayed them.
-		// Where the route's ends lie a tile outside the obstacle, the steps between are
-		// added as ordinary walking, the same for every recording of it: a stile climbed
-		// from outside and one climbed from on top come out the same shape.
+		// The recording is the obstacle and nothing else: from the player standing on the tile it
+		// starts them from to the moment it puts them down. Everything either side is the player,
+		// and was being replayed by golems. Where the route's ends lie a tile outside, the steps
+		// between are added as ordinary walking.
 		List<int[]> track = flattenTeleports(cutAtArrival(trimToStart(samples, startedAt), landing));
 		if (level && !track.isEmpty())
 		{
@@ -764,10 +703,8 @@ class ObstacleObserver
 			to.getX() * Golem.TILE + Golem.TILE / 2,
 			to.getY() * Golem.TILE + Golem.TILE / 2);
 
-		// Timings read off the recording, which is exactly one step long, rather than
-		// counted live. Counting live measured "longest unbroken run of movement" on a
-		// position that stalls every other cycle, and came back as one cycle for nearly
-		// every obstacle ever recorded.
+		// Timings read off the recording, which is exactly one step long. Counted live they came back
+		// as one cycle for nearly every obstacle, the position stalling every other cycle.
 		int ticks = tick - startedTick;
 		int delay = Math.max(0, moveDelay);
 		int span = 0;
@@ -781,11 +718,8 @@ class ObstacleObserver
 			}
 		}
 
-		// The route's ends in lasting coordinates. Inside an instance that is its template —
-		// captured when each position was seen, since the instance may be gone by now. The
-		// ends are a tile either side of the obstacle's own start and landing, so the same
-		// offset is carried over. Only if an end could not be placed is the sighting marked
-		// as an instance, whose route is not kept.
+		// The route's ends in lasting coordinates: inside an instance that is its template, captured
+		// when seen, since the instance may be gone by now. The same offset carries over.
 		WorldPoint fromTemplate = shift(startedAtTemplate, origin, startedAt);
 		WorldPoint toTemplate = shift(landingTemplate, to, landing);
 		boolean placed = fromTemplate != null && toTemplate != null;
@@ -810,9 +744,8 @@ class ObstacleObserver
 
 		reset();
 
-		// A traversal that did not move the player is not a traversal. This is the main
-		// thing standing between an honest sighting and the player having been attacked
-		// between clicking a ladder and reaching it.
+		// A traversal that did not move the player is not a traversal: the main guard against being
+		// attacked between clicking a ladder and reaching it.
 		if (!sighting.moved())
 		{
 			return;
@@ -825,11 +758,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Records a traversal that moved the player without animating them.
-	 *
-	 * <p>Judged by the move itself rather than by the click: a plane change, or a jump no
-	 * amount of running could cover in one tick. Walking to the obstacle looks nothing like
-	 * either, which is what keeps the ordinary business of getting there out of the record.
+	 * Records a traversal that moved the player without animating them, judged by the move rather
+	 * than the click: a plane change, or a jump no running could cover in one tick.
 	 */
 	private void silentTraversal(WorldPoint was, WorldPoint now, int tick, WorldPoint wasTemplate,
 		WorldPoint nowTemplate)
@@ -847,12 +777,9 @@ class ObstacleObserver
 			String menu = silentMenu;
 			clearSilent();
 
-			// A silent traversal has no clip to measure a window against, but it still has a
-			// shape. Without one a staircase could never be performed from a recording, and
-			// fell back to appearing at the far end on the tick the golem arrived.
-			// The curve in the coordinates it was sampled in; the route's ends in lasting ones.
-			// Leaving an instance by a silent exit is reported a tick after the overworld has
-			// loaded, so the exit's own tile was placed in its template on the tick before.
+			// A silent traversal has no clip to measure a window against but still has a shape:
+			// without one a staircase appeared at the far end the tick the golem arrived. A silent
+			// exit is reported a tick after the overworld loads, so its template is a tick older.
 			MotionCurve curve = silentCurve(from, to);
 			WorldPoint start = placed ? fromTemplate : from;
 			WorldPoint end = placed ? toTemplate : to;
@@ -890,6 +817,14 @@ class ObstacleObserver
 			return;
 		}
 
+		// Boarding or leaving a boat is not an obstacle: aboard, the player stands in the boat's own
+		// world thousands of tiles off the map, and a gangplank was learned as a way there.
+		boolean aboard = onBoat();
+		if (aboard || boatChanged)
+		{
+			return;
+		}
+
 		// Held, not emitted. Next tick decides.
 		silentFrom = was;
 		silentTo = now;
@@ -901,12 +836,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Drops the walk up to the obstacle, keeping the traversal itself.
-	 *
-	 * <p>Recording begins at the click, which is usually several seconds and several tiles
-	 * before anything interesting. The traversal starts at the last moment the player was
-	 * still standing on its origin tile, so everything before that is the approach and is
-	 * thrown away.
+	 * Drops the walk up to the obstacle, keeping the traversal itself, which starts at the last
+	 * moment the player stood on its origin tile. Recording begins at the click, well before.
 	 */
 	private List<int[]> trimToStart(List<int[]> all, WorldPoint from)
 	{
@@ -915,8 +846,8 @@ class ObstacleObserver
 		{
 			return all.subList(start, all.size());
 		}
-		// Never seen standing there: start at the animation rather than keep the whole
-		// approach, which would be the player's walk and not the obstacle.
+		// Never seen standing there: start at the animation rather than keep the approach,
+		// which is the player's walk and not the obstacle.
 		for (int i = 0; i < all.size(); i++)
 		{
 			if (all.get(i)[0] >= clipStartCycle)
@@ -928,10 +859,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * The walk onto and off an obstacle, added where a route starts or ends a tile outside it.
-	 *
-	 * <p>Straight lines at a golem's walking pace, playing no animation — the golem's own
-	 * walk is shown for them. Only the obstacle between is the player's.
+	 * The walk onto and off an obstacle, added where a route starts or ends a tile outside it:
+	 * straight lines at walking pace playing no animation, so the golem's own walk shows.
 	 */
 	private static List<int[]> withWalk(List<int[]> track, WorldPoint origin, WorldPoint start,
 		WorldPoint landing, WorldPoint dest)
@@ -975,22 +904,13 @@ class ObstacleObserver
 			return -1;
 		}
 
-		// Tile centres, because the samples are rendered positions and a player standing
-		// on a tile is drawn at its middle.
+		// Tile centres, because the samples are rendered and a player is drawn at a tile's middle.
 		int originX = from.getX() * Golem.TILE + Golem.TILE / 2;
 		int originY = from.getY() * Golem.TILE + Golem.TILE / 2;
 
-		// The moment the player arrived on the origin tile, not the moment they left it.
-		//
-		// Taking the last sample at the origin cut the wind-up off every obstacle that has
-		// one. A door stands still for thirty cycles and then teleports, and all of that
-		// stillness is "at the origin" — so the recording began at the teleport and the
-		// golem crossed instantly at the start of its animation instead of the end.
-		//
-		// So: find the last sample at the origin, then walk back to the beginning of the
-		// unbroken run it belongs to. For a door that recovers the whole pause; for a climb,
-		// which leaves immediately and never returns, it is the single sample before
-		// departure. Both are the instant the traversal began.
+		// The moment the player arrived on the origin tile, not the moment they left it: a door
+		// stands still for thirty cycles and then teleports, all of it "at the origin", so taking the
+		// last sample there began the recording at the teleport. Hence the walk back to the run.
 		int last = -1;
 		for (int i = 0; i < all.size(); i++)
 		{
@@ -1023,11 +943,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Drops whatever the player did after the obstacle finished with them.
-	 *
-	 * <p>The first moment, at or after the last animation ended, that the player is drawn
-	 * on the destination. A door keeps its whole animation — the player arrives halfway
-	 * through and stands there until it ends — and loses the walk that followed.
+	 * Drops whatever the player did after the obstacle finished: the first moment, at or after the
+	 * last animation ended, that they are drawn on the destination. A door keeps its whole clip.
 	 */
 	private List<int[]> cutAtArrival(List<int[]> track, WorldPoint to)
 	{
@@ -1053,13 +970,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Holds the recording still from the first teleport onward.
-	 *
-	 * <p>A cave mouth plays its animation and puts the player six thousand tiles away while
-	 * it is still playing. Recorded as it is, that is a curve travelling six thousand tiles
-	 * along the ground, which a golem would glide across the world performing. What a golem
-	 * should do is stand there for the rest of the animation and then be put down at the far
-	 * end, which is what holding the last position before the jump produces.
+	 * Holds the recording still from the first teleport onward. A cave mouth puts the player six
+	 * thousand tiles away while still animating, which a golem would glide across the world.
 	 */
 	private static List<int[]> flattenTeleports(List<int[]> track)
 	{
@@ -1085,10 +997,8 @@ class ObstacleObserver
 	}
 
 	/**
-	 * The stillness on a silent obstacle before the player vanishes, as a recording.
-	 *
-	 * <p>Only the part spent on the origin tile: the approach is not the obstacle, and the
-	 * far side is on another floor or across the map.
+	 * The stillness on a silent obstacle before the player vanishes, as a recording. Only the part
+	 * on the origin tile: the approach is not the obstacle, and the far side is elsewhere.
 	 */
 	private MotionCurve silentCurve(WorldPoint from, WorldPoint to)
 	{
@@ -1116,10 +1026,7 @@ class ObstacleObserver
 			to.getX() * Golem.TILE + Golem.TILE / 2, to.getY() * Golem.TILE + Golem.TILE / 2);
 	}
 
-	/**
-	 * The unbroken run of identical samples at the end of the recording, if it is a rest on
-	 * a tile's centre long enough to end a step. Null otherwise.
-	 */
+	/** The rest ending the recording, if long enough on a tile centre to end a step; else null. */
 	private List<int[]> restingRun()
 	{
 		if (samples.isEmpty())
@@ -1153,18 +1060,11 @@ class ObstacleObserver
 	/**
 	 * Where a traversal really starts, for a golem.
 	 *
-	 * <p>Some obstacles start the player on a tile no golem can walk onto: clicking the stile
-	 * walks you onto its blocked tile, and only then does the climb begin. Learned from
-	 * there, the route started where no golem could ever stand, and the stile went unused
-	 * however many golems passed it. The way in is the walkable tile behind the obstacle,
-	 * along the line it moves the player.
-	 *
-	 * <p>Decided from the obstacle alone — its line and what can be walked on — and never
-	 * from where the player happened to be. Players come at a stile from the side and step
-	 * off it at an angle, and routes taken from their positions ran diagonally across it.
-	 *
-	 * <p>A stepping stone is blocked ground too, but behind it is water, so a crossing
-	 * keeps starting on the stone it starts on.
+	 * <p>Some obstacles start the player on a tile no golem can walk onto: clicking the stile walks
+	 * you onto its blocked tile, so a route learned from there started where no golem could stand
+	 * and the stile went unused. The way in is the walkable tile behind the obstacle, along its
+	 * line — from the obstacle alone, never from where the player was, since players come at a
+	 * stile from the side. A stepping stone is blocked too, but behind it is water.
 	 */
 	private WorldPoint wayIn(WorldPoint origin, int dirX, int dirY)
 	{
@@ -1176,10 +1076,7 @@ class ObstacleObserver
 		return walkable(behind) ? behind : origin;
 	}
 
-	/**
-	 * Where a traversal really ends, for a golem: the landing if it can be walked on, else the
-	 * walkable tile past it along the same line, else the landing itself.
-	 */
+	/** Where a traversal really ends: the landing, else the walkable tile past it, else itself. */
 	private WorldPoint wayOut(WorldPoint landing, int dirX, int dirY)
 	{
 		if (walkable(landing) || (dirX == 0 && dirY == 0))
@@ -1207,6 +1104,140 @@ class ObstacleObserver
 			Math.floorDiv(sample[2], Golem.TILE), sample[3]);
 	}
 
+	/** The stone a hop of a crossing just landed on, where the crossing's next hop starts. */
+	private WorldPoint chainTile;
+
+	/** True if the player took damage since clicking the obstacle: they failed it. */
+	private boolean hurt;
+
+	/** The player's own standing, walking, running and turning poses, as they were at the click. */
+	private java.util.Set<Integer> ordinaryPoses;
+
+	/** A pose being recorded as the traversal's clip, or -1. */
+	private int posing = -1;
+
+	/** True if the player was aboard a boat last tick. */
+	private boolean wasOnBoat;
+
+	/**
+	 * True if the player got on or off a boat this tick, kept apart from {@link #wasOnBoat} because
+	 * {@link #posedTraversal} has moved that on before {@link #silentTraversal} looks: read there,
+	 * stepping off a boat could be learned as a route.
+	 */
+	private boolean boatChanged;
+
+	/**
+	 * Forgets the player's last position and click for a new session — the plugin starting, a
+	 * logout, a world hop — since otherwise a jump that never happened could be learned.
+	 */
+	void resetSession()
+	{
+		queuedObject = -1;
+		reset();
+		previousTile = null;
+		previousTileTemplate = null;
+		wasOnBoat = false;
+		boatChanged = false;
+		hurt = false;
+		ordinaryPoses = null;
+		clickedName = "";
+		clickedMenu = "";
+	}
+
+	/** Marks the obstacle under way as failed. Called when the player takes a hit. */
+	void onPlayerHurt()
+	{
+		if (clickedTick >= 0 || startedAt != null)
+		{
+			hurt = true;
+		}
+	}
+
+	private boolean onBoat()
+	{
+		Player local = client.getLocalPlayer();
+		return local != null && local.getWorldView() != null && !local.getWorldView().isTopLevel();
+	}
+
+	private static java.util.Set<Integer> ordinaryPosesOf(Player local)
+	{
+		java.util.Set<Integer> poses = new java.util.HashSet<>();
+		poses.add(-1);
+		poses.add(local.getIdlePoseAnimation());
+		poses.add(local.getIdleRotateLeft());
+		poses.add(local.getIdleRotateRight());
+		poses.add(local.getWalkAnimation());
+		poses.add(local.getWalkRotateLeft());
+		poses.add(local.getWalkRotateRight());
+		poses.add(local.getWalkRotate180());
+		poses.add(local.getRunAnimation());
+		return poses;
+	}
+
+	/**
+	 * Watches for an obstacle that moves the player in a pose of its own, playing nothing.
+	 *
+	 * <p>Climbing down a vine is one: the game swaps the player's walk for a climbing pose and
+	 * moves them a tile a tick with no animation, so this class, recording only on an animation or
+	 * a jump, saw nothing and the vine could only be learned going up. A pose none of the player's
+	 * own, soon after a click, is that obstacle's clip.
+	 *
+	 * @return true if this tick belonged to such a traversal
+	 */
+	private boolean posedTraversal(Player local, WorldPoint at, WorldPoint was, WorldPoint wasTemplate, int tick)
+	{
+		boolean aboard = onBoat();
+		boatChanged = aboard != wasOnBoat;
+		wasOnBoat = aboard;
+		if (boatChanged || aboard)
+		{
+			return false;
+		}
+
+		int pose = local.getPoseAnimation();
+		boolean special = ordinaryPoses != null && !ordinaryPoses.contains(pose) && local.getAnimation() == -1;
+
+		if (posing != -1)
+		{
+			if (special && pose == posing)
+			{
+				return false;
+			}
+			// Back to the player's own poses: the obstacle has let go.
+			posing = -1;
+			if (startedAt != null)
+			{
+				animEndCycle = client.getGameCycle();
+				animEndTile = at;
+				animEndTileTemplate = templateOf(at);
+				animTimeline.add(new int[]{client.getGameCycle(), -1});
+			}
+			return false;
+		}
+
+		if (!special || startedAt != null || !clips.isEmpty()
+			|| clickedObject < 0 || clickedTick < 0 || tick - clickedTick > CLAIM_WINDOW)
+		{
+			return false;
+		}
+
+		if (out != null)
+		{
+			write("POSED", "pose=" + pose + " for " + clickedName);
+		}
+		clearSilent();
+		posing = pose;
+		beginClip(pose, null, null, local, tick);
+		// From where the player was when the pose took them, a tick ago: by now they have
+		// already been moved a tile.
+		if (was != null)
+		{
+			startedAt = was;
+			startedAtTemplate = wasTemplate;
+		}
+		return true;
+	}
+
 	private void clearSilent()
 	{
 		silentFrom = null;
@@ -1219,6 +1250,8 @@ class ObstacleObserver
 	private void reset()
 	{
 		clearSilent();
+		posing = -1;
+		chainTile = null;
 		clipStartCycle = -1;
 		moveDelay = -1;
 		moveEnd = -1;
@@ -1234,8 +1267,7 @@ class ObstacleObserver
 		clickedTick = -1;
 		clickedObject = -1;
 
-		// A click held back while the obstacle finished is the one the next traversal
-		// belongs to.
+		// A click held back while the obstacle finished is the one the next traversal belongs to.
 		if (queuedObject >= 0)
 		{
 			clickedObject = queuedObject;
@@ -1286,28 +1318,21 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Writes the player's exact position while a traversal is in progress.
-	 *
-	 * <p>A game tick is 600ms and movement is interpolated thirty times inside it, so tick
-	 * resolution cannot tell a walk from a glide from a teleport. That distinction is the
-	 * whole question for the golems, which have been accused of all three, so these rows
-	 * are in local coordinates — 128ths of a tile, the same unit the client animates in and
-	 * the same unit the golems are simulated in.
+	 * Writes the player's exact position while a traversal is in progress. A game tick is 600ms and
+	 * movement is interpolated thirty times inside it, so tick resolution cannot tell a walk from a
+	 * glide from a teleport. These rows are local coordinates: 128ths of a tile, the golems' unit.
 	 */
 	void onClientTick()
 	{
-		if (out == null)
-		{
-			return;
-		}
-
+		// Not only while the journal is open: the samples below are the motion curves golems learn
+		// from, and a curve is what splits a line of stepping stones into its hops.
 		Player local = client.getLocalPlayer();
 		LocalPoint fine = local == null ? null : local.getLocalLocation();
 
 		if (fine != null)
 		{
-			// Always held, whether or not anything is being recorded. This is the only
-			// copy of what happened just before a traversal was noticed.
+			// Always held, recording or not: the only copy of what happened just before a
+			// traversal was noticed.
 			lookback[lookbackAt][0] = client.getGameCycle();
 			lookback[lookbackAt][1] = fine.getX();
 			lookback[lookbackAt][2] = fine.getY();
@@ -1315,38 +1340,20 @@ class ObstacleObserver
 			lookbackHeld = Math.min(lookbackHeld + 1, LOOKBACK_CYCLES);
 		}
 
-		// The motion itself, kept sample by sample. This is what a golem performs; the
-		// window below is a summary of it, useful for reading and for obstacles no curve
-		// was ever captured for.
-		// Sampled from the click onward, not from the animation.
-		//
-		// On some obstacles the movement happens *before* the clip — a rock climb puts you
-		// at the far side and animates you afterwards. Starting the recording at the
-		// animation meant every sample was already at the destination, so the golem jumped
-		// there on the first cycle and then wandered along the leftover noise. The leading
-		// approach is trimmed off at the end instead, once the traversal's true start tile
-		// is known.
-		//
-		// A rolling window rather than a cap. Capped, a long walk to the obstacle filled it
-		// before the player arrived, and the traversal itself was never sampled.
+		// The motion itself, sample by sample: what a golem performs, the window below being a summary
+		// for obstacles no curve was captured for. Sampled from the click onward, not the animation,
+		// because the movement can happen *before* the clip — a rock climb puts you at the far side
+		// first — so the approach is trimmed at the end. A rolling window; a cap left it unsampled.
 		if (clickedTick >= 0 && local != null)
 		{
 			net.runelite.api.WorldView view = client.getTopLevelWorldView();
 			LocalPoint fineNow = local.getLocalLocation();
 			if (view != null && fineNow != null)
 			{
-				// The *rendered* position, and only that.
-				//
-				// A traversal moves the player's logical tile to the destination
-				// immediately and then slides the drawn position across — which is what
-				// makes a rock climb look like a climb while getWorldLocation() already
-				// reads the top. Combining the two, as this did, produced the destination
-				// tile with the departure's sub-tile offset: a recording that began at the
-				// far side and then wandered. The golem jumped and flew around, which is
-				// precisely what was drawn.
-				//
-				// The local position is the animation's own truth, so the scene base is
-				// added to it rather than the logical tile being consulted at all.
+				// The *rendered* position, and only that. A traversal moves the logical tile to the
+				// destination at once and then slides the drawn position across, which is why
+				// getWorldLocation() already reads the top of a rock climb; combining the two gave
+				// the destination tile with the departure's sub-tile offset.
 				if (samples.size() >= MotionCurve.MAX_CYCLES)
 				{
 					samples.remove(0);
@@ -1362,11 +1369,9 @@ class ObstacleObserver
 			}
 		}
 
-		// The movement window, measured against the clip rather than the tick.
-		//
-		// A traversal holds the player still for part of its animation and then moves them
-		// quickly — 33 cycles of stillness then 12 of movement, on the stones. Recording
-		// only the total made every golem start drifting on the first frame.
+		// The movement window, measured against the clip rather than the tick. A traversal holds the
+		// player still for part of its animation and then moves them quickly — 33 cycles of stillness
+		// then 12 of movement, on the stones — and only the total made golems drift.
 		if (clipStartCycle >= 0 && fine != null && previousFine != null)
 		{
 			boolean moving = fine.getX() != previousFine.getX()
@@ -1382,15 +1387,14 @@ class ObstacleObserver
 		}
 		previousFine = fine;
 
-		if (fineRemaining <= 0)
+		if (fineRemaining <= 0 || out == null)
 		{
 			return;
 		}
 		fineRemaining--;
 
-		// The keyframe too. Movement and animation are two clocks, and whether a golem's
-		// hop plays at the right moment in its glide can only be judged against the frame
-		// the player's own hop was on when they left the ground.
+		// The keyframe too: movement and animation are two clocks, and whether a golem's hop plays
+		// at the right moment can only be judged against the frame the player's own hop was on.
 		write("FINE", fine == null ? "local=none"
 			: "localX=" + fine.getX() + " localY=" + fine.getY()
 				+ " frame=" + (local == null ? -1 : local.getAnimationFrame()));
@@ -1461,8 +1465,8 @@ class ObstacleObserver
 				}
 			}
 
-			// An impostor is the object the varbits actually resolve this one to. Where
-			// there is one, its id is the id the game is really using.
+			// An impostor is the object the varbits actually resolve this one to, and where
+			// there is one its id is the id the game is really using.
 			int impostor = -1;
 			try
 			{
@@ -1515,8 +1519,7 @@ class ObstacleObserver
 	}
 
 	/**
-	 * Positions kept in lasting coordinates alongside the ones sampled: the template of an
-	 * instance tile, captured while that instance is still the loaded scene. See InstanceMap.
+	 * The sampled positions' templates, captured while that instance is still the loaded scene.
 	 */
 	private WorldPoint previousTileTemplate;
 	private WorldPoint startedAtTemplate;

@@ -3,33 +3,21 @@ package com.golemsdontdie;
 /**
  * Whether a learned route follows the obstacle it was learned from.
  *
- * <p>An obstacle moves the player along a fixed line: a stile from one of its tiles to the
- * other, a rockslide from its foot to its top, a stepping stone to the next. A route is two
- * tiles chosen around that movement — where a golem gets on and where it gets off — and a
- * golem performs it along the straight line between them. If those two tiles are not on the
- * obstacle's line, neither is the golem.
- *
- * <p>That is how the stile came to be crossed diagonally. Its route ends were taken from
- * where the player happened to stand before and after, and a player walking up from the side
- * and stepping off at an angle taught a route eighteen degrees off the stile, which every
- * golem then crossed on a slant. The validator found it after the fact. This refuses such a
- * route when it is learned, and ignores one already saved, so it never reaches a golem.
+ * <p>An obstacle moves the player along a fixed line: a stile from one of its tiles to the other.
+ * A route is the two tiles a golem gets on and off at, travelled in a straight line, so off that
+ * line is off the obstacle. That is how the stile came to be crossed diagonally — its ends came
+ * from where the player happened to stand, eighteen degrees off. Such a route is refused when
+ * learned and ignored if already saved.
  */
 final class RouteGeometry
 {
 	/**
-	 * How far off an obstacle's line a route may run.
-	 *
-	 * <p>Ten degrees. A route and its line are both whole tiles, so real routes are either
-	 * exactly on the line or off it by the angle of a whole tile's offset — the diagonal
-	 * stile was eighteen — and nothing legitimate falls in between.
+	 * How far off an obstacle's line a route may run. Both are whole tiles, so a real route is on
+	 * the line or off by a whole tile's angle — the diagonal stile was eighteen — never between.
 	 */
 	static final double MAX_DEGREES_OFF = 10;
 
-	/**
-	 * Beyond this many tiles a traversal is a teleport — a cave mouth, a staircase — and has
-	 * no line to follow. Its ends are wherever the game puts the player.
-	 */
+	/** Beyond this many tiles a traversal is a teleport (cave mouth, staircase) with no line. */
 	static final int LOCAL_TILES = 8;
 
 	private RouteGeometry()
@@ -43,10 +31,8 @@ final class RouteGeometry
 	}
 
 	/**
-	 * True if a route runs along a line, in either direction.
-	 *
-	 * <p>A line of (0, 0) is unknown and anything follows it; so does any route too long to
-	 * be local. Only a short route beside a known line is refused.
+	 * True if a route runs along a line, either direction. A line of (0, 0) is unknown and a
+	 * non-local route has none, so both pass; only a short route beside a known line is refused.
 	 */
 	static boolean follows(int routeX, int routeY, int lineX, int lineY)
 	{
@@ -64,10 +50,7 @@ final class RouteGeometry
 		return Math.toDegrees(Math.acos(Math.min(1, cos)));
 	}
 
-	/**
-	 * A direction with its length and sense removed, so the same line crossed either way and
-	 * at any length compares equal: (0, 3), (0, -1) and (0, 2) are all (0, 1).
-	 */
+	/** A direction with length and sense removed: (0, 3), (0, -1) and (0, 2) are all (0, 1). */
 	static int[] canonical(int dx, int dy)
 	{
 		int divisor = gcd(Math.abs(dx), Math.abs(dy));

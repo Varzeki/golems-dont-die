@@ -6,35 +6,24 @@ import java.util.List;
 /**
  * A traversal as it actually happened, cycle by cycle, ready to be performed again.
  *
- * <p>This replaces a parametric model, and the reason is worth recording. Reducing a
- * traversal to a clip, a delay and a duration meant rebuilding the motion from three
- * numbers — and every obstacle shape needed the rebuild to work differently. A hop wanted
- * its clip played at natural length with movement in the middle; a climb wanted the clip
- * repeated per tile; a door wanted the whole animation and then a teleport. Each time the
- * model was fitted to one of them it came apart on another, and the same two obstacles were
- * still oscillating after a day of it.
- *
- * <p>None of those decisions exist here. The player's position is already recorded every
- * 20ms, so the motion is simply kept and replayed. There is no delay to choose, no duration
- * to stretch, and no classifying an obstacle as walked or glided or teleported — a teleport
- * is a curve that does not move and then does, and a climb is a curve that moves steadily.
- * The difference is in the data rather than in a branch.
+ * <p>This replaces a parametric model of clip, delay and duration, which had to rebuild the
+ * motion differently for every obstacle shape — a hop, a climb and a door all want something
+ * else — so fitting it to one broke it on another. The position is already recorded every
+ * 20ms, so the motion is kept and replayed instead; a teleport is a curve that does not move
+ * and then does.
  *
  * <h2>Why it is stored rotated</h2>
  *
- * <p>Samples are kept along the traversal's own axis — how far <b>forward</b> toward the
- * destination, and how far <b>sideways</b> — rather than as north and east. One recording
- * then serves every instance of that obstacle whichever way it faces, which is what makes
- * a handful of recordings able to cover thousands of rows. A stepping stone crossed
- * northward teaches the shape of every stepping stone.
+ * <p>Samples run along the traversal's own axis, <b>forward</b> toward the destination and
+ * <b>sideways</b>, not north and east, so one recording serves every instance of that
+ * obstacle whichever way it faces.
  */
 final class MotionCurve
 {
 	/**
-	 * Client cycles between stored samples.
-	 *
-	 * <p>Two. Movement is interpolated between samples anyway, and at 40ms a hop is twenty
-	 * numbers rather than forty — small enough to keep hundreds of these in a config value.
+	 * Client cycles between stored samples. Two: movement is interpolated between samples
+	 * anyway, and at 40ms a hop is twenty numbers rather than forty, small enough to keep
+	 * hundreds of these in a config value.
 	 */
 	static final int SAMPLE_EVERY = 2;
 
@@ -42,11 +31,9 @@ final class MotionCurve
 	static final int MAX_CYCLES = 600;
 
 	/**
-	 * Distance along the traversal axis at each sample, in 128ths of a tile.
-	 *
-	 * <p>Forward is toward the destination. A curve that ends short of its destination is
-	 * normal — the last part of some traversals is a teleport, which shows up as the final
-	 * sample being nowhere near the end.
+	 * Distance along the traversal axis at each sample, in 128ths of a tile, forward being
+	 * toward the destination. Ending short is normal: the last part of some traversals is a
+	 * teleport, so the final sample is nowhere near the end.
 	 */
 	private final short[] forward;
 
@@ -54,35 +41,27 @@ final class MotionCurve
 	private final short[] lateral;
 
 	/**
-	 * {cycle, animationId, startingFrame} at each point the animation changed.
-	 *
-	 * <p>The frame matters because a golem's animation runs on its own clock. We hand the
-	 * client an id and it advances the clip at the render rate, while the position advances
-	 * on the simulation's cycle count — two clocks for one motion, and any disagreement
-	 * between them reads as the animation skipping. Recording where the clip actually was
-	 * lets the two be tied together instead of assumed to agree.
+	 * {cycle, animationId, startingFrame} at each point the animation changed. The frame
+	 * matters because the client advances the clip at the render rate while position
+	 * advances on cycle count; any disagreement reads as the animation skipping.
 	 */
 	private final int[][] animations;
 
 	private final int cycles;
 
 	/**
-	 * Which way the player faced while traversing, relative to the direction of travel,
-	 * in the game's orientation units — 0 forwards, 1024 backwards — or -1 if not recorded.
-	 *
-	 * <p>Not always forwards. Climbing down the rockslide the player faces the rock and
-	 * moves away from it; a golem facing its direction of travel climbs down outwards,
-	 * off the cliff.
+	 * Which way the player faced while traversing, relative to the direction of travel, in
+	 * orientation units — 0 forwards, 1024 backwards — or -1 if not recorded. Not always
+	 * forwards: on the rockslide they face the rock and move away from it, and a golem
+	 * facing its travel climbs off the cliff.
 	 */
 	private final int facing;
 
 	/**
-	 * The keyframe the player's animation was on at each sample, -1 where none, or null
-	 * for a recording made before keyframes were kept.
-	 *
-	 * <p>The player's clip does not run at its authored speed. On a basalt stone it sits on
-	 * its first keyframe for about twenty-five cycles and then runs the rest during the
-	 * jump; played at authored speed a golem finished the hop before it left the ground.
+	 * The keyframe the player's animation was on at each sample, -1 where none, or null for
+	 * a recording predating keyframes. The clip does not run at authored speed: on a basalt
+	 * stone it holds its first keyframe about twenty-five cycles, so played as authored a
+	 * golem finished the hop before leaving the ground.
 	 */
 	private final short[] keyframes;
 
@@ -118,16 +97,40 @@ final class MotionCurve
 		return cycles;
 	}
 
+	/**
+	 * The recording as plain numbers, one entry per sample: {cycle, forward, lateral}. For
+	 * the obstacle data file, which depends on nothing in this class.
+	 */
+	int[][] samples()
+	{
+		int[][] out = new int[forward.length][];
+		for (int i = 0; i < forward.length; i++)
+		{
+			out[i] = new int[]{i * SAMPLE_EVERY, forward[i], i < lateral.length ? lateral[i] : 0};
+		}
+		return out;
+	}
+
+	/** Each point the animation changed, as plain numbers: {cycle, animation}. */
+	int[][] animationChanges()
+	{
+		int[][] out = new int[animations.length][];
+		for (int i = 0; i < animations.length; i++)
+		{
+			out[i] = new int[]{animations[i][0], animations[i][1]};
+		}
+		return out;
+	}
+
 	boolean isEmpty()
 	{
 		return forward.length == 0;
 	}
 
 	/**
-	 * The animation that should be playing at this point, or -1.
-	 *
-	 * <p>Read from the recorded timeline rather than decided. An obstacle that plays three
-	 * clips in sequence does so because the recording did.
+	 * The animation that should be playing at this point, or -1. Read from the recorded
+	 * timeline rather than decided: an obstacle that plays three clips in sequence does so
+	 * because the recording did.
 	 */
 	int animationAt(int cycle)
 	{
@@ -146,8 +149,8 @@ final class MotionCurve
 	/** The frame the animation should be on at this point, or -1 if not recorded. */
 	int frameAt(int cycle)
 	{
-		// Between clips there is no frame to drive, and the golem's own idle runs on the
-		// client's clock as usual. So does any recording made before keyframes were kept.
+		// Between clips there is no frame to drive: the golem's idle runs on the client's
+		// clock, as does any recording made before keyframes were kept.
 		if (keyframes == null || animationAt(cycle) == -1)
 		{
 			return -1;
@@ -165,11 +168,9 @@ final class MotionCurve
 	private static final int STILL = 8;
 
 	/**
-	 * Samples of stillness that separate two movements.
-	 *
-	 * <p>Six samples is twelve cycles. The quantised source stalls for a cycle or two in the
-	 * middle of a climb, which is sampling; the pause between two basalt hops is over
-	 * fifteen, which is a second step.
+	 * Samples of stillness that separate two movements. Six is twelve cycles: the quantised
+	 * source stalls a cycle or two mid-climb, which is sampling, while the pause between two
+	 * basalt hops is over fifteen, which is a second step.
 	 */
 	private static final int HOLD_SAMPLES = 6;
 
@@ -185,10 +186,9 @@ final class MotionCurve
 	}
 
 	/**
-	 * How many separate movements the recording holds.
-	 *
-	 * <p>One for any single obstacle. More means a chained crossing was captured as a single
-	 * traversal, which a transport covering one step of it cannot replay.
+	 * How many separate movements the recording holds. One for any single obstacle; more
+	 * means a chained crossing was captured as one traversal, which a transport covering
+	 * one step of it cannot replay.
 	 */
 	int bursts()
 	{
@@ -229,8 +229,8 @@ final class MotionCurve
 
 	/**
 	 * The cycle the recording first moves once its animation has begun, or -1 if it never
-	 * does. From the animation, not the start: a walk onto the obstacle may come first, and
-	 * the wind-up this measures is the pause between the clip starting and the jump.
+	 * does. From the animation, not the start, since a walk onto the obstacle may come
+	 * first; the wind-up measured is the pause between the clip starting and the jump.
 	 */
 	int firstMoveCycle()
 	{
@@ -260,11 +260,9 @@ final class MotionCurve
 	}
 
 	/**
-	 * Where the golem should be at this cycle, as an offset from where it started.
-	 *
-	 * <p>{@code out} receives the offset in world fine units. {@code axisX, axisY} is the
-	 * unit vector toward the destination, in the same units, which is what turns the stored
-	 * forward-and-sideways pair back into a direction on the ground.
+	 * Where the golem should be at this cycle, as an offset from where it started, into
+	 * {@code out} in world fine units. {@code axisX, axisY} is the unit vector toward the
+	 * destination, turning the stored forward-and-sideways pair back into a direction.
 	 */
 	void offsetAt(int cycle, float axisX, float axisY, int[] out)
 	{
@@ -272,12 +270,9 @@ final class MotionCurve
 	}
 
 	/**
-	 * As {@link #offsetAt}, with the forward distance scaled.
-	 *
-	 * <p>A golem may take an obstacle from a tile or two away from where the player did,
-	 * so the distance to cover is not always the distance recorded. Scaling the forward
-	 * component lands the golem where its own transport says it should end up, while
-	 * keeping the recording's timing and its sideways movement intact.
+	 * As {@link #offsetAt}, with the forward distance scaled. A golem may take an obstacle
+	 * from a tile or two from where the player did, so scaling lands it where its own
+	 * transport says, keeping the recording's timing and sideways movement.
 	 */
 	void offsetAt(int cycle, float axisX, float axisY, float scale, int[] out)
 	{
@@ -295,13 +290,9 @@ final class MotionCurve
 		int j = Math.min(i + 1, forward.length - 1);
 		float t = at - i;
 
-		// Except across a teleport, which is not interpolated.
-		//
-		// A door moves the player a whole tile in one cycle, and samples are two cycles
-		// apart, so interpolating put the golem halfway through the door on the cycle in
-		// between: a slide so quick it was almost, but not quite, a teleport. Holding the
-		// earlier sample until the later one is due puts the golem on one side and then
-		// the other, as the player was drawn.
+		// Except across a teleport, which is not interpolated. A door moves the player a
+		// whole tile in one cycle and samples are two cycles apart, so interpolating slid
+		// the golem through the door instead of putting it on one side and then the other.
 		if (Math.abs(forward[j] - forward[i]) + Math.abs(lateral[j] - lateral[i]) > NOISE_STEP)
 		{
 			t = 0f;
@@ -337,8 +328,8 @@ final class MotionCurve
 		}
 
 		// The axis is the straight line to the destination. Where a traversal does not move
-		// at all — a ladder, which animates and then teleports — there is no axis to speak
-		// of and north stands in; nothing is being projected onto it anyway.
+		// at all — a ladder, which animates and then teleports — north stands in; nothing is
+		// projected onto it anyway.
 		float dx = toFineX - fromFineX;
 		float dy = toFineY - fromFineY;
 		float length = (float) Math.sqrt(dx * dx + dy * dy);
@@ -395,14 +386,13 @@ final class MotionCurve
 
 		// Starting frames are stored as zero rather than left out. Leaving them out made a
 		// curve recorded this session play on the client's clock and the same curve loaded
-		// from the config play on the recording's, so one obstacle behaved two ways depending
-		// on whether the client had been restarted since it was learned.
+		// from config play on the recording's, so one obstacle behaved two ways.
 		List<int[]> kept = new ArrayList<>();
 		for (int i = 0; i < anims.size(); i++)
 		{
 			int[] change = anims.get(i);
-			// A looping clip reports -1 for a cycle between repeats. That is not the
-			// animation ending, and honouring it would flash the golem out of its climb.
+			// A looping clip reports -1 for a cycle between repeats. Not the animation
+			// ending; honouring it would flash the golem out of its climb.
 			if (change[1] == -1 && i + 1 < anims.size() && anims.get(i + 1)[0] - change[0] <= 4)
 			{
 				continue;
@@ -411,7 +401,7 @@ final class MotionCurve
 		}
 		int[][] timeline = kept.toArray(new int[0][]);
 
-		// Facing, relative to the way the traversal goes, from the moment it animates. The
+		// Facing relative to the way the traversal goes, from the moment it animates. The
 		// most common of eight directions: the player turns once at the start and holds it.
 		int facing = -1;
 		if (length >= Golem.TILE / 2f)
@@ -446,31 +436,21 @@ final class MotionCurve
 	}
 
 	/**
-	 * The largest step that can be sampling noise rather than real movement.
-	 *
-	 * <p>Three quarters of a tile. The two obstacle shapes are well separated: a climb's
-	 * sampling artefacts came back as steps of forty to sixty units, while a door's
-	 * teleport is a whole tile in a single sample. Nothing observed sits between them.
+	 * The largest step that can be sampling noise rather than real movement. Three quarters
+	 * of a tile: climb artefacts came back as steps of forty to sixty units, a door's
+	 * teleport is a whole tile in one sample, and nothing observed sits between.
 	 */
 	private static final int NOISE_STEP = Golem.TILE * 3 / 4;
 
 	/**
-	 * Evens out the sampling, which is coarser than the motion it is sampling — but only
-	 * where the motion really is continuous.
+	 * Evens out the sampling, which is coarser than the motion it samples, but only where
+	 * the motion really is continuous.
 	 *
-	 * <p>{@code getLocalLocation} does not report the smooth position the client draws, so
-	 * a recorded climb came back as {@code [111, 154, 154, 188, 188, 188, 248, ...]}:
-	 * plateaus of two or three samples and then a jump of forty to sixty. A golem
-	 * performing that holds still and lurches, which is how it looked.
-	 *
-	 * <p>Averaging all of it was wrong in the other direction. A door does not move and
-	 * then covers a whole tile in one sample, and smearing that across its neighbours turned
-	 * an instant teleport into a quick glide which began before the animation had finished.
-	 *
-	 * <p>So a step larger than {@link #NOISE_STEP} is taken to be real and is never averaged
-	 * across. Noise is small by definition; a teleport is not. That distinction is in the
-	 * data rather than in a per-obstacle decision, which is the whole reason for recording
-	 * motion instead of modelling it.
+	 * <p>{@code getLocalLocation} does not report the smooth position the client draws, so a
+	 * recorded climb came back as plateaus of two or three samples and then a jump of forty
+	 * to sixty, which a golem performed as holding still and lurching. Averaging all of it
+	 * was wrong the other way, beginning a door's teleport before its animation finished, so
+	 * a step larger than {@link #NOISE_STEP} is taken to be real and never averaged across.
 	 */
 	private static void smooth(short[] values)
 	{
