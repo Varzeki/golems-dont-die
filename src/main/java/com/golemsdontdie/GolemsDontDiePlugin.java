@@ -250,6 +250,14 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private Whereabouts whereabouts;
 
+	@Inject
+	private GolemMapPoints mapPoints;
+
+	/** How often the golems on the world map are moved, in game ticks. */
+	private static final int MAP_TICKS = 5;
+
+	private int ticksSinceMap;
+
 	/** How often the sidebar's "where is it" lines are brought up to date, in game ticks. */
 	private static final int PLACES_TICKS = 5;
 
@@ -437,6 +445,7 @@ public class GolemsDontDiePlugin extends Plugin
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
 		obstacleObserver.startUp();
 		obstacleData.startUp();
+		mapPoints.startUp();
 
 		// Saved map first, shipped baseline underneath: what the player has walked beats a
 		// static export of the same ground.
@@ -565,6 +574,7 @@ public class GolemsDontDiePlugin extends Plugin
 			pendingRestore.clear();
 			safely("removing props", this::clearProps);
 			safely("removing rafts", this::clearRafts);
+			safely("taking golems off the map", mapPoints::clear);
 			propFactory.clear();
 			raftFactory.clear();
 			census.clear();
@@ -1979,6 +1989,21 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			applyLearnedRoutes();
 			obstacleData.save();
+		}
+
+		if (++ticksSinceMap >= MAP_TICKS)
+		{
+			ticksSinceMap = 0;
+			GolemsDontDieConfig.MapGolems show = config.mapGolems();
+			if (show == GolemsDontDieConfig.MapGolems.NONE)
+			{
+				mapPoints.clear();
+			}
+			else
+			{
+				mapPoints.refresh(livingGolems(), show == GolemsDontDieConfig.MapGolems.NAMED,
+					PlayerPosition.of(client), roamContext.getTick());
+			}
 		}
 
 		if (panel != null && panel.isOnScreen() && ++ticksSincePlaces >= PLACES_TICKS)

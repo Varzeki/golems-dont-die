@@ -75,6 +75,40 @@ public interface GolemsDontDieConfig extends Config
 		return new Color(0xFFE700);
 	}
 
+	/** Which golems are drawn on the world map. */
+	enum MapGolems
+	{
+		NONE("None"),
+		NAMED("Named golems"),
+		ALL("All golems");
+
+		private final String label;
+
+		MapGolems(String label)
+		{
+			this.label = label;
+		}
+
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+	}
+
+	@ConfigItem(
+		keyName = "mapGolems",
+		name = "Golems on the world map",
+		description = "Shows golems on the world map, with their name and where they are. "
+			+ "A hundred at most, nearest first, or the map would be nothing but golems.",
+		section = golemsSection,
+		position = 5
+	)
+	default MapGolems mapGolems()
+	{
+		return MapGolems.NAMED;
+	}
+
 	@ConfigItem(
 		keyName = "restrictAmbition",
 		name = "Restrict Golem ambition",
