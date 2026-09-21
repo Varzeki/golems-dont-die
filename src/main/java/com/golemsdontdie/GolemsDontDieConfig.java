@@ -99,8 +99,7 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "mapGolems",
 		name = "Golems on the world map",
-		description = "Shows golems on the world map, with their name and where they are. "
-			+ "A hundred at most, nearest first, or the map would be nothing but golems.",
+		description = "Shows golems on the world map. Hover one to see its name and where it is.",
 		section = golemsSection,
 		position = 5
 	)

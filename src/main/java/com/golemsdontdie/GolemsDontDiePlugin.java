@@ -253,10 +253,6 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private GolemMapPoints mapPoints;
 
-	/** How often the golems on the world map are moved, in game ticks. */
-	private static final int MAP_TICKS = 5;
-
-	private int ticksSinceMap;
 
 	/** How often the sidebar's "where is it" lines are brought up to date, in game ticks. */
 	private static final int PLACES_TICKS = 5;
@@ -1991,19 +1987,17 @@ public class GolemsDontDiePlugin extends Plugin
 			obstacleData.save();
 		}
 
-		if (++ticksSinceMap >= MAP_TICKS)
+		// Every tick, so a golem keeps up with the map as it is panned. Closed, this is one widget
+		// lookup and nothing else.
+		GolemsDontDieConfig.MapGolems onMap = config.mapGolems();
+		if (onMap == GolemsDontDieConfig.MapGolems.NONE)
 		{
-			ticksSinceMap = 0;
-			GolemsDontDieConfig.MapGolems show = config.mapGolems();
-			if (show == GolemsDontDieConfig.MapGolems.NONE)
-			{
-				mapPoints.clear();
-			}
-			else
-			{
-				mapPoints.refresh(livingGolems(), show == GolemsDontDieConfig.MapGolems.NAMED,
-					PlayerPosition.of(client), roamContext.getTick());
-			}
+			mapPoints.clear();
+		}
+		else
+		{
+			mapPoints.refresh(livingGolems(), onMap == GolemsDontDieConfig.MapGolems.NAMED,
+				roamContext.getTick());
 		}
 
 		if (panel != null && panel.isOnScreen() && ++ticksSincePlaces >= PLACES_TICKS)
