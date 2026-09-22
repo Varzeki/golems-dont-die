@@ -2491,7 +2491,7 @@ public class GolemsDontDiePlugin extends Plugin
 			showSidebar(config.showSidebar());
 		}
 
-		if ("namePack".equals(event.getKey()) && panel != null)
+		if ("autoName".equals(event.getKey()) && panel != null)
 		{
 			panel.namesChanged();
 		}

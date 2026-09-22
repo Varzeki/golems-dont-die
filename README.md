@@ -37,7 +37,7 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Name colour | Yellow (#FFE700) | The colour of the golem names. |
 | Golems on the world map | Named golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
-| Names for unnamed golems | Unnamed | What the plugin calls golems you have not named: **Plain** (Susan Marble, Dave Flint), **Stone** (Pebblesworth, Slatebert) or **Gielinor** (names from the game's own people). A golem always gets the same name, and naming one yourself replaces it. |
+| Auto name golems | Off | Gives golems you have not named one anyway — a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
 | Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |
 
 **Celebrations**
@@ -59,9 +59,10 @@ each name is where that golem is — "Catherby", "Taverley Dungeon", "Sailing to
 Right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar. The
 option carries the number missing, and is only there while any are.
 
-Golems you have not named are called something anyway, if you pick a name pack in the settings —
-dimmed in the list, and on the golem's own page, so a name you typed still reads as yours. Nothing
-is written down: a golem keeps its name because the name comes from the golem.
+With **Auto name golems** on, the ones you have not named are called something anyway — dimmed in
+the list, and on the golem's own page, so a name you typed still reads as yours. Nothing is written
+down: a golem keeps its name because the name comes from the golem, and turning the setting off
+leaves them all plain golems again.
 
 **Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
 eight tiles of it or stop looking. While you are looking, that golem is the only one on the world

@@ -122,16 +122,17 @@ public interface GolemsDontDieConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "namePack",
-		name = "Names for unnamed golems",
-		description = "What to call golems you have not named, in the sidebar and on a golem's page. "
-			+ "A golem keeps the same name, and naming one yourself replaces it.",
+		keyName = "autoName",
+		name = "Auto name golems",
+		description = "Gives golems you have not named one anyway, in the sidebar and on a golem's "
+			+ "page: a name from Gielinor and a surname off the rocks. A golem always gets the same "
+			+ "name, and one you type yourself is kept whatever this is set to.",
 		section = golemsSection,
 		position = 6
 	)
-	default GolemNames.Pack namePack()
+	default boolean autoName()
 	{
-		return GolemNames.Pack.OFF;
+		return false;
 	}
 
 	@ConfigItem(

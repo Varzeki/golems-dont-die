@@ -1,7 +1,9 @@
 package com.golemsdontdie;
 
+import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Set;
+import net.runelite.api.coords.WorldPoint;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
@@ -9,12 +11,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** The names a golem answers to when nobody has named it. */
+/** The name a golem answers to when nobody has named it. */
 public class GolemNamesTest
 {
-	/** The same letter three times over, which a join can make and a name never has. */
-	private static final java.util.regex.Pattern TRIPLE =
-		java.util.regex.Pattern.compile("([A-Za-z])\\1\\1");
+	private static final WorldPoint PLINTH = new WorldPoint(2596, 2256, 0);
 
 	private GolemNames names;
 
@@ -25,29 +25,45 @@ public class GolemNamesTest
 		names.load();
 	}
 
+	private static Golem golem(long seed, String nickname)
+	{
+		GolemSnapshot snapshot = new GolemSnapshot(1234, "Golem", new int[0], new short[0], new short[0],
+			128, 128, 1, -1, -1, -1, PLINTH, 0);
+		Golem golem = Golem.onTile(snapshot, PLINTH, seed, PLINTH);
+		golem.setNickname(nickname);
+		return golem;
+	}
+
+	private void setAutoName(boolean on) throws Exception
+	{
+		Field field = GolemNames.class.getDeclaredField("config");
+		field.setAccessible(true);
+		field.set(names, new GolemsDontDieConfig()
+		{
+			@Override
+			public boolean autoName()
+			{
+				return on;
+			}
+		});
+	}
+
 	@Test
 	public void theHarvestedNamesAreThere()
 	{
 		assertTrue("names.gz should hold the people of Gielinor", names.getGielinor().length > 500);
 	}
 
+	/** A name from Gielinor and a surname off the rocks: two words, both of them names. */
 	@Test
-	public void everyPackNamesEveryGolem()
+	public void everyGolemIsCalledSomething()
 	{
-		for (GolemNames.Pack pack : GolemNames.Pack.values())
+		for (long id = -200; id < 200; id++)
 		{
-			for (long id = -50; id < 50; id++)
-			{
-				String name = names.nameFor(pack, id);
-				if (pack == GolemNames.Pack.OFF)
-				{
-					assertNull("nothing is named when the pack is off", name);
-					continue;
-				}
-				assertNotNull(pack + " named golem " + id, name);
-				assertTrue(pack + " gave an empty name", name.length() > 1);
-				assertTrue(pack + " gave '" + name + "'", name.matches("[A-Z][A-Za-z]+( [A-Z][a-z]+)?"));
-			}
+			String name = names.nameFor(id);
+			assertNotNull("golem " + id + " went unnamed", name);
+			assertTrue("'" + name + "' is not a first name and a surname",
+				name.matches("[A-Z][A-Za-z]+ [A-Z][a-z]+"));
 		}
 	}
 
@@ -56,64 +72,44 @@ public class GolemNamesTest
 	{
 		for (long id = 0; id < 100; id++)
 		{
-			assertEquals(names.nameFor(GolemNames.Pack.STONE, id), names.nameFor(GolemNames.Pack.STONE, id));
+			assertEquals(names.nameFor(id), names.nameFor(id));
 		}
 	}
 
-	/** A roster of a few hundred should not be half Daves. */
+	/** A roster of a thousand should be a thousand names, not sixty Dorises. */
 	@Test
-	public void aPackHasEnoughNamesToGoRound()
+	public void thereAreEnoughNamesToGoRound()
 	{
-		for (GolemNames.Pack pack : new GolemNames.Pack[]{
-			GolemNames.Pack.PLAIN, GolemNames.Pack.STONE, GolemNames.Pack.GIELINOR})
+		Set<String> seen = new HashSet<>();
+		for (long id = 0; id < 1000; id++)
 		{
-			Set<String> seen = new HashSet<>();
-			for (long id = 0; id < 500; id++)
-			{
-				seen.add(names.nameFor(pack, id * 7919));
-			}
-			assertTrue(pack + " gave only " + seen.size() + " names to 500 golems", seen.size() > 300);
+			seen.add(names.nameFor(id * 7919));
 		}
+		assertTrue("only " + seen.size() + " names for a thousand golems", seen.size() > 980);
 	}
 
-	/** Switching packs is a fresh name for everyone, not the same name in a different list. */
+	/** A golem the player has named keeps that name, whatever the setting says. */
 	@Test
-	public void thePacksDisagree()
+	public void aNamedGolemIsLeftAlone() throws Exception
 	{
-		int same = 0;
-		for (long id = 0; id < 200; id++)
-		{
-			if (names.nameFor(GolemNames.Pack.PLAIN, id).equals(names.nameFor(GolemNames.Pack.GIELINOR, id)))
-			{
-				same++;
-			}
-		}
-		assertTrue("the packs should not agree on much", same < 5);
+		setAutoName(true);
+		assertNotNull("an unnamed golem is given one", names.suggested(golem(7, null)));
+		assertNull("a named golem keeps its name", names.suggested(golem(7, "Kevin")));
+		assertNotNull("a name cleared back to nothing is not a name", names.suggested(golem(7, "")));
 	}
 
-	/** Where the two halves of a stone name meet, a vowel gives way to the next. */
+	/** Off, nobody is called anything, and the golems are golems again. */
 	@Test
-	public void theHalvesOfAStoneNameJoinUp()
+	public void offMeansOff() throws Exception
 	{
-		assertEquals("Pebblina", GolemNames.join("Pebble", "ina"));
-		assertEquals("Pebblesworth", GolemNames.join("Pebble", "sworth"));
-		assertEquals("Sandy", GolemNames.join("Sandy", "y"));
-		assertEquals("Ashy", GolemNames.join("Ash", "y"));
-		assertEquals("Granitella", GolemNames.join("Granite", "ella"));
-		assertEquals("Flintwick", GolemNames.join("Flint", "wick"));
-		assertEquals("Tuffoot", GolemNames.join("Tuff", "foot"));
-		assertEquals("Flinton", GolemNames.join("Flint", "ton"));
-		assertEquals("Mossworth", GolemNames.join("Moss", "sworth"));
-	}
+		setAutoName(false);
+		assertNull(names.suggested(golem(7, null)));
 
-	/** And nothing comes out with a letter three times over, which is a join gone wrong. */
-	@Test
-	public void noStoneNameStutters()
-	{
-		for (long id = 0; id < 5000; id++)
-		{
-			String name = names.nameFor(GolemNames.Pack.STONE, id);
-			assertTrue(name + " has a letter three times over", !TRIPLE.matcher(name).find());
-		}
+		setAutoName(true);
+		String named = names.suggested(golem(7, null));
+		setAutoName(false);
+		assertNull("turning it off takes the name away", names.suggested(golem(7, null)));
+		setAutoName(true);
+		assertEquals("and turning it on gives the same one back", named, names.suggested(golem(7, null)));
 	}
 }
