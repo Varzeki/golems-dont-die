@@ -254,6 +254,9 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private GolemClimate climates;
 
+	@Inject
+	private GolemNames names;
+
 	/** One golem's own page, opened from the list. Swing thread only. */
 	private GolemPage page;
 
@@ -494,6 +497,7 @@ public class GolemsDontDiePlugin extends Plugin
 		// the one place a few milliseconds shows.
 		worldMesh.load();
 		placeNames.load();
+		names.load();
 		// The climate is named places resolved to regions, so it waits for them.
 		climates.learn(placeNames);
 		propFactory.load();
@@ -533,6 +537,7 @@ public class GolemsDontDiePlugin extends Plugin
 		// All three panel callbacks arrive on the Swing thread and touch the roster, which the
 		// client thread owns, so each hops across.
 		panel = new GolemListPanel(
+			names,
 			golem -> clientThread.invoke(() -> removeGolem(golem)),
 			(golem, name) -> clientThread.invoke(() ->
 			{
@@ -554,7 +559,7 @@ public class GolemsDontDiePlugin extends Plugin
 				}
 			});
 		// Swing throughout, and it only reads the golem it is given: see GolemPage.
-		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)));
+		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), names);
 		menu.setOnRenamed(golem ->
 		{
 			if (!running || panel == null)
@@ -2484,6 +2489,11 @@ public class GolemsDontDiePlugin extends Plugin
 		if ("showSidebar".equals(event.getKey()))
 		{
 			showSidebar(config.showSidebar());
+		}
+
+		if ("namePack".equals(event.getKey()) && panel != null)
+		{
+			panel.namesChanged();
 		}
 
 		if ("maxGolems".equals(event.getKey()) || "limitGolems".equals(event.getKey()))

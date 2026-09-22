@@ -89,6 +89,9 @@ class GolemListPanel extends PluginPanel
 	/** Asks for one golem's own page to be opened. */
 	private final Consumer<Golem> onOpen;
 
+	/** What to call a golem nobody has named; see GolemNames. */
+	private final GolemNames names;
+
 	/** The bar offering to stop pointing, shown only while a golem is being pointed at. */
 	private final JButton finding = new JButton();
 
@@ -120,10 +123,12 @@ class GolemListPanel extends PluginPanel
 		}
 	}
 
-	GolemListPanel(Consumer<Golem> onRemove, java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive,
+	GolemListPanel(GolemNames names, Consumer<Golem> onRemove,
+		java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive,
 		Consumer<Golem> onFind, Consumer<Golem> onOpen)
 	{
 		super(false);
+		this.names = names;
 		this.onRemove = onRemove;
 		this.onFind = onFind;
 		this.onOpen = onOpen;
@@ -271,6 +276,20 @@ class GolemListPanel extends PluginPanel
 	 *                only when this is positive
 	 * @param names   also take names given in game, which leave the roster otherwise unchanged
 	 */
+	/**
+	 * Builds every row again, for when the name pack changes: the name a row shows for a golem
+	 * nobody has named is a prompt set when the row was made.
+	 */
+	void namesChanged()
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			shown.clear();
+			rows.removeAll();
+			relist();
+		});
+	}
+
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->
@@ -296,7 +315,9 @@ class GolemListPanel extends PluginPanel
 		List<Golem> found = new ArrayList<>();
 		for (Golem golem : roster)
 		{
-			String name = golem.getNickname();
+			// Searched by whatever the row says, which for a golem nobody has named is the name
+			// the plugin gives it: a player looking for Pebblesworth means the one called that.
+			String name = golem.getNickname() == null ? names.suggested(golem) : golem.getNickname();
 			if (wanted.isEmpty() || name != null && name.toLowerCase().contains(wanted))
 			{
 				found.add(golem);
@@ -468,7 +489,12 @@ class GolemListPanel extends PluginPanel
 		place.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		place.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 0));
 
-		JTextField name = new PlaceholderField(golem.getNickname());
+		// The dimmed prompt is the name the plugin would call it, so an unnamed golem still reads
+		// as somebody. Left as a prompt rather than put in the field: it is not a name until it
+		// is typed, and a field holding it would save it as one.
+		String suggested = names.suggested(golem);
+		JTextField name = new PlaceholderField(golem.getNickname(),
+			suggested == null ? "Unnamed Golem" : suggested);
 		Row[] self = new Row[1];
 		name.setToolTipText("Name this golem");
 		name.getDocument().addDocumentListener(new DocumentListener()

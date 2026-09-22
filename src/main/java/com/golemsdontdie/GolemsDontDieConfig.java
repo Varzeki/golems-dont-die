@@ -122,12 +122,25 @@ public interface GolemsDontDieConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "namePack",
+		name = "Names for unnamed golems",
+		description = "What to call golems you have not named, in the sidebar and on a golem's page. "
+			+ "A golem keeps the same name, and naming one yourself replaces it.",
+		section = golemsSection,
+		position = 6
+	)
+	default GolemNames.Pack namePack()
+	{
+		return GolemNames.Pack.OFF;
+	}
+
+	@ConfigItem(
 		keyName = "showSidebar",
 		name = "Enable sidebar",
 		description = "Shows the Golems tab. With it off, missing golems can still be revived by "
 			+ "right-clicking a golem plinth on Wyrmscraig.",
 		section = golemsSection,
-		position = 6
+		position = 7
 	)
 	default boolean showSidebar()
 	{

@@ -56,15 +56,19 @@ class GolemPage
 	/** Points the arrow at the golem, on the client thread. */
 	private final Consumer<Golem> onFind;
 
+	/** What to call a golem nobody has named; see GolemNames. */
+	private final GolemNames names;
+
 	/**
 	 * The golem the page is showing, or null when it has never been opened. Set on the Swing
 	 * thread and read on the client thread, which works out where the golem is.
 	 */
 	private volatile Golem showing;
 
-	GolemPage(Consumer<Golem> onFind)
+	GolemPage(Consumer<Golem> onFind, GolemNames names)
 	{
 		this.onFind = onFind;
+		this.names = names;
 
 		title.setFont(TITLE);
 		title.setForeground(Color.WHITE);
@@ -169,7 +173,9 @@ class GolemPage
 	void show(Golem golem, Component beside)
 	{
 		showing = golem;
-		title.setText(golem.getNickname() == null ? "Unnamed golem" : golem.getNickname());
+		String suggested = names == null ? null : names.suggested(golem);
+		title.setText(golem.getNickname() != null ? golem.getNickname()
+			: suggested != null ? suggested : "Unnamed golem");
 		place.setText(" ");
 		find.setEnabled(true);
 		picture.setIcon(null);
