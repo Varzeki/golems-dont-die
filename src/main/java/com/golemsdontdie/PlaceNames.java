@@ -83,6 +83,42 @@ class PlaceNames
 		}
 	}
 
+	/**
+	 * The regions any of the given names belong to, from both sources: a region the curated list
+	 * calls one of them, and the region a map label of that name stands in. Nothing is matched
+	 * loosely — the name must be the whole of it — and a name that matches nothing is logged, which
+	 * is how a curated list is kept honest as the game changes under it.
+	 */
+	java.util.Set<Integer> regionsNamed(String[] names)
+	{
+		java.util.Set<Integer> found = new java.util.HashSet<>();
+		for (String name : names)
+		{
+			boolean any = false;
+			for (Map.Entry<Integer, String> region : regions.entrySet())
+			{
+				if (region.getValue().equalsIgnoreCase(name))
+				{
+					found.add(region.getKey());
+					any = true;
+				}
+			}
+			for (int i = 0; i < labels.length; i++)
+			{
+				if (labelNames[i].equalsIgnoreCase(name))
+				{
+					found.add((labels[i][0] >> 6) << 8 | labels[i][1] >> 6);
+					any = true;
+				}
+			}
+			if (!any)
+			{
+				log.debug("No place called {}", name);
+			}
+		}
+		return found;
+	}
+
 	/** What to call this tile, or null if nothing is known nearby. */
 	String nameFor(WorldPoint at)
 	{

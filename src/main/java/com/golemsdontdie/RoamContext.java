@@ -40,6 +40,10 @@ final class RoamContext
 	@Setter
 	private GolemCensus census;
 
+	/** Which places are cold, hot and home, for the golems that care. Null in tools that do not. */
+	@Setter
+	private GolemClimate climates;
+
 	/** Where a golem in view reports each crossing, for the obstacle record; null if none. */
 	@Setter
 	private java.util.function.Consumer<GolemTraversal> traversals;
@@ -48,6 +52,24 @@ final class RoamContext
 	float roominess(int x, int y, int plane)
 	{
 		return census == null ? 1f : census.roominess(x, y, plane);
+	}
+
+	/**
+	 * As {@link #roominess}, as one golem sees it: a sociable golem does not mind a crowd at all, and
+	 * a crowd-shy one minds it more than most.
+	 */
+	float roominess(int x, int y, int plane, TransportMemory memory)
+	{
+		if (memory == null)
+		{
+			return roominess(x, y, plane);
+		}
+		if (memory.is(GolemTrait.SOCIABLE))
+		{
+			return 1f;
+		}
+		float room = roominess(x, y, plane);
+		return memory.is(GolemTrait.CROWD_SHY) ? room * room : room;
 	}
 
 	/** How little a shortcut that keeps a crowded golem in place appeals. */
@@ -62,12 +84,22 @@ final class RoamContext
 	 */
 	float appeal(int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane)
 	{
+		return appeal(fromX, fromY, fromPlane, toX, toY, toPlane, null);
+	}
+
+	/**
+	 * As {@link #appeal}, for one golem: a crowd weighs differently on a sociable golem than on a
+	 * crowd-shy one. Only crowds — what a golem makes of the place itself is {@link #desire}, kept
+	 * apart because a golem hemmed in by others should still take a way out it does not care for.
+	 */
+	float appeal(int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane, TransportMemory memory)
+	{
 		if (census == null)
 		{
 			return 1f;
 		}
-		float here = census.roominess(fromX, fromY, fromPlane);
-		float there = census.roominess(toX, toY, toPlane);
+		float here = roominess(fromX, fromY, fromPlane, memory);
+		float there = roominess(toX, toY, toPlane, memory);
 		if (here >= 1f)
 		{
 			return there;
@@ -77,6 +109,18 @@ final class RoamContext
 			return STAYING_PUT;
 		}
 		return Math.min(1f, there / here);
+	}
+
+	/** What a golem makes of going from one tile to another, given its taste in places. */
+	float desire(TransportMemory memory, int fromX, int fromY, int toX, int toY)
+	{
+		return climates == null ? 1f : climates.desire(memory, fromX, fromY, toX, toY);
+	}
+
+	/** How ready a golem is to leave where it is at all, which is less where it likes being. */
+	float wanderlust(TransportMemory memory, int x, int y)
+	{
+		return climates == null ? 1f : climates.wanderlust(memory, x, y);
 	}
 
 	boolean crowdedRegion(int x, int y, int plane)

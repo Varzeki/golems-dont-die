@@ -1,0 +1,155 @@
+package com.golemsdontdie;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import lombok.Getter;
+
+/**
+ * What a golem is like: a handful of traits it keeps for life.
+ *
+ * <p>Drawn from the golem's own seed, so they are decided the moment it is made, never change, and
+ * cost nothing to store — a golem saved before this existed comes back with the traits it always
+ * had. Most golems have one or two; five is rare.
+ *
+ * <p>Some lean on the chances the planner already rolls, which is what makes a golem that likes the
+ * cold spend its life in the snow. The rest are only true of it, and wait for the golem's own page
+ * to be read.
+ *
+ * <p>Nothing about a golem's traits is stored, so editing this list — adding one, reordering, even
+ * changing a weight — deals every golem a fresh hand. Harmless while nothing shows them; once the
+ * golem's page does, a change here is a change to every golem a player thought they knew.
+ */
+@Getter
+enum GolemTrait
+{
+	// ------------------------------------------------------------------ what a golem does
+
+	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice, and travels to find it.", 3),
+	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert, and stays once it gets there.", 3),
+	HOMESICK("Homesick", "Never away from Wyrmscraig for long.", 3),
+	SEAFARER("Seafarer", "Takes to the water at every chance, and walks to docks it passes.", 3),
+	SPELUNKER("Spelunker", "Goes down whenever there is a down to go.", 3),
+	CLIMBER("Climber", "Ladders, stairs and cliffs: anything that leads up.", 3),
+	RESTLESS("Restless", "Walks further, and rarely stands still for long.", 3),
+	CROWD_SHY("Crowd-shy", "Keeps away from other golems, and leaves when they gather.", 3),
+	SOCIABLE("Sociable", "Thinks nothing of a crowd, and will happily join one.", 3),
+	CAUTIOUS("Cautious", "Will not risk a jump or a stepping stone.", 3),
+	SURE_FOOTED("Sure-footed", "Takes the obstacle rather than the way round it.", 3),
+
+	// ------------------------------------------------------------------ what a golem is
+	//
+	// Flavour for the golem's own page, with nothing behind it. Nothing here claims anything about
+	// how a golem looks: they are all carved from the same rock, and a page saying otherwise would
+	// be contradicted by the golem standing in front of you.
+
+	FRIENDLY("Friendly", "Would wave, if anyone waved first.", 6),
+	LIFE_OF_THE_PARTY("Life of the party", "Would dance, given a crowd and a reason.", 4),
+	PONDEROUS("Ponderous", "Thinks things over. At length.", 6),
+	WELL_TRAVELLED("Well-travelled", "Has been further than most, and is quietly pleased about it.", 4),
+	HUMS("Hums to itself", "A single note, somewhere below hearing.", 5),
+	OLD_SOUL("Old soul", "Older than it has any right to be, and acts it.", 4),
+	SUPERSTITIOUS("Superstitious", "Will not be the third golem through a door.", 4),
+	STOIC("Stoic", "Has never once complained.", 5),
+	CURIOUS("Curious", "Looks at things twice.", 5),
+	LUCKY("Lucky", "Nothing has gone badly for it yet.", 4),
+	PATIENT("Patient", "Whatever it is waiting for, it will wait.", 5),
+	COUNTS_THINGS("Counts things", "Stones, steps, other golems. Quietly.", 5),
+	FOND_OF_GOATS("Fond of goats", "Has views on the Wyrmscraig goat, and holds them firmly.", 4),
+	LOYAL("Loyal", "Would follow you anywhere, given the words.", 5);
+
+	/** What the golem's page calls this. */
+	private final String label;
+
+	/** A line for the golem's page. */
+	private final String description;
+
+	/**
+	 * How often this comes up, against the others. Cosmetic traits are commoner than ones that
+	 * change what a golem does: a golem with four habits pulling against each other has none.
+	 */
+	private final int weight;
+
+	GolemTrait(String label, String description, int weight)
+	{
+		this.label = label;
+		this.description = description;
+		this.weight = weight;
+	}
+
+	private static final GolemTrait[] ALL = values();
+
+	/** How many traits a golem may have. The draw leans hard on the low end. */
+	private static final int MOST_TRAITS = 5;
+
+	/**
+	 * The traits belonging to a seed, as a bitmask.
+	 *
+	 * <p>Drawn from a generator of its own rather than the golem's, so that asking a golem what it is
+	 * like never disturbs where it walks: the two would otherwise share a sequence, and a golem's
+	 * traits would change what it did next.
+	 */
+	static int of(long seed)
+	{
+		Random random = new Random(seed * 0x9E3779B97F4A7C15L ^ 0x5DEECE66DL);
+		int count = 1;
+		// Each further trait is half as likely as the one before: most golems have one or two.
+		while (count < MOST_TRAITS && random.nextFloat() < 0.4f)
+		{
+			count++;
+		}
+
+		int total = 0;
+		for (GolemTrait trait : ALL)
+		{
+			total += trait.weight;
+		}
+
+		int traits = 0;
+		List<GolemTrait> left = new ArrayList<>(ALL.length);
+		java.util.Collections.addAll(left, ALL);
+		for (int i = 0; i < count && !left.isEmpty(); i++)
+		{
+			int roll = random.nextInt(total);
+			GolemTrait drawn = left.get(left.size() - 1);
+			for (GolemTrait trait : left)
+			{
+				roll -= trait.weight;
+				if (roll < 0)
+				{
+					drawn = trait;
+					break;
+				}
+			}
+			traits |= 1 << drawn.ordinal();
+			total -= drawn.weight;
+			left.remove(drawn);
+		}
+		return traits;
+	}
+
+	boolean in(int traits)
+	{
+		return (traits & mask()) != 0;
+	}
+
+	/** This trait alone, as a mask. */
+	int mask()
+	{
+		return 1 << ordinal();
+	}
+
+	/** The traits in a mask, in the order they are declared. */
+	static List<GolemTrait> list(int traits)
+	{
+		List<GolemTrait> found = new ArrayList<>();
+		for (GolemTrait trait : ALL)
+		{
+			if (trait.in(traits))
+			{
+				found.add(trait);
+			}
+		}
+		return found;
+	}
+}

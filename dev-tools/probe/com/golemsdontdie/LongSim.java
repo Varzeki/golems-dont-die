@@ -99,6 +99,12 @@ public class LongSim
 		// Golems spread out by knowing where the others are, so the simulation counts them too.
 		GolemCensus census = new GolemCensus();
 		context.setCensus(census);
+		// And the golems with a taste in weather need to know where the weather is.
+		PlaceNames places = new PlaceNames();
+		places.load();
+		climate = new GolemClimate();
+		climate.learn(places);
+		context.setClimates(climate);
 
 		SailingDocks docks = new SailingDocks();
 		set(docks, "mesh", mesh);
@@ -255,12 +261,16 @@ public class LongSim
 		System.out.printf("done: %d golems, %d ticks, %.0f s%n", count, ticks, (System.nanoTime() - wallStart) / 1e9);
 	}
 
+	/** Which places are cold, hot and home; the snapshot reports whether tastes are being met. */
+	private static GolemClimate climate;
+
 	private static void snapshot(PrintWriter out, List<Sim> golems, long tick, long plans, long nothing,
 		long exceptions, long voyages, long planNanos, long maxPlanNanos, long wallStart)
 	{
 		Map<Long, Integer> regions = new HashMap<>();
 		Map<Long, Integer> tiles = new HashMap<>();
 		int stuck = 0, underground = 0, upstairs = 0, atSea = 0;
+		int[] tastes = new int[10];
 		for (Sim g : golems)
 		{
 			WorldPoint p = g.itinerary == null ? g.at : g.itinerary.positionAt((int) Math.min(tick, Integer.MAX_VALUE));
@@ -270,6 +280,22 @@ public class LongSim
 			underground += p.getY() >= 4160 ? 1 : 0;
 			upstairs += p.getPlane() > 0 ? 1 : 0;
 			atSea += g.itinerary != null && g.itinerary.isVoyage() && !g.itinerary.isFinished((int) tick) ? 1 : 0;
+
+			// Of the golems that care where they are, how many are there.
+			boolean cold = GolemTrait.LIKES_THE_COLD.in(g.traits);
+			boolean hot = GolemTrait.LIKES_THE_HEAT.in(g.traits);
+			boolean homesick = GolemTrait.HOMESICK.in(g.traits);
+			tastes[0] += cold ? 1 : 0;
+			tastes[1] += cold && climate.isCold(p.getX(), p.getY()) ? 1 : 0;
+			tastes[2] += hot ? 1 : 0;
+			tastes[3] += hot && climate.isHot(p.getX(), p.getY()) ? 1 : 0;
+			tastes[4] += homesick ? 1 : 0;
+			tastes[5] += homesick && atHome(p) ? 1 : 0;
+			// And, as a control, where everyone else is.
+			tastes[6]++;
+			tastes[7] += climate.isCold(p.getX(), p.getY()) ? 1 : 0;
+			tastes[8] += climate.isHot(p.getX(), p.getY()) ? 1 : 0;
+			tastes[9] += atHome(p) ? 1 : 0;
 		}
 		int maxStack = 0;
 		long busiest = 0;
@@ -288,6 +314,12 @@ public class LongSim
 		out.printf("S,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.1f,%.1f,%d,%.0f%n", tick, plans, nothing, exceptions, voyages,
 			stuck, underground, upstairs, atSea, maxStack, plans == 0 ? 0.0 : planNanos / 1000.0 / plans,
 			maxPlanNanos / 1e6, heapMb, (System.nanoTime() - wallStart) / 1e9);
+		StringBuilder taste = new StringBuilder("C,").append(tick);
+		for (int of : tastes)
+		{
+			taste.append(',').append(of);
+		}
+		out.println(taste);
 		StringBuilder line = new StringBuilder("R,").append(tick);
 		for (Map.Entry<Long, Integer> e : regions.entrySet())
 		{
@@ -297,9 +329,22 @@ public class LongSim
 		out.flush();
 	}
 
+	private static boolean atHome(WorldPoint at)
+	{
+		for (int region : GolemContent.ISLAND_REGIONS)
+		{
+			if (at.getRegionID() == region)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static final class Sim
 	{
 		final Random random;
+		final int traits;
 		final TransportMemory transportMemory = new TransportMemory();
 		WorldPoint at;
 		Itinerary itinerary;
@@ -311,6 +356,8 @@ public class LongSim
 		{
 			this.at = at;
 			this.random = new Random(seed);
+			this.traits = GolemTrait.of(seed);
+			transportMemory.setTraits(traits);
 		}
 
 		void arrive(WorldPoint where, int tick)

@@ -379,6 +379,10 @@ class Golem
 	@Getter
 	private final long id;
 
+	/** What this golem is like, drawn from its seed and kept for life. See GolemTrait. */
+	@Getter
+	private final int traits;
+
 	Golem(GolemSnapshot snapshot, WorldPoint home, long seed, int startFineX, int startFineY)
 	{
 		this.snapshot = snapshot;
@@ -386,6 +390,8 @@ class Golem
 		this.plane = home.getPlane();
 		this.random = new Random(seed);
 		this.id = seed;
+		this.traits = GolemTrait.of(seed);
+		transportMemory.setTraits(traits);
 
 		this.fineX = startFineX;
 		this.fineY = startFineY;
@@ -1011,7 +1017,9 @@ class Golem
 						float chance = TRANSPORT_CHANCE
 							* (TRANSPORT_REACH + 1 - distance) / (TRANSPORT_REACH + 1)
 							* context.appeal(tileX, tileY, plane,
-								transport.getToX(), transport.getToY(), transport.getToPlane());
+								transport.getToX(), transport.getToY(), transport.getToPlane(), transportMemory)
+							* context.desire(transportMemory, tileX, tileY, transport.getToX(), transport.getToY())
+							* transportMemory.tasteFor(transport);
 						if (random.nextFloat() >= chance)
 						{
 							continue;

@@ -26,6 +26,7 @@ def main(patterns):
     stats = defaultdict(lambda: defaultdict(float))
     maxima = defaultdict(lambda: defaultdict(float))
     regions = defaultdict(lambda: defaultdict(int))
+    tastes = defaultdict(lambda: defaultdict(int))
     golems = 0
     for path in files:
         for line in open(path):
@@ -44,6 +45,10 @@ def main(patterns):
                 maxima[tick]["heap"] = max(maxima[tick]["heap"], float(parts[13]))
                 maxima[tick]["wall"] = max(maxima[tick]["wall"], float(parts[14]))
                 stats[tick]["shards"] += 1
+            elif parts[0] == "C":
+                tick = int(parts[1])
+                for i, value in enumerate(parts[2:]):
+                    tastes[tick][i] += int(value)
             elif parts[0] == "R":
                 tick = int(parts[1])
                 for entry in parts[2:]:
@@ -75,6 +80,22 @@ def main(patterns):
     for key, avg in sorted(total.items(), key=lambda kv: -kv[1])[:12]:
         print(f"  {100 * avg / golems:5.1f}%  {region_name(key)}")
     print(f"  golems spread over {len(total)} regions in all")
+
+    # Whether the golems that care where they are have got there. The last three columns are
+    # every golem, wherever it is, which is what the first three have to beat to mean anything.
+    shown = [t for t in ticks if tastes[t]]
+    if shown:
+        print()
+        print("Golems with a taste in places, and how often they are in one (all golems, for scale):")
+        print("  when           likes cold  likes heat    homesick  |  any in cold   any in heat    any home")
+        step = max(1, len(shown) // 12)
+        for t in shown[::step] + ([shown[-1]] if shown[-1] not in shown[::step] else []):
+            c = tastes[t]
+
+            def share(of, among):
+                return f"{100 * c[of] / c[among]:5.1f}%" if c[among] else "    -"
+            print(f"  {when(t)}       {share(1, 0)}      {share(3, 2)}      {share(5, 4)}  |"
+                  f"       {share(7, 6)}        {share(8, 6)}      {share(9, 6)}")
 
     # A sink fills over time: compare the first and last quarter of the run.
     quarter = max(1, len(ticks) // 4)

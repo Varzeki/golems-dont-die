@@ -70,7 +70,9 @@ class RoamPlanner
 		RoamContext context)
 	{
 		lastCandidates = 0;
-		Itinerary crossing = planVoyage(from, tick, random, memory, context, AT_DOCK_SAIL_CHANCE);
+		Itinerary crossing = planVoyage(from, tick, random, memory, context,
+			AT_DOCK_SAIL_CHANCE * (memory != null && memory.is(GolemTrait.SEAFARER) ? 1.5f : 1f)
+				* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY())));
 		if (crossing != null)
 		{
 			lastOutcome = Outcome.VOYAGE;
@@ -109,6 +111,7 @@ class RoamPlanner
 
 		boolean pressed = context != null && context.crowdedRegion(from.getX(), from.getY(), from.getPlane());
 		Reach reach = new Reach(from, context, FAR_SEARCH_BUDGET);
+		reach.memory = memory;
 
 		// Somewhere it knows no way out of: now and then, back out the way it came in.
 		if (random.nextFloat() < HOMEWARD_CHANCE)
@@ -125,7 +128,9 @@ class RoamPlanner
 
 		// Out of view a golem only sailed if a leg ended within two tiles of a quayside, which almost
 		// never happens; now and then it goes to one on purpose.
-		if (random.nextFloat() < DOCK_SEEK_CHANCE)
+		float seeking = DOCK_SEEK_CHANCE * (memory != null && memory.is(GolemTrait.SEAFARER) ? 3f : 1f)
+			* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY()));
+		if (random.nextFloat() < seeking)
 		{
 			Itinerary toDock = toNearbyDock(from, tick, memory, reach);
 			if (toDock != null)
@@ -136,7 +141,11 @@ class RoamPlanner
 		}
 
 		// A golem in a crowd is looking for the way out, so it neither rolls for this nor rests first.
-		if (pressed || random.nextFloat() < TRANSPORT_CHANCE && (memory == null || !memory.restingFromTransports(tick)))
+		// A golem where it wanted to be looks for a shortcut far less often: turning each one down as
+		// it comes is no use when a town offers a dozen, and one roll in ten will take it.
+		float hopping = TRANSPORT_CHANCE
+			* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY()));
+		if (pressed || random.nextFloat() < hopping && (memory == null || !memory.restingFromTransports(tick)))
 		{
 			Itinerary toTransport = toNearbyTransport(from, tick, random, memory, reach);
 			if (toTransport != null)
@@ -326,6 +335,9 @@ class RoamPlanner
 	{
 		private final WorldPoint from;
 		private final RoamContext context;
+
+		/** The golem's own memory, for the traits that change where it wants to go. */
+		private TransportMemory memory;
 		private final int budget;
 		private TileMap cameFrom;
 
@@ -369,9 +381,18 @@ class RoamPlanner
 	 */
 	private Itinerary wander(WorldPoint from, int tick, Random random, Reach reach)
 	{
+		boolean restless = reach.memory != null && reach.memory.is(GolemTrait.RESTLESS);
+
+		// A golem that likes the cold, the heat, or home takes the leg that suits it best of the
+		// several it finds, rather than the first that works. That is the whole of how it gets
+		// there: a few dozen tiles the right way, a couple of times a minute, all year.
+		GolemClimate climate = reach.context == null ? null : reach.context.getClimates();
+		boolean picky = climate != null && climate.cares(reach.memory);
+		List<int[]> wanted = picky ? new ArrayList<>(ATTEMPTS) : null;
+
 		for (int attempt = 0; attempt < ATTEMPTS; attempt++)
 		{
-			int distance = LEG_MIN + random.nextInt(LEG_SPREAD);
+			int distance = LEG_MIN + random.nextInt(restless ? LEG_SPREAD * 2 : LEG_SPREAD);
 			double angle = random.nextDouble() * Math.PI * 2;
 			int toX = from.getX() + (int) Math.round(Math.cos(angle) * distance);
 			int toY = from.getY() + (int) Math.round(Math.sin(angle) * distance);
@@ -388,12 +409,33 @@ class RoamPlanner
 				continue;
 			}
 			lastCandidates++;
+			if (picky)
+			{
+				wanted.add(new int[]{toX, toY, (int) (climate.liking(reach.memory, toX, toY) * 10000)});
+				continue;
+			}
 			List<int[]> leg = straightLine(from.getX(), from.getY(), toX, toY, from.getPlane());
 			if (leg == null)
 			{
 				continue;
 			}
 			return Itinerary.of(leg, from.getPlane(), tick, 0);
+		}
+
+		if (picky)
+		{
+			// Best liked first, and the rest behind it: the pick still has to be walkable in a
+			// straight line, and where nothing is liked more than anything else this is the order
+			// they were found in, which is random.
+			wanted.sort((one, other) -> other[2] - one[2]);
+			for (int[] candidate : wanted)
+			{
+				List<int[]> leg = straightLine(from.getX(), from.getY(), candidate[0], candidate[1], from.getPlane());
+				if (leg != null)
+				{
+					return Itinerary.of(leg, from.getPlane(), tick, 0);
+				}
+			}
 		}
 
 		TileMap tiles = reach.tiles();
@@ -572,7 +614,11 @@ class RoamPlanner
 	Itinerary planVoyage(WorldPoint from, int tick, Random random, TransportMemory memory,
 		RoamContext context)
 	{
-		return planVoyage(from, tick, random, memory, context, SAIL_CHANCE);
+		// A seafarer takes every chance it gets; the rest sail now and then, and a golem standing
+		// where it wanted to be hardly at all.
+		return planVoyage(from, tick, random, memory, context,
+			SAIL_CHANCE * (memory != null && memory.is(GolemTrait.SEAFARER) ? 3f : 1f)
+				* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY())));
 	}
 
 	/** Chance a far golem at a dock sets sail, per plan: higher, as it plans once per leg. */
@@ -641,7 +687,8 @@ class RoamPlanner
 	/** Rolls for a crossing for a golem that walked to a dock on purpose: the far golem's chance. */
 	Itinerary planVoyageAtDock(WorldPoint from, int tick, Random random, TransportMemory memory, RoamContext context)
 	{
-		return planVoyage(from, tick, random, memory, context, AT_DOCK_SAIL_CHANCE);
+		return planVoyage(from, tick, random, memory, context, AT_DOCK_SAIL_CHANCE
+			* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY())));
 	}
 
 	private Itinerary planVoyage(WorldPoint from, int tick, Random random, TransportMemory memory,
@@ -710,7 +757,8 @@ class RoamPlanner
 
 	/**
 	 * A walk to a transport in range and the transport itself, or null. Every transport starting
-	 * within reach is considered in a random order, which keeps the choice fair.
+	 * within reach is considered in a random order, which keeps the choice fair — except for a
+	 * golem with a taste in places, which considers the ones that suit it first.
 	 */
 	private Itinerary toNearbyTransport(WorldPoint from, int tick, Random random, TransportMemory memory,
 		Reach reach)
@@ -718,6 +766,15 @@ class RoamPlanner
 		List<GolemTransport> near = new ArrayList<>();
 		transports.near(from.getX(), from.getY(), TRANSPORT_SEARCH, near);
 		java.util.Collections.shuffle(near, random);
+		GolemClimate climate = reach.context == null ? null : reach.context.getClimates();
+		if (climate != null && climate.cares(memory))
+		{
+			// Shortcuts and boats are how a golem covers real distance, so a golem that wants to be
+			// somewhere in particular takes the one that gets it nearest. Shuffled first, so the
+			// ones it has no opinion about — which is most of them — stay in a random order.
+			near.sort((one, other) -> Float.compare(climate.liking(memory, other.getToX(), other.getToY()),
+				climate.liking(memory, one.getToX(), one.getToY())));
+		}
 
 		int walksTried = 0;
 		// The first one it passed over for being crowded, in case nothing roomier turns up.
@@ -735,11 +792,24 @@ class RoamPlanner
 			{
 				continue;
 			}
+			// What the golem itself makes of this one: a taste in places, and a taste in obstacles.
+			// Turned down here it is turned down for good — unlike a crowd, which a golem would
+			// rather push through than stay put in.
+			float wanted = reach.context == null ? 1f
+				: reach.context.desire(memory, from.getX(), from.getY(), transport.getToX(), transport.getToY());
+			if (memory != null)
+			{
+				wanted *= memory.tasteFor(transport);
+			}
+			if (wanted < 1f && random.nextFloat() >= wanted)
+			{
+				continue;
+			}
 			// Somewhere with room in it, by preference; see RoamContext.appeal. One that turns a
 			// transport down falls back on the first it passed over rather than staying put.
 			float appeal = reach.context == null ? 1f
 				: reach.context.appeal(from.getX(), from.getY(), from.getPlane(),
-					transport.getToX(), transport.getToY(), transport.getToPlane());
+					transport.getToX(), transport.getToY(), transport.getToPlane(), memory);
 			if (appeal < 1f && random.nextFloat() >= appeal)
 			{
 				if (crowdedChoice == null)

@@ -129,20 +129,39 @@ class Voyage
 		}
 		if (chosen == null)
 		{
-			// A few tries for a port with room ashore, then wherever the last roll lands.
+			// A few tries for a port with room ashore and weather to suit, then wherever the last
+			// roll lands. Ports are how a golem crosses the world, so this is where a taste for the
+			// cold or the heat takes it somewhere it could never have walked — and a golem with one
+			// reads the whole board rather than sampling it, three ports out of ninety being no way
+			// to find the one port in the snow.
+			GolemClimate climate = context == null ? null : context.getClimates();
+			boolean picky = climate != null && climate.cares(memory);
+			if (picky)
+			{
+				candidates.sort((one, other) -> Float.compare(liking(climate, memory, other),
+					liking(climate, memory, one)));
+			}
 			for (int attempt = 0; attempt < 3 && chosen == null; attempt++)
 			{
-				SailingDocks.Dock candidate = candidates.get(random.nextInt(candidates.size()));
+				SailingDocks.Dock candidate = picky ? candidates.get(Math.min(attempt, candidates.size() - 1))
+					: candidates.get(random.nextInt(candidates.size()));
 				WorldPoint shore = candidate.getShore();
-				float roominess = context == null || shore == null ? 1f
-					: context.roominess(shore.getX(), shore.getY(), shore.getPlane());
-				if (roominess >= 1f || random.nextFloat() < roominess)
+				float appeal = context == null || shore == null ? 1f
+					: context.roominess(shore.getX(), shore.getY(), shore.getPlane(), memory)
+					* (climate == null ? 1f : climate.liking(memory, shore.getX(), shore.getY()));
+				if (appeal >= 1f || random.nextFloat() < appeal)
 				{
 					chosen = candidate;
 				}
 			}
 			if (chosen == null)
 			{
+				// A golem with a taste in places stays ashore rather than sail somewhere it does not
+				// want to be. Anyone else takes whatever the last roll offered.
+				if (picky)
+				{
+					return null;
+				}
 				chosen = candidates.get(random.nextInt(candidates.size()));
 			}
 		}
@@ -159,6 +178,13 @@ class Voyage
 			memory.clearPending();
 		}
 		return crossing;
+	}
+
+	/** How much a golem likes the look of a dock's own shore; 0 for a dock with no shore. */
+	private static float liking(GolemClimate climate, TransportMemory memory, SailingDocks.Dock dock)
+	{
+		WorldPoint shore = dock.getShore();
+		return shore == null ? 0f : climate.liking(memory, shore.getX(), shore.getY());
 	}
 
 	/**

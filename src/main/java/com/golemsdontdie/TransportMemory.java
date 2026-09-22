@@ -117,9 +117,59 @@ final class TransportMemory
 	}
 
 	/**
-	 * As {@link #used(GolemTransport, int)}, barred for a given number of ticks. Shorter where the
-	 * far side is small: two minutes is sensible before a town, very long in a sheep pen.
+	 * What the golem this belongs to is like, as a mask of {@link GolemTrait}.
+	 *
+	 * <p>Kept here because this is the one piece of a golem the planner is handed: it plans for a
+	 * golem it cannot see, and a golem's habits belong to that planning as much as its cooldowns do.
 	 */
+	@Getter
+	@Setter
+	private int traits;
+
+	boolean is(GolemTrait trait)
+	{
+		return trait.in(traits);
+	}
+
+	/**
+	 * How much this golem likes the look of a shortcut, as a multiplier on the chance of taking it.
+	 *
+	 * <p>A cautious golem will not risk a jump or a stone; a sure-footed one goes out of its way for
+	 * one. A climber prefers anything leading up and a spelunker anything leading down, which is what
+	 * sends one to the rooftops and the other into the caves.
+	 */
+	float tasteFor(GolemTransport transport)
+	{
+		if (traits == 0)
+		{
+			return 1f;
+		}
+		boolean risky = transport.getArchetype() == GolemTransport.ARCHETYPE_JUMP
+			|| transport.getArchetype() == GolemTransport.ARCHETYPE_BALANCE
+			|| transport.getArchetype() == GolemTransport.ARCHETYPE_TIGHTROPE;
+		if (risky && is(GolemTrait.CAUTIOUS))
+		{
+			return 0f;
+		}
+
+		float taste = is(GolemTrait.SURE_FOOTED) ? 1.6f : 1f;
+		int rise = transport.getFromPlane() - transport.getToPlane();
+		boolean down = rise > 0 || transport.getToY() >= UNDERGROUND && transport.getFromY() < UNDERGROUND;
+		boolean up = rise < 0 || transport.getFromY() >= UNDERGROUND && transport.getToY() < UNDERGROUND;
+		if (down && is(GolemTrait.SPELUNKER) || up && is(GolemTrait.CLIMBER))
+		{
+			taste *= 2.5f;
+		}
+		if (up && is(GolemTrait.SPELUNKER) || down && is(GolemTrait.CLIMBER))
+		{
+			taste *= 0.4f;
+		}
+		return taste;
+	}
+
+	/** Coordinates this far north are underground. */
+	private static final int UNDERGROUND = 4160;
+
 	/**
 	 * How long a golem walks after using a shortcut before it looks for another. Three minutes.
 	 *
@@ -134,9 +184,18 @@ final class TransportMemory
 	/** True if the golem has used a shortcut lately and is walking for a while. */
 	boolean restingFromTransports(int tick)
 	{
+		if (is(GolemTrait.RESTLESS))
+		{
+			// Off again almost as soon as it lands.
+			return tick < restUntil - TRANSPORT_REST_TICKS / 2;
+		}
 		return tick < restUntil;
 	}
 
+	/**
+	 * As {@link #used(GolemTransport, int)}, barred for a given number of ticks. Shorter where the
+	 * far side is small: two minutes is sensible before a town, very long in a sheep pen.
+	 */
 	void used(GolemTransport transport, int tick, int cooldownTicks)
 	{
 		restUntil = tick + TRANSPORT_REST_TICKS;

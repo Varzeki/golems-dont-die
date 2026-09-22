@@ -248,6 +248,9 @@ public class GolemsDontDiePlugin extends Plugin
 	private PlaceNames placeNames;
 
 	@Inject
+	private GolemClimate climates;
+
+	@Inject
 	private Whereabouts whereabouts;
 
 	@Inject
@@ -478,6 +481,8 @@ public class GolemsDontDiePlugin extends Plugin
 		// the one place a few milliseconds shows.
 		worldMesh.load();
 		placeNames.load();
+		// The climate is named places resolved to regions, so it waits for them.
+		climates.learn(placeNames);
 		propFactory.load();
 		transports.load();
 		// The index before the routes, because the routes are filtered by it.
@@ -500,6 +505,7 @@ public class GolemsDontDiePlugin extends Plugin
 		});
 		roamContext.setPlanner(roamPlanner);
 		roamContext.setCensus(census);
+		roamContext.setClimates(climates);
 		roamContext.setTraversals(obstacleData::golemCrossed);
 		roamContext.setModels(modelFactory);
 
