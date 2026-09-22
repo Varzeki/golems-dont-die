@@ -39,6 +39,7 @@ import net.runelite.client.plugins.PluginManager;
  * ::gfind               point the arrow at the nearest golem
  * ::gremove [n]         remove n golems, to leave some missing for the plinth to revive
  * ::gmap                what the world map is looking at, with the map open
+ * ::gwhere [name]       where a golem is, and whether the ground under it is walkable
  *
  * <p>All of them wear the g: ::dance belongs to somebody else's plugin, and the golems stood
  * there while the player danced.
@@ -48,6 +49,8 @@ import net.runelite.client.plugins.PluginManager;
 	enabledByDefault = true)
 public class DevCommands extends Plugin
 {
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DevCommands.class);
+
 	@Inject
 	private Client client;
 
@@ -76,6 +79,7 @@ public class DevCommands extends Plugin
 			case "gfind":
 			case "gremove":
 			case "gmap":
+			case "gwhere":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -153,9 +157,34 @@ public class DevCommands extends Plugin
 				break;
 			}
 
+			case "gwhere":
+			{
+				String wanted = args.length > 0 ? String.join(" ", args).toLowerCase() : "";
+				int said = 0;
+				for (Golem one : golems)
+				{
+					String called = one.getNickname() == null ? names.nameFor(one.getId()) : one.getNickname();
+					if (wanted.isEmpty() || called != null && called.toLowerCase().contains(wanted))
+					{
+						WorldPoint at = one.currentTile();
+						say(called + " at " + at.getX() + "," + at.getY() + " plane " + at.getPlane()
+							+ ", " + (one.isSailing(client.getTickCount()) ? "sailing" : "ashore"));
+						if (++said >= 5)
+						{
+							break;
+						}
+					}
+				}
+				if (said == 0)
+				{
+					say("No golem called that.");
+				}
+				break;
+			}
+
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
-				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap");
+				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap  ::gwhere [name]");
 				break;
 
 			case "golems":
@@ -469,8 +498,13 @@ public class DevCommands extends Plugin
 		}
 	}
 
+	/**
+	 * Says something in the chat box, and in the client log with it: a run of ::gmap read back
+	 * over a screenshot is a slow way to answer a question about coordinates.
+	 */
 	private void say(String text)
 	{
 		client.addChatMessage(ChatMessageType.CONSOLE, "Golems", text, null);
+		log.info("{}", text);
 	}
 }
