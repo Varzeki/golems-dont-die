@@ -148,12 +148,11 @@ class GolemMapPoints
 			return;
 		}
 
-		// One cell per face, so two golems share a point exactly when their faces would have
-		// overlapped — measured against the largest face, since a cell holding a crowd is drawn
-		// with a head that size. Faces are then drawn at the middle of their cell, which is what
-		// keeps a grown head from sitting on top of the golem in the next cell along.
+		// How near two golems have to be to share a face, in tiles: a face's width at this zoom.
+		// Zoomed all the way in that is a tile, so every golem has its own face; pulled back it
+		// grows, and the groups grow with it.
 		float zoom = map.getWorldMapZoom();
-		int cellTiles = Math.max(1, (int) Math.ceil(FACE_PIXELS * CROWD_SIZES[CROWD_SIZES.length - 1] / zoom));
+		int cellTiles = Math.max(1, Math.round(FACE_PIXELS / zoom));
 		Point centre = map.getWorldMapPosition();
 		int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2) + MARGIN;
 		int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2) + MARGIN;
@@ -212,8 +211,35 @@ class GolemMapPoints
 				continue;
 			}
 
-			long key = ((long) (x / cellTiles) << 32) | (y / cellTiles) & 0xFFFFFFFFL;
-			int index = (int) cells.getOrDefault(key, -1);
+			// The nearest group close enough to take it, looked for in the nine cells around the
+			// golem: a group is only ever a cell or so across, so nothing further can reach.
+			int index = -1;
+			long nearest = Long.MAX_VALUE;
+			for (int dx = -1; dx <= 1 && !pinned; dx++)
+			{
+				for (int dy = -1; dy <= 1; dy++)
+				{
+					int at = (int) cells.getOrDefault(bucket(x / cellTiles + dx, y / cellTiles + dy), -1);
+					if (at < 0)
+					{
+						continue;
+					}
+					Cell group = cellList.get(at);
+					if (group.plane != golem.getPlane())
+					{
+						continue;
+					}
+					// A group of twenty is drawn with a head twice the size, and reaches as far.
+					long reach = (long) (cellTiles * CROWD_SIZES[sizeFor(group.count)]);
+					long away = Math.max(Math.abs(group.x - x), Math.abs(group.y - y));
+					if (away <= reach && away < nearest)
+					{
+						nearest = away;
+						index = at;
+					}
+				}
+			}
+
 			if (index < 0)
 			{
 				if (used >= MOST_POINTS)
@@ -226,18 +252,31 @@ class GolemMapPoints
 				}
 				index = used++;
 				Cell fresh = cellList.get(index);
-				// The middle of the cell, not the golem: two cells are a face apart by
-				// construction, two golems in neighbouring cells need not be.
-				fresh.x = pinned ? x : (x / cellTiles) * cellTiles + cellTiles / 2;
-				fresh.y = pinned ? y : (y / cellTiles) * cellTiles + cellTiles / 2;
+				fresh.x = x;
+				fresh.y = y;
+				fresh.sumX = 0;
+				fresh.sumY = 0;
 				fresh.plane = golem.getPlane();
 				fresh.count = 0;
 				fresh.first = golem;
-				cells.add(key, index);
+				// Bucketed where it started, so the golems after it can find it.
+				cells.add(bucket(x / cellTiles, y / cellTiles), index);
 			}
 			Cell cell = cellList.get(index);
 			cell.count++;
+			cell.sumX += x;
+			cell.sumY += y;
+			// A group sits at the middle of the golems in it, which is where a player would say
+			// they are. Laid out on the cells instead, a crowd came out as a lattice of heads.
+			cell.x = (int) (cell.sumX / cell.count);
+			cell.y = (int) (cell.sumY / cell.count);
 		}
+	}
+
+	/** The key of a cell of the lookup grid. */
+	private static long bucket(int x, int y)
+	{
+		return ((long) x << 32) | y & 0xFFFFFFFFL;
 	}
 
 	/** Puts a point on each filled cell, keeping the ones already on the map. */
@@ -317,8 +356,8 @@ class GolemMapPoints
 	/** The faces, one per size, drawn from the shipped one the first time each is wanted. */
 	private final BufferedImage[] faces = new BufferedImage[CROWDS.length];
 
-	/** The face to draw for a cell holding this many golems. */
-	private BufferedImage faceFor(int count)
+	/** Which of the face sizes a group of this many golems is drawn at. */
+	private static int sizeFor(int count)
 	{
 		int size = 0;
 		for (int i = 1; i < CROWDS.length; i++)
@@ -328,6 +367,13 @@ class GolemMapPoints
 				size = i;
 			}
 		}
+		return size;
+	}
+
+	/** The face to draw for a cell holding this many golems. */
+	private BufferedImage faceFor(int count)
+	{
+		int size = sizeFor(count);
 		if (faces[size] == null)
 		{
 			faces[size] = size == 0 ? face
@@ -375,8 +421,14 @@ class GolemMapPoints
 	/** The golems drawn as one face: where they are, how many, and a few of their names. */
 	private static final class Cell
 	{
+		/** Where the face goes: the middle of the golems in it. */
 		int x;
 		int y;
+
+		/** Their positions added up, which is how the middle is kept as each one joins. */
+		long sumX;
+		long sumY;
+
 		int plane;
 		int count;
 		Golem first;

@@ -1157,6 +1157,9 @@ class Golem
 	/** Shortest wait before going back, however small the space beyond: about 15 seconds. */
 	private static final int MIN_COOLDOWN_TICKS = 25;
 
+	/** And in a pen, five seconds: there is nowhere else to go, so there is nothing to wait for. */
+	private static final int PENNED_COOLDOWN_TICKS = 8;
+
 	/**
 	 * Walkable tiles around a golem below which it counts as penned in.
 	 *
@@ -1187,7 +1190,8 @@ class Golem
 		int room = Math.min(context.enclosedArea(x, y, toPlane),
 			context.enclosedArea(fineX / TILE, fineY / TILE, plane));
 		float share = Math.min(1f, room / (float) RoamContext.OPEN_AREA);
-		return Math.max(MIN_COOLDOWN_TICKS, Math.round(TransportMemory.COOLDOWN_TICKS * share));
+		int floor = room < PENNED_TILES ? PENNED_COOLDOWN_TICKS : MIN_COOLDOWN_TICKS;
+		return Math.max(floor, Math.round(TransportMemory.COOLDOWN_TICKS * share));
 	}
 
 	/**

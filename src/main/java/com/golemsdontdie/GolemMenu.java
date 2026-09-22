@@ -54,6 +54,16 @@ class GolemMenu
 		this.onRenamed = onRenamed;
 	}
 
+	/** Opens a golem's page. Set by the plugin, which owns the window. */
+	private Consumer<Golem> onInfo = golem ->
+	{
+	};
+
+	void setOnInfo(Consumer<Golem> onInfo)
+	{
+		this.onInfo = onInfo;
+	}
+
 	/**
 	 * Adds entries for whichever golem is under the cursor. Called once per client tick,
 	 * when the client rebuilds its menu. Only the topmost golem gets entries.
@@ -95,7 +105,7 @@ class GolemMenu
 			.onClick(e -> message(GolemContent.GOLEM_EXAMINE));
 
 		// Shift held, as NPC Indicators offers its tag. Added after Examine at the same
-		// index, so it sits just above Cancel.
+		// index, so they sit just above Cancel.
 		if (client.isKeyPressed(KeyCode.KC_SHIFT))
 		{
 			client.getMenu().createMenuEntry(1)
@@ -103,6 +113,12 @@ class GolemMenu
 				.setTarget(target)
 				.setType(MenuAction.RUNELITE)
 				.onClick(e -> askForName(hovered));
+
+			client.getMenu().createMenuEntry(1)
+				.setOption("Show Info")
+				.setTarget(target)
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> onInfo.accept(hovered));
 		}
 	}
 

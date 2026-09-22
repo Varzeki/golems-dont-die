@@ -560,6 +560,19 @@ public class GolemsDontDiePlugin extends Plugin
 			});
 		// Swing throughout, and it only reads the golem it is given: see GolemPage.
 		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), names);
+		menu.setOnInfo(golem ->
+		{
+			GolemPage open = page;
+			if (open != null)
+			{
+				// Swing's, from the client thread: the page is a window, not part of the game.
+				javax.swing.SwingUtilities.invokeLater(() ->
+				{
+					open.show(golem, panel);
+					clientThread.invoke(() -> dressPage(open, golem));
+				});
+			}
+		});
 		menu.setOnRenamed(golem ->
 		{
 			if (!running || panel == null)
