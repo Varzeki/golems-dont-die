@@ -5,7 +5,9 @@ import java.util.Map;
 import net.runelite.cache.ConfigType;
 import net.runelite.cache.IndexType;
 import net.runelite.cache.definitions.SequenceDefinition;
+import net.runelite.cache.definitions.SpotAnimDefinition;
 import net.runelite.cache.definitions.loaders.SequenceLoader;
+import net.runelite.cache.definitions.loaders.SpotAnimLoader;
 import net.runelite.cache.fs.Archive;
 import net.runelite.cache.fs.ArchiveFiles;
 import net.runelite.cache.fs.FSFile;
@@ -47,6 +49,32 @@ public class AnimationCheck
 			Map<Integer, Integer> framemaps = mapSequencesToFramemaps(store, sequences);
 
 			System.out.println();
+			if (args.length > 0 && args[0].equals("spot"))
+			{
+				// What a spot animation is made of, for drawing one on a golem: the client plays
+				// these on an actor and golems are not actors, so the model and the sequence have
+				// to be fetched and drawn as scenery. See FakeProp.
+				System.out.printf("%-8s %-10s %-10s %-10s %s%n",
+					"spot", "model", "animation", "framemap", "name");
+				Map<Integer, SpotAnimDefinition> spots = loadSpotAnims(store);
+				System.out.println("(" + spots.size() + " spot animations in the cache)");
+				for (int i = 1; i < args.length; i++)
+				{
+					int id = Integer.parseInt(args[i].trim());
+					SpotAnimDefinition spot = spots.get(id);
+					if (spot == null)
+					{
+						System.out.printf("%-8d %s%n", id, "no such spot animation");
+						continue;
+					}
+					Integer framemap = framemaps.get(spot.animationId);
+					System.out.printf("%-8d %-10d %-10d %-10s %s%n", id, spot.modelId, spot.animationId,
+						framemap == null ? "-" : framemap.toString(),
+						spot.debugName == null ? "" : spot.debugName);
+				}
+				return;
+			}
+
 			System.out.printf("%-8s %-10s %-8s %-12s %s%n", "anim", "framemap", "frames", "length", "verdict");
 			for (String arg : args)
 			{
@@ -77,6 +105,22 @@ public class AnimationCheck
 		System.out.printf("%-8d %-10s %-8d %-12s %s%n", id,
 			framemap == null ? "?" : framemap.toString(), frames,
 			String.format("%.1fs", cycles * CYCLE_SECONDS), verdict);
+	}
+
+	private static Map<Integer, SpotAnimDefinition> loadSpotAnims(Store store) throws Exception
+	{
+		Storage storage = store.getStorage();
+		Index index = store.getIndex(IndexType.CONFIGS);
+		Archive archive = index.getArchive(ConfigType.SPOTANIM.getId());
+		ArchiveFiles files = archive.getFiles(storage.loadArchive(archive));
+
+		SpotAnimLoader loader = new SpotAnimLoader();
+		Map<Integer, SpotAnimDefinition> out = new LinkedHashMap<>();
+		for (FSFile file : files.getFiles())
+		{
+			out.put(file.getFileId(), loader.load(file.getFileId(), file.getContents()));
+		}
+		return out;
 	}
 
 	private static Map<Integer, SequenceDefinition> loadSequences(Store store) throws Exception

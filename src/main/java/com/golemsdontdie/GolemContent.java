@@ -240,11 +240,10 @@ final class GolemContent
 	static final int ANIM_GOLEM_HELM = 13341;
 
 	/**
-	 * Scenery animations, framemaps 2503 and 2486 against the golem's 0, so only {@link FakeProp}
-	 * can draw them.
-	 */
-	/**
-	 * Kept for the record rather than used: {@link PropFactory} reads each object's own
+	 * Scenery animations belong to the scenery's own framemaps, 2503 and 2486 against the golem's
+	 * 0, so only {@link FakeProp} can draw them.
+	 *
+	 * <p>Kept for the record rather than used: {@link PropFactory} reads each object's own
 	 * {@code animationID} from the cache, so a plank, a gate and a fairy ring each get their own.
 	 */
 	static final int ANIM_PROP_GANGPLANK = 13562;
@@ -252,6 +251,39 @@ final class GolemContent
 
 	/** How long a scenery animation is drawn for, in client cycles. */
 	static final int PROP_CYCLES = 60;
+
+	// ---------------------------------------------------------------------------
+	// Celebrations
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * The fireworks that go off over a levelling player, drawn over a dancing golem instead.
+	 *
+	 * <p>Spot animation 199, which the client plays on an actor: golems are not actors, so its
+	 * model and sequence are drawn as scenery like any other prop. Read from the cache with
+	 * {@code dev-tools/AnimationCheck spot 199}; the sequence is framemap 877, the spot
+	 * animation's own rig, which is why it is played against its own model and not the golem.
+	 *
+	 * <p>The three fireworks Death Party offers are 199, 1388 (the 99) and 1389 (max total).
+	 * This is the first of them, being the one a player sees most.
+	 */
+	static final int SPOTANIM_FIREWORK = 199;
+	static final int FIREWORK_MODEL = 411;
+	static final int FIREWORK_ANIMATION = 913;
+
+	/** How long the fireworks are drawn for, in client cycles: the sequence is 1.8 seconds. */
+	static final int FIREWORK_CYCLES = 90;
+
+	/**
+	 * The guitar an air guitar is played on. Spot animation 1239, whose sequence runs the same
+	 * three seconds as the emote, so the two start together and strum together.
+	 */
+	static final int SPOTANIM_AIR_GUITAR = 1239;
+	static final int AIR_GUITAR_MODEL = 29315;
+	static final int AIR_GUITAR_ANIMATION = 4752;
+
+	/** How long a dance prop is drawn for, in client cycles: the guitar's sequence is 3 seconds. */
+	static final int DANCE_PROP_CYCLES = 150;
 
 	static boolean isGolem(int npcId)
 	{

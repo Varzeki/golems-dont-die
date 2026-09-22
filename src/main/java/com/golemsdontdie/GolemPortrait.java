@@ -123,6 +123,15 @@ class GolemPortrait
 		return model == null ? null : draw(posed(model, animation, frame), model, degrees, 0, shown);
 	}
 
+	/**
+	 * Any model, posed by any animation, for the developer export: what the fireworks and the
+	 * guitar look like is worth seeing before they are drawn over somebody's golems.
+	 */
+	BufferedImage of(Model model, int animation, int frame)
+	{
+		return model == null ? null : draw(posed(model, animation, frame), model, 0, 0, 1f);
+	}
+
 	/** The model held at one frame of an animation, or as it rests if there is no such animation. */
 	private Model posed(Model model, int animation, int frame)
 	{

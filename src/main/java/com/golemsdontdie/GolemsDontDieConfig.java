@@ -121,6 +121,50 @@ public interface GolemsDontDieConfig extends Config
 		return false;
 	}
 
+	@ConfigSection(
+		name = "Celebrations",
+		description = "Golems stop what they are doing and dance when something goes well",
+		position = 1
+	)
+	String celebrationsSection = "celebrations";
+
+	@ConfigItem(
+		keyName = "danceOnLevelUp",
+		name = "Level up",
+		description = "Golems dance when you gain a level.",
+		section = celebrationsSection,
+		position = 0
+	)
+	default boolean danceOnLevelUp()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnCollectionLog",
+		name = "Collection log",
+		description = "Golems dance when you fill a collection log slot. Needs the game's collection "
+			+ "log chat message turned on.",
+		section = celebrationsSection,
+		position = 1
+	)
+	default boolean danceOnCollectionLog()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnGolemCrafted",
+		name = "Golem crafted",
+		description = "Golems dance each time you craft another golem.",
+		section = celebrationsSection,
+		position = 2
+	)
+	default boolean danceOnGolemCrafted()
+	{
+		return false;
+	}
+
 	// Developer settings, not shipped. Golems always learn from the player's play, so that is
 	// not an option. Obstacle data is kept on disk for a later update to offer to send; see the
 	// telemetry package. The two below are always off in a release: on a dev client, uncomment

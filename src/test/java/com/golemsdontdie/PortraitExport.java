@@ -172,6 +172,35 @@ public class PortraitExport extends Plugin
 			}
 		}
 		ImageIO.write(sheet, "png", new File(dir, "portraits-dances.png"));
+
+		// And what the celebration draws beside the golem: the fireworks and the air guitar.
+		int[][] spots = {
+			{GolemContent.FIREWORK_MODEL, GolemContent.FIREWORK_ANIMATION},
+			{GolemContent.AIR_GUITAR_MODEL, GolemContent.AIR_GUITAR_ANIMATION},
+		};
+		sheet = new BufferedImage(GolemPortrait.WIDTH * 6, GolemPortrait.HEIGHT * spots.length,
+			BufferedImage.TYPE_INT_ARGB);
+		for (int row = 0; row < spots.length; row++)
+		{
+			net.runelite.api.ModelData data = client.loadModelData(spots[row][0]);
+			net.runelite.api.Model model = data == null ? null : data.cloneVertices().light();
+			net.runelite.api.Animation loaded = client.loadAnimation(spots[row][1]);
+			log.info("model {} has {} vertices and {} faces; animation {} has {} frames",
+				spots[row][0], model == null ? -1 : model.getVerticesCount(),
+				model == null ? -1 : model.getFaceCount(), spots[row][1],
+				loaded == null ? -1 : loaded.getNumFrames());
+			for (int frame = 0; frame < 6; frame++)
+			{
+				int at = loaded == null ? frame : frame * Math.max(1, loaded.getNumFrames()) / 6;
+				BufferedImage drawn = portraits.of(model, spots[row][1], at);
+				if (drawn != null)
+				{
+					sheet.getGraphics().drawImage(drawn, frame * GolemPortrait.WIDTH,
+						row * GolemPortrait.HEIGHT, null);
+				}
+			}
+		}
+		ImageIO.write(sheet, "png", new File(dir, "portraits-celebration.png"));
 		log.info("Portraits written to {}", dir);
 	}
 }

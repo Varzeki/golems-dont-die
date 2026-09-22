@@ -14,6 +14,7 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Model;
+import net.runelite.api.ModelData;
 import net.runelite.api.NPC;
 import net.runelite.api.Perspective;
 import net.runelite.api.Player;
@@ -30,6 +31,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.events.ClientShutdown;
@@ -295,6 +297,9 @@ public class GolemsDontDiePlugin extends Plugin
 	private static final int CENSUS_TICKS = 10;
 
 	private int ticksSinceCensus;
+
+	@Inject
+	private GolemCelebration celebration;
 
 	/** Set when a golem is added, removed or restored, so the panel redraws once. */
 	private boolean rosterChanged = true;
@@ -763,6 +768,14 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			rosterChanged = true;
 		}
+		celebration.chatMessage(event.getMessage(), client.getTickCount());
+	}
+
+	/** A level going up is one of the things the golems dance about. See GolemCelebration. */
+	@Subscribe
+	public void onStatChanged(StatChanged event)
+	{
+		celebration.statChanged(event.getSkill(), event.getLevel(), client.getTickCount());
 	}
 
 	/**
@@ -796,6 +809,11 @@ public class GolemsDontDiePlugin extends Plugin
 		if (tally.observeCount(count))
 		{
 			rosterChanged = true;
+		}
+		// The count itself says a golem was crafted, message or no message.
+		if (count > 0)
+		{
+			celebration.golemCount(count, client.getTickCount());
 		}
 		if (count > 0)
 		{
@@ -1331,6 +1349,12 @@ public class GolemsDontDiePlugin extends Plugin
 		int tick = client.getTickCount();
 		boolean lookAtAll = farViewChanged(wv, playerAt, restrictAmbition);
 
+		// Something is being celebrated. Fireworks are rolled for once a tick rather than once a
+		// frame, which is fifty times as often and would fill the sky in a second.
+		boolean celebrating = celebration.isDancing(tick);
+		boolean fireworksDue = celebrating && tick != lastFireworkTick;
+		lastFireworkTick = celebrating ? tick : lastFireworkTick;
+
 		for (Golem golem : golems)
 		{
 			if (!lookAtAll && golem.getTier() == GolemTier.FAR && golem.getRenderer() == null
@@ -1348,6 +1372,10 @@ public class GolemsDontDiePlugin extends Plugin
 			GolemTier tier = tierFor(golem, wv, playerAt, playerTemplate, sceneChunks);
 
 			golem.setTier(tier, roamContext, roamPlanner);
+
+			// Only the golems the player can see dance: one three regions away would be standing
+			// still for nobody, and it has walking to be getting on with.
+			golem.setDancing(celebrating && tier == GolemTier.SCENE);
 
 			if (tier == GolemTier.FAR)
 			{
@@ -1381,6 +1409,16 @@ public class GolemsDontDiePlugin extends Plugin
 			if (prop != null && tier == GolemTier.SCENE)
 			{
 				spawnProp(prop, wv);
+			}
+
+			// What the dance needs: the guitar an air guitar is played on, and the fireworks.
+			if (golem.takeDanceProp())
+			{
+				spawnDanceProp(golem, wv);
+			}
+			if (fireworksDue && tier == GolemTier.SCENE && fireworkRandom.nextFloat() < FIREWORK_CHANCE)
+			{
+				spawnFirework(golem, wv);
 			}
 		}
 
@@ -1873,6 +1911,110 @@ public class GolemsDontDiePlugin extends Plugin
 		props.add(drawn);
 	}
 
+	/** The chance per dancing golem per tick that fireworks go off over it. */
+	private static final float FIREWORK_CHANCE = 0.06f;
+
+	/** Whose fireworks go off, and nothing else: the golems' own generators are their own. */
+	private final java.util.Random fireworkRandom = new java.util.Random();
+
+	/** How many lots of fireworks may be in the air at once, so a crowd does not fill the sky. */
+	private static final int MOST_FIREWORKS = 6;
+
+	/** The last tick fireworks were rolled for, so the roll is per tick and not per frame. */
+	private int lastFireworkTick = -1;
+
+	/** Models for the celebration, built once each: see GolemContent. */
+	private final Map<Integer, Model> celebrationModels = new HashMap<>();
+
+	/**
+	 * Draws the fireworks over a golem. The client plays these on an actor, and a golem is a
+	 * model of our own rather than an actor, so its model and sequence are drawn as scenery.
+	 */
+	private void spawnFirework(Golem golem, WorldView wv)
+	{
+		int live = 0;
+		for (FakeProp prop : props)
+		{
+			if (prop.getAnimationId() == GolemContent.FIREWORK_ANIMATION)
+			{
+				live++;
+			}
+		}
+		if (live >= MOST_FIREWORKS)
+		{
+			return;
+		}
+		spawnAtGolem(golem, wv, GolemContent.FIREWORK_MODEL, GolemContent.FIREWORK_ANIMATION,
+			GolemContent.FIREWORK_CYCLES);
+	}
+
+	/** Draws whatever the golem's dance move needs beside it: the air guitar's guitar. */
+	private void spawnDanceProp(Golem golem, WorldView wv)
+	{
+		GolemDance move = golem.getDanceMove();
+		if (move == null || move.getSpotanim() != GolemContent.SPOTANIM_AIR_GUITAR)
+		{
+			return;
+		}
+		spawnAtGolem(golem, wv, GolemContent.AIR_GUITAR_MODEL, GolemContent.AIR_GUITAR_ANIMATION,
+			GolemContent.DANCE_PROP_CYCLES);
+	}
+
+	/**
+	 * Draws a model on the golem's own tile, playing its own animation for a while. The golem
+	 * stands still while it dances, so nothing has to follow it.
+	 */
+	private void spawnAtGolem(Golem golem, WorldView wv, int modelId, int animationId, int cycles)
+	{
+		if (wv == null)
+		{
+			return;
+		}
+		int localX = golem.getFineX() - wv.getBaseX() * Golem.TILE;
+		int localY = golem.getFineY() - wv.getBaseY() * Golem.TILE;
+		if (!Golem.isInScene(wv, localX, localY))
+		{
+			return;
+		}
+		Model model = celebrationModel(modelId);
+		if (model == null)
+		{
+			return;
+		}
+		int height = Perspective.getTileHeight(client,
+			new LocalPoint(localX, localY, wv), golem.getPlane());
+		FakeProp drawn = new FakeProp(client, model, modelFactory.animationFor(animationId),
+			animationId, golem.getFineX(), golem.getFineY(), golem.getPlane(), height, cycles);
+		client.registerRuneLiteObject(drawn);
+		props.add(drawn);
+	}
+
+	/** A celebration model, lit as the props are and kept: there are two of them and they repeat. */
+	private Model celebrationModel(int modelId)
+	{
+		Model cached = celebrationModels.get(modelId);
+		if (cached != null)
+		{
+			return cached;
+		}
+		try
+		{
+			ModelData data = client.loadModelData(modelId);
+			if (data == null)
+			{
+				return null;
+			}
+			Model built = data.cloneVertices().light();
+			celebrationModels.put(modelId, built);
+			return built;
+		}
+		catch (RuntimeException e)
+		{
+			log.debug("Celebration model {} would not load", modelId, e);
+			return null;
+		}
+	}
+
 	/** Unregisters scenery whose animation has run out. */
 	private void advanceProps()
 	{
@@ -2261,6 +2403,10 @@ public class GolemsDontDiePlugin extends Plugin
 			detector.reset();
 			hiddenNpcs.clear();
 			lastGameCycle = -1;
+
+			// The tick counter restarts on the other side, so a deadline carried across would sit
+			// far ahead of it, and the levels and the golem count are about to be sent again.
+			celebration.reset();
 
 			for (Golem golem : golems)
 			{

@@ -67,6 +67,7 @@ class FakeGolem extends RuneLiteObjectController
 		this.baseModel = baseModel;
 		this.shared = shared;
 		this.animation = new AnimationController(client, -1);
+		this.animation.setOnFinished(this::poseFinished);
 
 		// The default radius suits a single-tile object; a bigger golem needs the tiles under
 		// its footprint drawn first or it z-fights with the ground.
@@ -203,6 +204,30 @@ class FakeGolem extends RuneLiteObjectController
 			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getDrawPlane())
 				- golem.jumpArc() - golem.deckLift());
 		}
+	}
+
+	/**
+	 * The next dance move, when one finishes.
+	 *
+	 * <p>Set here rather than left to {@link #applyPose()}, which only acts when the wanted
+	 * animation changes: the next move may be the one that just finished, and the golem would
+	 * stop on its last frame.
+	 *
+	 * <p>Only when what finished was the move itself. A golem dancing when it starts to crumble
+	 * is playing its death animation, and that ending is not a cue to dance again.
+	 */
+	private void poseFinished(AnimationController controller)
+	{
+		GolemDance move = golem.getDanceMove();
+		if (!golem.isDancing() || move == null || loadedAnimationId != move.getAnimationId())
+		{
+			controller.loop();
+			return;
+		}
+
+		golem.nextDanceMove();
+		loadedAnimationId = golem.currentPoseAnimation();
+		controller.setAnimation(shared.animationFor(loadedAnimationId));
 	}
 
 	/** Switches between the walk and idle loops as the simulation changes its mind. */

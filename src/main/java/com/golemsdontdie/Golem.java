@@ -325,6 +325,28 @@ class Golem
 	@Getter
 	private boolean walking;
 
+	/**
+	 * Set while the golems are celebrating something. A dancing golem stands where it is until it
+	 * is over: it finishes the step it is on, then dances rather than looking for anywhere to go.
+	 */
+	@Getter
+	@Setter
+	private boolean dancing;
+
+	/** The move it is on, or null before the first. */
+	@Getter
+	private GolemDance danceMove;
+
+	/**
+	 * The moves' own generator, seeded from the golem but separate from it: drawn from the golem's
+	 * own, dancing would change where it walked afterwards, and two golems that danced the same
+	 * number of moves would then walk in step.
+	 */
+	private Random danceRandom;
+
+	/** Set when a move wants something drawn beside the golem, such as the air guitar's guitar. */
+	private boolean propPending;
+
 	/** Set when the golem is inside the loaded scene and should be drawn. */
 	@Getter
 	@Setter
@@ -776,6 +798,12 @@ class Golem
 				if (path.isEmpty())
 				{
 					walking = false;
+					// Dancing: the step it was on is finished, and it goes nowhere else until the
+					// celebration is over. Not even a shortcut under its nose.
+					if (dancing)
+					{
+						return searched;
+					}
 					dwellRemaining -= remaining;
 					if (dwellRemaining > 0)
 					{
@@ -1939,6 +1967,27 @@ class Golem
 			+ (dwellRemaining > 0 ? " dwell=" + dwellRemaining : "");
 	}
 
+	void nextDanceMove()
+	{
+		if (danceRandom == null)
+		{
+			danceRandom = new Random(id * 0x2545F4914F6CDD1DL);
+		}
+		danceMove = GolemDance.random(danceRandom);
+		propPending = danceMove.getSpotanim() != -1;
+	}
+
+	/**
+	 * Whether the move just started needs something drawn beside the golem, clearing the ask.
+	 * Called once per move by whoever can draw it; see GolemsDontDiePlugin.spawnDanceProp.
+	 */
+	boolean takeDanceProp()
+	{
+		boolean wanted = propPending;
+		propPending = false;
+		return wanted;
+	}
+
 	/** The animation this golem should be playing right now. -1 if it has none. */
 	int currentPoseAnimation()
 	{
@@ -1957,6 +2006,17 @@ class Golem
 		if (gaitWalk != -1)
 		{
 			return walking ? gaitWalk : gaitIdle;
+		}
+		// Last of all, and never over anything else: a golem climbing, crossing or at the helm has
+		// a pose already, and one halfway through a recorded motion is having its frames set by
+		// hand. Dancing is what a golem does when it is doing nothing.
+		if (dancing && !walking)
+		{
+			if (danceMove == null)
+			{
+				nextDanceMove();
+			}
+			return danceMove.getAnimationId();
 		}
 		return walking ? snapshot.getWalkAnimation() : snapshot.getIdlePoseAnimation();
 	}

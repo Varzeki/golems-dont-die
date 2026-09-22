@@ -38,6 +38,16 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Golems on the world map | Named golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
 
+**Celebrations**
+
+Golems in view stop what they are doing, dance for about ten seconds and set off fireworks.
+
+| Setting | Default | |
+|---|---|---|
+| Level up | On | Golems dance when you gain a level. |
+| Collection log | On | Golems dance when you fill a collection log slot. Needs the game's collection log chat message turned on. |
+| Golem crafted | Off | Golems dance each time you craft another golem. |
+
 
 ## Finding a golem
 
@@ -70,6 +80,10 @@ Model and animation technique from
 
 Boat movement modelled
 on [Turning Circles](https://github.com/anmcgrath/turning-circles) by anmcgrath. 
+
+Dancing contributed by [NathanVegetable](https://github.com/Varzeki/golems-dont-die/pull/1), who took
+the idea from [Dance Party](https://github.com/dekvall/runelite-external-plugins/tree/dance-party) by
+dekvall. Fireworks after [Death Party](https://github.com/DangItOSRS/death-party) by DangItOSRS. 
 
 ## Licence
 
