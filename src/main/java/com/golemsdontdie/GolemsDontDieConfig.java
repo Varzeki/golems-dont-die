@@ -125,7 +125,7 @@ public interface GolemsDontDieConfig extends Config
 		keyName = "showSidebar",
 		name = "Enable sidebar",
 		description = "Shows the Golems tab. With it off, missing golems can still be revived by "
-			+ "shift right-clicking a golem plinth on Wyrmscraig.",
+			+ "right-clicking a golem plinth on Wyrmscraig.",
 		section = golemsSection,
 		position = 6
 	)

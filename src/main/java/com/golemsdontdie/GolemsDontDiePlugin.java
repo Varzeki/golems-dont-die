@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.KeyCode;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
@@ -2225,11 +2224,14 @@ public class GolemsDontDiePlugin extends Plugin
 	/**
 	 * Offers to revive missing golems from the plinth they were carved on, for a player with the
 	 * sidebar off — and for anyone standing at the plinth, which is where it would occur to them.
+	 *
+	 * <p>On a plain right-click and not behind shift: the entry is there only while golems are
+	 * missing, so it is never in the way of carving another one.
 	 */
 	@Subscribe
 	public void onMenuOpened(MenuOpened event)
 	{
-		if (!running || !client.isKeyPressed(KeyCode.KC_SHIFT))
+		if (!running)
 		{
 			return;
 		}

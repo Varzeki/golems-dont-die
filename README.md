@@ -37,7 +37,7 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Name colour | Yellow (#FFE700) | The colour of the golem names. |
 | Golems on the world map | Named golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
-| Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by shift right-clicking a golem plinth. |
+| Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |
 
 **Celebrations**
 
@@ -55,8 +55,8 @@ Golems in view stop what they are doing, dance for about ten seconds and set off
 The sidebar lists your golems nearest first, fifty to a page, with a search box for names. Under
 each name is where that golem is — "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
 
-Shift right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar;
-the option carries the number missing.
+Right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar. The
+option carries the number missing, and is only there while any are.
 
 **Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
 eight tiles of it or stop looking. While you are looking, that golem is the only one on the world

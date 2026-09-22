@@ -106,8 +106,9 @@ class GolemMenu
 	/**
 	 * Adds the plinth's revive entry, above Cancel as the golems' own entries are.
 	 *
-	 * <p>Shown on a golem plinth with shift held, and only while golems are missing: the count is
-	 * in the option so a player knows what they are asking for before they ask.
+	 * <p>Shown on a golem plinth while golems are missing and not otherwise, which is why it needs
+	 * no shift to reach. The count is in the option, so a player knows what they are asking for
+	 * before they ask.
 	 */
 	void addReviveEntry(int missing, String target, Runnable revive)
 	{
