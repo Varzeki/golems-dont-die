@@ -486,6 +486,12 @@ class RoamPlanner
 		return Itinerary.of(single(at), at.getPlane(), tick, ticks);
 	}
 
+	/** Standing where it is for a while: a golem waiting at a quayside for a crew to make up. */
+	static Itinerary stayPut(WorldPoint at, int tick, int ticks)
+	{
+		return Itinerary.of(single(at), at.getPlane(), tick, Math.max(1, ticks));
+	}
+
 	private static List<int[]> single(WorldPoint at)
 	{
 		List<int[]> path = new ArrayList<>(1);

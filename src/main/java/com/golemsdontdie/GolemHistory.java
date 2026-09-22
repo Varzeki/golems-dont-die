@@ -73,6 +73,15 @@ class GolemHistory
 	}
 
 	/**
+	 * Takes a crossing back off the tally: a golem held at the quayside to wait for a crew had
+	 * already been counted out, and will be counted again when it really goes.
+	 */
+	void unsailed()
+	{
+		voyages = Math.max(0, voyages - 1);
+	}
+
+	/**
 	 * Notes where the golem is now. Called for every golem on the census pass, so it is a handful
 	 * of comparisons and nothing else.
 	 */

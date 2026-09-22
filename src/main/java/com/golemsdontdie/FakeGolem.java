@@ -193,7 +193,9 @@ class FakeGolem extends RuneLiteObjectController
 		setY(localY);
 		setWorldView(wv.getId());
 		setLevel(golem.getDrawPlane());
-		setOrientation(golem.getOrientation());
+		// A golem in a crew looks out over the side it stands on; everyone else faces where it is
+		// going. See Golem.drawOrientation.
+		setOrientation(golem.drawOrientation());
 
 		// Ground height is re-read as the golem moves: Wyrmscraig is not flat, and a golem
 		// holding its spawn height would sink into a rise.

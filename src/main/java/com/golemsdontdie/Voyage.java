@@ -180,6 +180,70 @@ class Voyage
 		return crossing;
 	}
 
+	/**
+	 * Plans the one crossing a crew will share.
+	 *
+	 * <p>The port is chosen after the crew is, and chosen for all of them: a candidate is worth no
+	 * more than the least any of them thinks of it, so a crew never sails somewhere one of its
+	 * members would have refused to go. Ports any of them is blocked from are not offered at all.
+	 *
+	 * @param crew the memories of the golems sailing, the first of which is at the helm
+	 * @return the crossing, or null if none could be planned this tick
+	 */
+	Itinerary crewCrossing(SailingDocks.Dock from, java.util.List<TransportMemory> crew, WorldPoint at,
+		int tick, Random random, RoamContext context)
+	{
+		if (crew.isEmpty())
+		{
+			return null;
+		}
+		List<SailingDocks.Dock> candidates = new java.util.ArrayList<>(docks.openDocks());
+		candidates.removeIf(d -> d.getRowId() == from.getRowId());
+		for (TransportMemory memory : crew)
+		{
+			candidates.removeIf(d -> d.getRowId() == memory.getBlockedPort());
+		}
+		if (candidates.isEmpty())
+		{
+			return null;
+		}
+
+		GolemClimate climate = context == null ? null : context.getClimates();
+		SailingDocks.Dock best = null;
+		float bestWorth = -1f;
+		for (SailingDocks.Dock candidate : candidates)
+		{
+			WorldPoint shore = candidate.getShore();
+			if (shore == null)
+			{
+				continue;
+			}
+			// The least anyone thinks of it, not the average: one golem dragged somewhere it hates
+			// is the thing to avoid, and a crew is a compromise by nature.
+			float worth = context == null ? 1f
+				: context.roominess(shore.getX(), shore.getY(), shore.getPlane(), crew.get(0));
+			if (climate != null)
+			{
+				for (TransportMemory memory : crew)
+				{
+					worth = Math.min(worth, climate.liking(memory, shore.getX(), shore.getY()));
+				}
+			}
+			// A nudge apiece so equals do not always fall the same way.
+			worth *= 0.75f + random.nextFloat() * 0.5f;
+			if (worth > bestWorth)
+			{
+				bestWorth = worth;
+				best = candidate;
+			}
+		}
+		if (best == null)
+		{
+			return null;
+		}
+		return crossTo(from, best, at, crew.get(0), tick, random, context);
+	}
+
 	/** How much a golem likes the look of a dock's own shore; 0 for a dock with no shore. */
 	private static float liking(GolemClimate climate, TransportMemory memory, SailingDocks.Dock dock)
 	{

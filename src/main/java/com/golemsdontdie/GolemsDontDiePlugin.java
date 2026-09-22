@@ -140,6 +140,9 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private RaftFactory raftFactory;
 
+	@Inject
+	private GolemCrews crews;
+
 	/**
 	 * Watches the player use obstacles and teaches the plugin what each does. Golems may only
 	 * use obstacles whose animation is known; this grows that set.
@@ -655,6 +658,7 @@ public class GolemsDontDiePlugin extends Plugin
 			});
 			propFactory.clear();
 			raftFactory.clear();
+			crews.clear();
 			census.clear();
 			hiddenNpcs.clear();
 			detector.reset();
@@ -1978,6 +1982,14 @@ public class GolemsDontDiePlugin extends Plugin
 		boolean afloat = visible && (golem.isAfloat() || worldMesh.isOcean(
 			golem.getFineX() / Golem.TILE, golem.getFineY() / Golem.TILE, golem.getPlane()));
 
+		// A crew has one boat between them, drawn under whoever has the helm. Everyone else is
+		// standing on it, and a raft apiece would be eight rafts in a heap.
+		GolemCrew crew = crews.crewOf(golem);
+		if (crew != null && !crew.isHelm(golem))
+		{
+			afloat = false;
+		}
+
 		if (!afloat)
 		{
 			if (raft != null)
@@ -1988,9 +2000,10 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
+		GolemBoat kind = crew == null ? GolemBoat.RAFT : crew.getBoat();
 		if (raft == null)
 		{
-			Model hull = raftFactory.raftModel();
+			Model hull = raftFactory.boatModel(kind);
 			if (hull == null)
 			{
 				return;
@@ -2001,11 +2014,12 @@ public class GolemsDontDiePlugin extends Plugin
 			rafts.put(golem, raft);
 		}
 
-		// The hull follows the golem, which is at the helm at the stern, so the raft's middle is
-		// a tile ahead — the way it faces: 0 south, 512 west, 1024 north, 1536 east.
+		// The hull follows the golem, which is at the helm at the stern, so the boat's middle is
+		// ahead of it — the way it faces: 0 south, 512 west, 1024 north, 1536 east. How far ahead
+		// is the boat's own business: a sloop's helm sits three and a half tiles back.
 		double facing = golem.getOrientation() * Math.PI / 1024;
-		int aheadX = (int) Math.round(-Math.sin(facing) * GolemContent.RAFT_HELM_OFFSET);
-		int aheadY = (int) Math.round(-Math.cos(facing) * GolemContent.RAFT_HELM_OFFSET);
+		int aheadX = (int) Math.round(-Math.sin(facing) * kind.getHelmOffset());
+		int aheadY = (int) Math.round(-Math.cos(facing) * kind.getHelmOffset());
 		// At the golem's ground height, always in the scene when the golem is drawn.
 		WorldView view = client.getTopLevelWorldView();
 		int localX = golem.getFineX() - (view == null ? 0 : view.getBaseX() * Golem.TILE);
@@ -2540,6 +2554,9 @@ public class GolemsDontDiePlugin extends Plugin
 			applyLearnedRoutes();
 			obstacleData.save();
 		}
+
+		// Who is waiting at a quayside, who has just cast off, and who has landed.
+		crews.update(golems, roamContext.getTick(), roamContext);
 
 		// A few golems a tick, asked whether the ground they are on joins up with home.
 		sweepForCutOff();

@@ -467,6 +467,35 @@ class Golem
 	}
 
 	/**
+	 * Stands the golem at the quayside for a while instead of casting off, while a crew is made
+	 * up around it. The crossing it had planned is given up — the crew's is planned when the crew
+	 * is, and a golem let go without one plans afresh — so the tally gives that one back too.
+	 */
+	void waitAshore(int tick, int ticks)
+	{
+		if (itinerary != null && itinerary.isVoyage())
+		{
+			history.unsailed();
+		}
+		path.clear();
+		walking = false;
+		itinerary = RoamPlanner.stayPut(currentTile(), tick, ticks);
+	}
+
+	/** Takes the crossing its crew has planned. Counted, as any other voyage is. */
+	void boardCrossing(Itinerary crossing)
+	{
+		path.clear();
+		walking = false;
+		adopt(crossing);
+	}
+
+	TransportMemory getTransportMemory()
+	{
+		return transportMemory;
+	}
+
+	/**
 	 * Takes on a plan, and keeps the tally with it: a voyage is only ever known about here, the
 	 * planner having worked it out for a golem it was handed the memory of and not the golem.
 	 */
@@ -1788,6 +1817,51 @@ class Golem
 	private int drawOffsetY;
 	private int drawPlane = -1;
 
+	/**
+	 * Where this golem stands on its crew's boat, in model units: across to starboard, and forward
+	 * of the helm. The helm's own berth is 0,0. A crew shares one crossing, so every golem in it is
+	 * at the same place by the route's reckoning and would stand in one heap without this.
+	 */
+	private int deckAcross;
+	private int deckAlong;
+
+	/** Set while this golem is one of a crew rather than alone on a raft. */
+	@Getter
+	private boolean crewed;
+
+	/** Takes a berth on a boat. See GolemCrew, which hands them out. */
+	void board(int across, int along)
+	{
+		deckAcross = across;
+		deckAlong = along;
+		crewed = true;
+	}
+
+	/** Steps off, back to sailing alone. */
+	void disembark()
+	{
+		deckAcross = 0;
+		deckAlong = 0;
+		crewed = false;
+	}
+
+	/**
+	 * The way the golem is drawn facing.
+	 *
+	 * <p>A golem at the helm faces the way the boat is going. Everyone else looks out over the
+	 * side they are standing on, which is what people on a boat do and what keeps a crew from
+	 * reading as a rank of soldiers.
+	 */
+	int drawOrientation()
+	{
+		if (!crewed || deckAcross == 0)
+		{
+			return orientation;
+		}
+		// Right of a golem facing south is west, which is 512 further round.
+		return orientation + (deckAcross > 0 ? 512 : -512) & 2047;
+	}
+
 	void setDrawOffset(int x, int y, int plane)
 	{
 		drawOffsetX = x;
@@ -1797,12 +1871,32 @@ class Golem
 
 	int getDrawFineX()
 	{
-		return fineX + drawOffsetX;
+		return fineX + drawOffsetX + deckOffset(true);
 	}
 
 	int getDrawFineY()
 	{
-		return fineY + drawOffsetY;
+		return fineY + drawOffsetY + deckOffset(false);
+	}
+
+	/**
+	 * How far a berth lies from the boat's helm, along the world's axes. Model units and the
+	 * golem's own hundred-and-twenty-eighths of a tile are the same size, so the deck's numbers
+	 * need no scaling — only turning, to wherever the boat is pointing.
+	 */
+	private int deckOffset(boolean acrossX)
+	{
+		if (!crewed || deckAcross == 0 && deckAlong == 0)
+		{
+			return 0;
+		}
+		double facing = orientation * Math.PI / 1024;
+		double sin = Math.sin(facing);
+		double cos = Math.cos(facing);
+		// Forward is where the boat points; starboard is a quarter turn right of it.
+		return (int) Math.round(acrossX
+			? deckAlong * -sin + deckAcross * -cos
+			: deckAlong * -cos + deckAcross * sin);
 	}
 
 	int getDrawPlane()
