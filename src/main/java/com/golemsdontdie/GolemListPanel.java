@@ -79,6 +79,12 @@ class GolemListPanel extends PluginPanel
 
 	private final Consumer<Golem> onRemove;
 
+	/** Asks for a golem to be pointed at, or for the pointing to stop when given null. */
+	private final Consumer<Golem> onFind;
+
+	/** The bar offering to stop pointing, shown only while a golem is being pointed at. */
+	private final JButton finding = new JButton();
+
 	/** A golem and its new name, or null for none. Called on the Swing thread. */
 	private final java.util.function.BiConsumer<Golem, String> onRename;
 
@@ -107,10 +113,12 @@ class GolemListPanel extends PluginPanel
 		}
 	}
 
-	GolemListPanel(Consumer<Golem> onRemove, java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive)
+	GolemListPanel(Consumer<Golem> onRemove, java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive,
+		Consumer<Golem> onFind)
 	{
 		super(false);
 		this.onRemove = onRemove;
+		this.onFind = onFind;
 		this.onRename = onRename;
 		this.onRevive = onRevive;
 
@@ -180,9 +188,22 @@ class GolemListPanel extends PluginPanel
 		paging.add(next, BorderLayout.EAST);
 		paging.setVisible(false);
 
+		finding.setFont(ROW);
+		finding.setFocusPainted(false);
+		finding.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		finding.setForeground(Color.WHITE);
+		finding.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		finding.addActionListener(e -> onFind.accept(null));
+		finding.setVisible(false);
+
+		JPanel above = new JPanel(new BorderLayout());
+		above.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		above.add(revive, BorderLayout.NORTH);
+		above.add(finding, BorderLayout.SOUTH);
+
 		JPanel controls = new JPanel(new BorderLayout());
 		controls.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		controls.add(revive, BorderLayout.NORTH);
+		controls.add(above, BorderLayout.NORTH);
 		controls.add(search, BorderLayout.CENTER);
 		controls.add(paging, BorderLayout.SOUTH);
 
@@ -356,6 +377,25 @@ class GolemListPanel extends PluginPanel
 		});
 	}
 
+	/** Shows or hides the bar offering to stop pointing at a golem. */
+	void setFinding(String name)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			boolean show = name != null;
+			if (show)
+			{
+				finding.setText("Stop finding " + name);
+			}
+			if (finding.isVisible() != show)
+			{
+				finding.setVisible(show);
+				revalidate();
+				repaint();
+			}
+		});
+	}
+
 	/** True while the panel is on screen: nothing else is worth updating. */
 	boolean isOnScreen()
 	{
@@ -461,6 +501,15 @@ class GolemListPanel extends PluginPanel
 		text.add(place, BorderLayout.SOUTH);
 		panel.add(text, BorderLayout.CENTER);
 
+		JButton find = new JButton("Find");
+		find.setToolTipText("Point at this golem until you reach it");
+		find.setFont(ROW);
+		find.setFocusPainted(false);
+		find.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		find.setForeground(Color.WHITE);
+		find.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+		find.addActionListener(e -> onFind.accept(golem));
+
 		JButton remove = new JButton("✕");
 		remove.setToolTipText("Remove this golem");
 		remove.setFont(ROW);
@@ -469,7 +518,11 @@ class GolemListPanel extends PluginPanel
 		remove.setForeground(Color.LIGHT_GRAY);
 		remove.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
 		remove.addActionListener(e -> onRemove.accept(golem));
-		panel.add(remove, BorderLayout.EAST);
+		JPanel buttons = new JPanel(new BorderLayout(4, 0));
+		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		buttons.add(find, BorderLayout.CENTER);
+		buttons.add(remove, BorderLayout.EAST);
+		panel.add(buttons, BorderLayout.EAST);
 
 		// Spacing between rows, which a BoxLayout will not do on its own.
 		JPanel spaced = new JPanel(new BorderLayout());

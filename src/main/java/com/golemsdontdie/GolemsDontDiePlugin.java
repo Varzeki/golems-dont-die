@@ -520,7 +520,8 @@ public class GolemsDontDiePlugin extends Plugin
 				golem.setNickname(name);
 				saveGolemsSoon();
 			}),
-			() -> clientThread.invoke(this::reviveMissing));
+			() -> clientThread.invoke(this::reviveMissing),
+			golem -> clientThread.invoke(() -> findGolem(golem)));
 		menu.setOnRenamed(golem ->
 		{
 			if (!running || panel == null)
@@ -594,6 +595,11 @@ public class GolemsDontDiePlugin extends Plugin
 			safely("removing props", this::clearProps);
 			safely("removing rafts", this::clearRafts);
 			safely("taking golems off the map", mapPoints::clear);
+			safely("taking the arrow off a golem", () ->
+			{
+				finding = null;
+				client.clearHintArrow();
+			});
 			propFactory.clear();
 			raftFactory.clear();
 			census.clear();
@@ -747,6 +753,58 @@ public class GolemsDontDiePlugin extends Plugin
 			gameCount = count;
 			trimToGameCount();
 		}
+	}
+
+	/** The golem being pointed at, or null. See findGolem. */
+	private Golem finding;
+
+	/** How near a golem being looked for counts as found, in tiles. */
+	private static final int FOUND_TILES = 8;
+
+	/**
+	 * Points at a golem until it is reached, or at nothing when given null.
+	 *
+	 * <p>A hint arrow over it while it is in view, an arrow at the edge of the screen while it is
+	 * not, and the golem alone on the world map with its face stuck to the map's edge. Asking again
+	 * for the golem already being pointed at stops the pointing, so one button does both.
+	 */
+	private void findGolem(Golem golem)
+	{
+		finding = golem == finding ? null : golem;
+		if (finding == null)
+		{
+			client.clearHintArrow();
+		}
+		if (panel != null)
+		{
+			panel.setFinding(finding == null ? null
+				: isNamed(finding) ? finding.getNickname() : "that golem");
+		}
+		pointAtGolem();
+	}
+
+	/** Moves the arrow to where the golem is now, and stops once the player has reached it. */
+	private void pointAtGolem()
+	{
+		if (finding == null)
+		{
+			return;
+		}
+		if (finding.isDying() || !golems.contains(finding))
+		{
+			findGolem(null);
+			return;
+		}
+
+		WorldPoint at = finding.isSailing(roamContext.getTick()) ? finding.saveTile() : finding.currentTile();
+		WorldPoint me = PlayerPosition.of(client);
+		if (me != null && me.getPlane() == at.getPlane() && me.distanceTo2D(at) <= FOUND_TILES)
+		{
+			// Found. An arrow over a golem standing beside you is noise.
+			findGolem(null);
+			return;
+		}
+		client.setHintArrow(at);
 	}
 
 	/** Golems the game says have been crafted, as read this session, or -1 if unread. */
@@ -2012,15 +2070,17 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Every tick, so a golem keeps up with the map as it is panned. Closed, this is one widget
 		// lookup and nothing else.
+		pointAtGolem();
+
 		GolemsDontDieConfig.MapGolems onMap = config.mapGolems();
-		if (onMap == GolemsDontDieConfig.MapGolems.NONE)
+		if (onMap == GolemsDontDieConfig.MapGolems.NONE && finding == null)
 		{
 			mapPoints.clear();
 		}
 		else
 		{
 			mapPoints.refresh(livingGolems(), onMap == GolemsDontDieConfig.MapGolems.NAMED,
-				roamContext.getTick());
+				roamContext.getTick(), finding);
 		}
 
 		if (panel != null && panel.isOnScreen() && ++ticksSincePlaces >= PLACES_TICKS)

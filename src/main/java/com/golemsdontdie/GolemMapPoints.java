@@ -82,6 +82,9 @@ class GolemMapPoints
 	private int used;
 	private int tick;
 
+	/** True while one golem is being looked for, which is drawn stuck to the map's edge. */
+	private boolean pinned;
+
 	void startUp()
 	{
 		face = ImageUtil.loadImageResource(GolemsDontDiePlugin.class, "/golem-map-icon.png");
@@ -107,11 +110,29 @@ class GolemMapPoints
 	 */
 	void refresh(List<Golem> golems, boolean named, int tick)
 	{
+		refresh(golems, named, tick, null);
+	}
+
+	/**
+	 * As {@link #refresh(List, boolean, int)}, but showing one golem alone.
+	 *
+	 * <p>While a golem is being looked for it is the only thing on the map, and its face sticks to
+	 * the edge when the map is panned away from it, the way a clue scroll's marker does — the point
+	 * of looking for a golem is to be told which way it lies.
+	 */
+	void refresh(List<Golem> golems, boolean named, int tick, Golem only)
+	{
 		this.tick = tick;
 		if (face == null)
 		{
 			return;
 		}
+		if (only != null)
+		{
+			golems = java.util.Collections.singletonList(only);
+			named = false;
+		}
+		this.pinned = only != null;
 
 		WorldMap map = client.getWorldMap();
 		Widget window = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
@@ -158,7 +179,9 @@ class GolemMapPoints
 				x = landing.getX();
 				y = landing.getY();
 			}
-			if (x < minX || x > maxX || y < minY || y > maxY)
+			// The golem being looked for is kept whether or not the map is looking at it: its face
+			// snaps to the edge to say which way it lies.
+			if (!pinned && (x < minX || x > maxX || y < minY || y > maxY))
 			{
 				continue;
 			}
@@ -216,6 +239,7 @@ class GolemMapPoints
 				shown.add(point);
 				mapPoints.add(point);
 			}
+			point.setSnapToEdge(pinned);
 			dress(point, cell);
 		}
 	}
