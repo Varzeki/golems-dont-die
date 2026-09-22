@@ -257,7 +257,30 @@ public class GolemsDontDiePlugin extends Plugin
 	/** How often the sidebar's "where is it" lines are brought up to date, in game ticks. */
 	private static final int PLACES_TICKS = 5;
 
+	/** How many of those updates pass before the sidebar is put back in order of distance. */
+	private static final int ORDERS_EVERY = 4;
+
 	private int ticksSincePlaces;
+
+	private int placesSinceOrder;
+
+	/**
+	 * The roster nearest first, which is the order the sidebar lists golems in.
+	 *
+	 * <p>Sorted here rather than in the panel because where a golem is belongs to the client thread.
+	 * Distance is measured flat, so a golem upstairs or underfoot sorts by how far away it is on the
+	 * map rather than being pushed to the end.
+	 */
+	private List<Golem> nearestFirst()
+	{
+		List<Golem> living = livingGolems();
+		WorldPoint me = PlayerPosition.of(client);
+		if (me != null)
+		{
+			living.sort(java.util.Comparator.comparingInt(golem -> golem.currentTile().distanceTo2D(me)));
+		}
+		return living;
+	}
 
 	/** How often golems are counted by region, in game ticks. See GolemCensus. */
 	private static final int CENSUS_TICKS = 10;
@@ -1977,7 +2000,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (panel != null && rosterChanged)
 		{
 			rosterChanged = false;
-			List<Golem> living = livingGolems();
+			List<Golem> living = nearestFirst();
 			panel.refresh(living, tally.getTotal() - living.size());
 		}
 
@@ -2003,13 +2026,24 @@ public class GolemsDontDiePlugin extends Plugin
 		if (panel != null && panel.isOnScreen() && ++ticksSincePlaces >= PLACES_TICKS)
 		{
 			ticksSincePlaces = 0;
-			List<Golem> living = livingGolems();
-			List<String> places = new ArrayList<>(living.size());
-			for (Golem golem : living)
+
+			// Only the golems on the page: naming a place for every golem of a roster in the
+			// thousands, five times a second, would be the most expensive thing the plugin does.
+			List<Golem> listed = panel.onScreenGolems();
+			List<String> places = new ArrayList<>(listed.size());
+			for (Golem golem : listed)
 			{
 				places.add(whereabouts.of(golem, roamContext.getTick()));
 			}
-			panel.showPlaces(living, places);
+			panel.showPlaces(listed, places);
+
+			// And the order, now and then: nearest first, but not so often that the list shuffles
+			// under a name being typed.
+			if (++placesSinceOrder >= ORDERS_EVERY)
+			{
+				placesSinceOrder = 0;
+				panel.refresh(nearestFirst(), tally.getTotal() - countLiving(), false);
+			}
 		}
 
 		if (++ticksSinceCensus >= CENSUS_TICKS)

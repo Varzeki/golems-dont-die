@@ -43,8 +43,33 @@ class GolemListPanel extends PluginPanel
 	/** Dim enough to read as absent text rather than as a name someone chose. */
 	private static final Color PLACEHOLDER_COLOUR = new Color(120, 120, 120);
 
+	/** Golems listed at once. A player who has crafted for months has thousands. */
+	private static final int PER_PAGE = 50;
+
 	private final JPanel rows = new JPanel();
 	private final JLabel summary = new JLabel();
+
+	/** Narrows the list to golems whose name or whereabouts contains what is typed. */
+	private final JTextField search = new PlaceholderField(null, "Search golems");
+
+	private final JButton previous = new JButton("<");
+	private final JButton next = new JButton(">");
+	private final JLabel pageLabel = new JLabel();
+	private final JPanel paging = new JPanel(new BorderLayout());
+
+	/** The whole roster, as the client thread last gave it. */
+	private List<Golem> roster = java.util.Collections.emptyList();
+
+	/** Where each golem is, in step with the roster, for searching by place. */
+	private List<String> rosterPlaces = java.util.Collections.emptyList();
+
+	/** The golems matching the search, named first. */
+	private List<Golem> matching = java.util.Collections.emptyList();
+
+	/** The golems on the page now, for whoever wants to know what is worth updating. */
+	private volatile List<Golem> onScreen = java.util.Collections.emptyList();
+
+	private int page;
 
 	/**
 	 * Offers to make up the difference when fewer golems are roaming than have been crafted.
@@ -106,11 +131,66 @@ class GolemListPanel extends PluginPanel
 		revive.addActionListener(e -> onRevive.run());
 		revive.setVisible(false);
 
+		search.setFont(ROW);
+		search.getDocument().addDocumentListener(new DocumentListener()
+		{
+			@Override
+			public void insertUpdate(DocumentEvent e)
+			{
+				searched();
+			}
+
+			@Override
+			public void removeUpdate(DocumentEvent e)
+			{
+				searched();
+			}
+
+			@Override
+			public void changedUpdate(DocumentEvent e)
+			{
+				searched();
+			}
+
+			private void searched()
+			{
+				page = 0;
+				relist();
+			}
+		});
+
+		for (JButton button : new JButton[]{previous, next})
+		{
+			button.setFont(ROW);
+			button.setFocusPainted(false);
+			button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			button.setForeground(Color.WHITE);
+			button.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
+		}
+		previous.addActionListener(e -> turnTo(page - 1));
+		next.addActionListener(e -> turnTo(page + 1));
+		pageLabel.setFont(ROW);
+		pageLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		pageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+		paging.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		paging.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+		paging.add(previous, BorderLayout.WEST);
+		paging.add(pageLabel, BorderLayout.CENTER);
+		paging.add(next, BorderLayout.EAST);
+		paging.setVisible(false);
+
+		JPanel controls = new JPanel(new BorderLayout());
+		controls.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		controls.add(revive, BorderLayout.NORTH);
+		controls.add(search, BorderLayout.CENTER);
+		controls.add(paging, BorderLayout.SOUTH);
+
 		JPanel header = new JPanel(new BorderLayout());
 		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		header.setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 0));
 		header.add(summary, BorderLayout.NORTH);
-		header.add(revive, BorderLayout.CENTER);
+		header.add(controls, BorderLayout.CENTER);
 		add(header, BorderLayout.NORTH);
 
 		rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
@@ -151,71 +231,114 @@ class GolemListPanel extends PluginPanel
 	 *
 	 * @param names also show names given in game, which leave the roster otherwise unchanged
 	 */
+	/**
+	 * Takes the roster as it now stands, in the order the client thread put it: nearest first.
+	 *
+	 * <p>Only a page of it is ever built. One row is half a dozen Swing components, and a player who
+	 * has crafted for months has thousands of golems — sixty thousand components in one scroll pane
+	 * is minutes of laying out and megabytes held for a list nobody can read anyway.
+	 *
+	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
+	 *                only when this is positive
+	 * @param names   also take names given in game, which leave the roster otherwise unchanged
+	 */
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
+			roster = golems;
 			updateRevive(missing);
-
-			java.util.Set<Golem> wanted = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-			wanted.addAll(golems);
-			boolean changed = false;
-
-			// Gone first, so what is left in the list is only rows that are staying.
-			java.util.Iterator<java.util.Map.Entry<Golem, Row>> it = shown.entrySet().iterator();
-			while (it.hasNext())
-			{
-				java.util.Map.Entry<Golem, Row> entry = it.next();
-				if (!wanted.contains(entry.getKey()))
-				{
-					rows.remove(entry.getValue().component);
-					it.remove();
-					changed = true;
-				}
-			}
-
-			// Then walk the roster against what is displayed: a row in its place is left
-			// alone, a new golem's is inserted, one out of place is moved.
-			for (int i = 0; i < golems.size(); i++)
-			{
-				Golem golem = golems.get(i);
-				Row row = shown.get(golem);
-				if (row == null)
-				{
-					row = row(golem);
-					shown.put(golem, row);
-					rows.add(row.component, i);
-					changed = true;
-				}
-				else
-				{
-					if (i >= rows.getComponentCount() || rows.getComponent(i) != row.component)
-					{
-						rows.remove(row.component);
-						rows.add(row.component, Math.min(i, rows.getComponentCount()));
-						changed = true;
-					}
-					if (names)
-					{
-						showName(row, golem);
-					}
-				}
-			}
-
 			updateSummary(golems.size());
-			if (changed)
+			relist();
+			if (names)
 			{
-				rows.revalidate();
-				rows.repaint();
+				for (java.util.Map.Entry<Golem, Row> entry : shown.entrySet())
+				{
+					showName(entry.getValue(), entry.getKey());
+				}
 			}
 		});
+	}
+
+	/** Works out who is on the page now, and builds the rows for them. */
+	private void relist()
+	{
+		String wanted = search.getText() == null ? "" : search.getText().trim().toLowerCase();
+		List<Golem> found = new ArrayList<>();
+		for (Golem golem : roster)
+		{
+			String name = golem.getNickname();
+			if (wanted.isEmpty() || name != null && name.toLowerCase().contains(wanted))
+			{
+				found.add(golem);
+			}
+		}
+		matching = found;
+
+		int pages = Math.max(1, (matching.size() + PER_PAGE - 1) / PER_PAGE);
+		page = Math.max(0, Math.min(page, pages - 1));
+		int from = page * PER_PAGE;
+		int to = Math.min(matching.size(), from + PER_PAGE);
+		List<Golem> wantedRows = matching.subList(from, to);
+		onScreen = new ArrayList<>(wantedRows);
+
+		// Rows belong to golems, not to places in the list: a row kept is a name still being typed.
+		java.util.Set<Golem> keep = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+		keep.addAll(wantedRows);
+		java.util.Iterator<java.util.Map.Entry<Golem, Row>> it = shown.entrySet().iterator();
+		while (it.hasNext())
+		{
+			java.util.Map.Entry<Golem, Row> entry = it.next();
+			if (!keep.contains(entry.getKey()))
+			{
+				rows.remove(entry.getValue().component);
+				it.remove();
+			}
+		}
+
+		for (int i = 0; i < wantedRows.size(); i++)
+		{
+			Golem golem = wantedRows.get(i);
+			Row row = shown.get(golem);
+			if (row == null)
+			{
+				row = row(golem);
+				shown.put(golem, row);
+				rows.add(row.component, Math.min(i, rows.getComponentCount()));
+			}
+			else if (i >= rows.getComponentCount() || rows.getComponent(i) != row.component)
+			{
+				rows.remove(row.component);
+				rows.add(row.component, Math.min(i, rows.getComponentCount()));
+			}
+		}
+
+		paging.setVisible(pages > 1);
+		previous.setEnabled(page > 0);
+		next.setEnabled(page < pages - 1);
+		pageLabel.setText(matching.isEmpty() ? "No golems found"
+			: "Page " + (page + 1) + " of " + pages + "  (" + matching.size() + ")");
+		rows.revalidate();
+		rows.repaint();
+	}
+
+	private void turnTo(int wanted)
+	{
+		page = wanted;
+		relist();
+	}
+
+	/** The golems listed on the page now. Read from the client thread, which updates their places. */
+	List<Golem> onScreenGolems()
+	{
+		return onScreen;
 	}
 
 	/**
 	 * Says where each golem is, under its name.
 	 *
-	 * <p>Given as a list in step with the roster rather than read from the golems here: they belong
-	 * to the client thread, and this is Swing's.
+	 * <p>Given as a list in step with the golems rather than read from them here: they belong to the
+	 * client thread, and this is Swing's.
 	 */
 	void showPlaces(List<Golem> golems, List<String> places)
 	{
@@ -366,11 +489,17 @@ class GolemListPanel extends PluginPanel
 	 */
 	private static final class PlaceholderField extends JTextField
 	{
-		private static final String PROMPT = "Unnamed Golem";
+		private final String prompt;
 
 		PlaceholderField(String initial)
 		{
+			this(initial, "Unnamed Golem");
+		}
+
+		PlaceholderField(String initial, String prompt)
+		{
 			super(initial == null ? "" : initial);
+			this.prompt = prompt;
 			setFont(ROW);
 			setBackground(ColorScheme.DARKER_GRAY_COLOR);
 			setForeground(Color.WHITE);
@@ -401,7 +530,7 @@ class GolemListPanel extends PluginPanel
 				int x = getInsets().left;
 				int y = (getHeight() - g2.getFontMetrics().getHeight()) / 2
 					+ g2.getFontMetrics().getAscent();
-				g2.drawString(PROMPT, x, y);
+				g2.drawString(prompt, x, y);
 			}
 			finally
 			{
