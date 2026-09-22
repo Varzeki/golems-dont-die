@@ -118,7 +118,7 @@ public class PortraitExport extends Plugin
 		sheet = new BufferedImage(GolemPortrait.WIDTH * 12, GolemPortrait.HEIGHT, BufferedImage.TYPE_INT_ARGB);
 		for (int at = 0; at < 12; at++)
 		{
-			BufferedImage drawn = portraits.of(golem, at * 30, GolemContent.GOLEM_IDLE_ANIMATION, 0);
+			BufferedImage drawn = portraits.of(golem, at * 30, GolemContent.GOLEM_IDLE_ANIMATION, 0, 1f);
 			if (drawn != null)
 			{
 				sheet.getGraphics().drawImage(drawn, at * GolemPortrait.WIDTH, 0, null);
@@ -143,7 +143,7 @@ public class PortraitExport extends Plugin
 				// Spread across the animation rather than the first eight frames of it.
 				net.runelite.api.Animation loaded = client.loadAnimation(animations[row]);
 				int at = loaded == null ? frame : frame * Math.max(1, loaded.getNumFrames()) / 8;
-				BufferedImage drawn = portraits.of(golem, 0, animations[row], at);
+				BufferedImage drawn = portraits.of(golem, 0, animations[row], at, 1f);
 				if (drawn != null)
 				{
 					sheet.getGraphics().drawImage(drawn, frame * GolemPortrait.WIDTH,
@@ -152,6 +152,26 @@ public class PortraitExport extends Plugin
 			}
 		}
 		ImageIO.write(sheet, "png", new File(dir, "portraits-poses.png"));
+
+		// The dance emotes from the dancing pull request, to see what they do to a stone golem.
+		int[] dances = {862, 866, 2106, 2107, 2108, 3543, 7533, 7537, 2109, 1835, 4751, 2128};
+		sheet = new BufferedImage(GolemPortrait.WIDTH * 6, GolemPortrait.HEIGHT * dances.length,
+			BufferedImage.TYPE_INT_ARGB);
+		for (int row = 0; row < dances.length; row++)
+		{
+			net.runelite.api.Animation loaded = client.loadAnimation(dances[row]);
+			for (int frame = 0; frame < 6; frame++)
+			{
+				int at = loaded == null ? frame : frame * Math.max(1, loaded.getNumFrames()) / 6;
+				BufferedImage drawn = portraits.of(golem, 0, dances[row], at, 1f);
+				if (drawn != null)
+				{
+					sheet.getGraphics().drawImage(drawn, frame * GolemPortrait.WIDTH,
+						row * GolemPortrait.HEIGHT, null);
+				}
+			}
+		}
+		ImageIO.write(sheet, "png", new File(dir, "portraits-dances.png"));
 		log.info("Portraits written to {}", dir);
 	}
 }

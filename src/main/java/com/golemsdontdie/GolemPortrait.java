@@ -107,17 +107,20 @@ class GolemPortrait
 		int pose = GolemTrait.LIFE_OF_THE_PARTY.in(golem.getTraits()) ? DANCING
 			: POSES[(int) Math.floorMod(seed >> 3, POSES.length)];
 		int turn = FACING + (int) Math.floorMod(seed >> 17, TURN * 2L) - TURN;
-		return draw(posed(model, pose, (int) (seed >> 5)), model, turn, seed);
+		return draw(posed(model, pose, (int) (seed >> 5)), model, turn, seed, SHOWN);
 	}
 
 	/**
-	 * The same picture at an angle and a pose of the caller's choosing, for the developer export
-	 * that draws a golem the whole way round to find which way it faces.
+	 * The same picture at an angle, a pose and a crop of the caller's choosing, for the developer
+	 * export: which way the model faces, and what an animation does to a golem held still.
+	 *
+	 * @param shown how much of the golem to frame, from the top: {@link #SHOWN} for a portrait as
+	 *              the page has it, 1 for the whole figure.
 	 */
-	BufferedImage of(Golem golem, int degrees, int animation, int frame)
+	BufferedImage of(Golem golem, int degrees, int animation, int frame, float shown)
 	{
 		Model model = golem == null || models == null ? null : models.modelFor(golem.getSnapshot());
-		return model == null ? null : draw(posed(model, animation, frame), model, degrees, 0);
+		return model == null ? null : draw(posed(model, animation, frame), model, degrees, 0, shown);
 	}
 
 	/** The model held at one frame of an animation, or as it rests if there is no such animation. */
@@ -138,12 +141,12 @@ class GolemPortrait
 	 * Draws the model turned to face the viewer, give or take, with the lean and the distance a
 	 * golem's own number gives it.
 	 */
-	private static BufferedImage draw(Model model, Model standing, int degrees, long seed)
+	private static BufferedImage draw(Model model, Model standing, int degrees, long seed, float shown)
 	{
 		double turn = Math.toRadians(degrees);
 		double lean = Math.toRadians(Math.floorMod(seed >> 29, LEAN * 2L) - LEAN);
 		float zoom = NEAREST - (NEAREST - FURTHEST) * (Math.floorMod(seed >> 41, 16L) / 15f);
-		return draw(model, standing, turn, lean, zoom);
+		return draw(model, standing, turn, lean, zoom, shown);
 	}
 
 	/**
@@ -151,7 +154,8 @@ class GolemPortrait
 	 *                 picture is cut. Framed on the pose instead, a golem with a hand raised came
 	 *                 out smaller and lower than the one beside it.
 	 */
-	private static BufferedImage draw(Model model, Model standing, double turn, double lean, float zoom)
+	private static BufferedImage draw(Model model, Model standing, double turn, double lean, float zoom,
+		float shown)
 	{
 		int count = model.getVerticesCount();
 		float[] modelX = model.getVerticesX();
@@ -189,7 +193,7 @@ class GolemPortrait
 
 		// Framed on the golem standing: its top half, at the size that fills the frame. Whatever
 		// the pose puts outside that — a raised hand, the legs below the cut — falls off the edge.
-		float[] framing = framing(standing);
+		float[] framing = framing(standing, shown);
 		float scale = zoom * framing[0];
 		float offsetX = WIDTH / 2f;
 		float offsetY = HEIGHT / 2f - framing[1] * scale;
@@ -263,11 +267,11 @@ class GolemPortrait
 	 * How the picture is framed on a golem standing: the scale to draw it at, and the height in the
 	 * model to put in the middle of the frame.
 	 *
-	 * <p>Only the top {@link #SHOWN} of it is considered, which is what makes this a portrait and
+	 * <p>Only the top {@code shown} of it is considered, which is what makes this a portrait and
 	 * not a figure. Width is measured at any angle rather than as the model happens to face, so
 	 * turning a golem does not change its size.
 	 */
-	private static float[] framing(Model standing)
+	private static float[] framing(Model standing, float shown)
 	{
 		float[] modelX = standing.getVerticesX();
 		float[] modelY = standing.getVerticesY();
@@ -284,7 +288,7 @@ class GolemPortrait
 			top = Math.min(top, modelY[v]);
 			bottom = Math.max(bottom, modelY[v]);
 		}
-		float cut = top + (bottom - top) * SHOWN;
+		float cut = top + (bottom - top) * shown;
 
 		float across = 1f;
 		for (int v = 0; v < count; v++)
