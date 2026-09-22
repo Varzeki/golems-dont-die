@@ -141,11 +141,15 @@ class RoamPlanner
 		}
 
 		// A golem in a crowd is looking for the way out, so it neither rolls for this nor rests first.
-		// A golem where it wanted to be looks for a shortcut far less often: turning each one down as
-		// it comes is no use when a town offers a dozen, and one roll in ten will take it.
+		// Nor does one penned into a paddock, which has nowhere to walk its rest off. A golem where
+		// it wanted to be looks for a shortcut far less often: turning each one down as it comes is
+		// no use when a town offers a dozen, and one roll in ten will take it.
+		boolean penned = context != null
+			&& context.enclosedArea(from.getX(), from.getY(), from.getPlane()) < Golem.PENNED_TILES;
 		float hopping = TRANSPORT_CHANCE
 			* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY()));
-		if (pressed || random.nextFloat() < hopping && (memory == null || !memory.restingFromTransports(tick)))
+		if (pressed || penned
+			|| random.nextFloat() < hopping && (memory == null || !memory.restingFromTransports(tick)))
 		{
 			Itinerary toTransport = toNearbyTransport(from, tick, random, memory, reach);
 			if (toTransport != null)

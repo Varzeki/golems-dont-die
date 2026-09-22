@@ -55,6 +55,9 @@ class GolemMapPoints
 	/** How far below the surface the underground is drawn, in tiles. */
 	private static final int UNDERGROUND = 6400;
 
+	/** Whether the map is looking at a dungeon rather than the ground above it. */
+	private boolean underground;
+
 	/** Named faces kept before the oldest are dropped: renaming in the sidebar makes one a keystroke. */
 	private static final int MOST_LABELS = 256;
 
@@ -146,12 +149,19 @@ class GolemMapPoints
 		}
 
 		// One cell per face, so two golems share a point exactly when their faces would have
-		// overlapped: a tile each at full zoom, a region each from far out.
+		// overlapped — measured against the largest face, since a cell holding a crowd is drawn
+		// with a head that size. Faces are then drawn at the middle of their cell, which is what
+		// keeps a grown head from sitting on top of the golem in the next cell along.
 		float zoom = map.getWorldMapZoom();
-		int cellTiles = Math.max(1, (int) Math.ceil(FACE_PIXELS / zoom));
+		int cellTiles = Math.max(1, (int) Math.ceil(FACE_PIXELS * CROWD_SIZES[CROWD_SIZES.length - 1] / zoom));
 		Point centre = map.getWorldMapPosition();
 		int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2) + MARGIN;
 		int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2) + MARGIN;
+
+		// Whether the map is looking underground, which decides where an underground golem goes:
+		// the surface map draws a dungeon over the ground above it, and the dungeon's own view
+		// draws it where it really is.
+		underground = centre.getY() >= UNDERGROUND;
 
 		gather(golems, named, cellTiles, centre.getX() - halfWidth, centre.getX() + halfWidth,
 			centre.getY() - halfHeight, centre.getY() + halfHeight);
@@ -187,10 +197,11 @@ class GolemMapPoints
 					y = at.getY();
 				}
 			}
-			// The map draws a dungeon over the ground above it, so a golem underground belongs at
-			// the surface coordinates it is beneath. Left where it stood it sat a hundred regions
-			// north of the map, where nobody ever saw it.
-			if (y >= UNDERGROUND)
+			// The surface map draws a dungeon over the ground above it, so a golem underground
+			// belongs at the surface coordinates it is beneath. Left where it stood it sat a
+			// hundred regions north of the map, where nobody ever saw it. Looking at the dungeon
+			// itself, its own coordinates are the right ones.
+			if (y >= UNDERGROUND && !underground)
 			{
 				y -= UNDERGROUND;
 			}
@@ -215,8 +226,10 @@ class GolemMapPoints
 				}
 				index = used++;
 				Cell fresh = cellList.get(index);
-				fresh.x = x;
-				fresh.y = y;
+				// The middle of the cell, not the golem: two cells are a face apart by
+				// construction, two golems in neighbouring cells need not be.
+				fresh.x = pinned ? x : (x / cellTiles) * cellTiles + cellTiles / 2;
+				fresh.y = pinned ? y : (y / cellTiles) * cellTiles + cellTiles / 2;
 				fresh.plane = golem.getPlane();
 				fresh.count = 0;
 				fresh.first = golem;

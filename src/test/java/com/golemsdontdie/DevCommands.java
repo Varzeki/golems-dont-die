@@ -38,6 +38,7 @@ import net.runelite.client.plugins.PluginManager;
  * ::gpage               open the nearest golem's page
  * ::gfind               point the arrow at the nearest golem
  * ::gremove [n]         remove n golems, to leave some missing for the plinth to revive
+ * ::gmap                what the world map is looking at, with the map open
  *
  * <p>All of them wear the g: ::dance belongs to somebody else's plugin, and the golems stood
  * there while the player danced.
@@ -74,6 +75,7 @@ public class DevCommands extends Plugin
 			case "gpage":
 			case "gfind":
 			case "gremove":
+			case "gmap":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -106,9 +108,32 @@ public class DevCommands extends Plugin
 
 		switch (command)
 		{
+			case "gmap":
+			{
+				// Which coordinates the map is drawing, so a dungeon view can be told from the
+				// surface one: golems are put on the map by world coordinates, and a view working
+				// in some other space is why they would not be on it.
+				net.runelite.api.worldmap.WorldMap map = client.getWorldMap();
+				if (map == null)
+				{
+					say("The map is not open.");
+					break;
+				}
+				net.runelite.api.Point centre = map.getWorldMapPosition();
+				say("map at " + (centre == null ? "?" : centre.getX() + "," + centre.getY())
+					+ ", zoom " + map.getWorldMapZoom());
+				Golem golem = nearestOne(golems);
+				if (golem != null)
+				{
+					WorldPoint at = golem.currentTile();
+					say("nearest golem at " + at.getX() + "," + at.getY() + " plane " + at.getPlane());
+				}
+				break;
+			}
+
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
-				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]");
+				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap");
 				break;
 
 			case "golems":

@@ -1070,9 +1070,10 @@ class Golem
 					if (!stranded)
 					{
 						// Not straight after the last one, unless looking for a way out of a
-						// crowd. See TransportMemory.TRANSPORT_REST_TICKS.
+						// crowd or out of a pen. See TransportMemory.TRANSPORT_REST_TICKS.
 						if (transportMemory.restingFromTransports(context.getTick())
-							&& !context.crowdedRegion(tileX, tileY, plane))
+							&& !context.crowdedRegion(tileX, tileY, plane)
+							&& context.enclosedArea(tileX, tileY, plane) >= PENNED_TILES)
 						{
 							continue;
 						}
@@ -1157,6 +1158,15 @@ class Golem
 	private static final int MIN_COOLDOWN_TICKS = 25;
 
 	/**
+	 * Walkable tiles around a golem below which it counts as penned in.
+	 *
+	 * <p>A golem that hops a stile into a paddock has nowhere to walk off its three minutes of
+	 * shore leave from shortcuts, so it paced the paddock until something else moved it. Penned,
+	 * it may take the stile straight back.
+	 */
+	static final int PENNED_TILES = 80;
+
+	/**
 	 * How long before a golem may go back the way a transport just took it, scaled by the
 	 * room on the far side. The full wait suits open ground; behind the stile is a pen of a
 	 * few dozen tiles, where two minutes let arrivals outnumber departures until it could
@@ -1172,7 +1182,11 @@ class Golem
 		{
 			return TransportMemory.COOLDOWN_TICKS;
 		}
-		float share = Math.min(1f, context.enclosedArea(x, y, toPlane) / (float) RoamContext.OPEN_AREA);
+		// The smaller of the two ends: a golem in a pen is as stuck as one that hopped into it,
+		// and the way back out is the only way there is.
+		int room = Math.min(context.enclosedArea(x, y, toPlane),
+			context.enclosedArea(fineX / TILE, fineY / TILE, plane));
+		float share = Math.min(1f, room / (float) RoamContext.OPEN_AREA);
 		return Math.max(MIN_COOLDOWN_TICKS, Math.round(TransportMemory.COOLDOWN_TICKS * share));
 	}
 

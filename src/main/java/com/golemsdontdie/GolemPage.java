@@ -38,7 +38,7 @@ class GolemPage
 	private static final Font TITLE = FontManager.getRunescapeBoldFont().deriveFont(20f);
 	private static final Font BODY = FontManager.getRunescapeFont().deriveFont(16f);
 
-	private final JFrame frame = new JFrame("Golem");
+	private final JFrame frame = new JFrame("Golem Info");
 	private final JLabel title = new JLabel();
 	private final JLabel place = new JLabel();
 	private final JPanel traits = new JPanel();
@@ -116,7 +116,21 @@ class GolemPage
 		traits.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		traits.setBorder(BorderFactory.createEmptyBorder(0, 12, 10, 12));
 
-		scroll = new JScrollPane(traits);
+		// The traits are pinned to the top of a panel of their own. In the scroll pane directly,
+		// the list is given the whole height of the window and shares the slack out between the
+		// traits, which put half a window between two of them.
+		JPanel pinned = new JPanel(new BorderLayout())
+		{
+			@Override
+			public Dimension getMaximumSize()
+			{
+				return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+			}
+		};
+		pinned.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		pinned.add(traits, BorderLayout.NORTH);
+
+		scroll = new JScrollPane(pinned);
 		scroll.setBorder(BorderFactory.createEmptyBorder());
 		// Never sideways: the lines wrap to the window, so there is nothing off to the right.
 		scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -176,6 +190,8 @@ class GolemPage
 			frame.setIconImage(icon);
 		}
 
+		// Over the client rather than behind it: a page is opened to be read beside the game.
+		frame.setAlwaysOnTop(true);
 		frame.setContentPane(body);
 		frame.setMinimumSize(new Dimension(320, 260));
 		frame.setSize(new Dimension(380, 420));
@@ -345,8 +361,6 @@ class GolemPage
 			one.add(line, BorderLayout.CENTER);
 			traits.add(one);
 		}
-		// And the slack goes to the bottom rather than between them.
-		traits.add(Box.createVerticalGlue());
 		traits.revalidate();
 		traits.repaint();
 	}
