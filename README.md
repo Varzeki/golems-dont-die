@@ -35,7 +35,20 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Maximum golems | 25 | The cap, when Limit golems is on. |
 | Show golem names | On | Show golem names above their head. |
 | Name colour | Yellow (#FFE700) | The colour of the golem names. |
+| Golems on the world map | Named golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
+
+
+## Finding a golem
+
+The sidebar lists your golems nearest first, fifty to a page, with a search box for names. Under
+each name is where that golem is — "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
+
+**Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
+eight tiles of it or stop looking. While you are looking, that golem is the only one on the world
+map, and its face sticks to the edge of the map when you pan away from it.
+
+On the map, a named golem wears its name. Hover any face to see where it is.
 
 
 ## Building
