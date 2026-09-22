@@ -250,6 +250,9 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private GolemClimate climates;
 
+	/** One golem's own page, opened from the list. Swing thread only. */
+	private GolemPage page;
+
 	@Inject
 	private Whereabouts whereabouts;
 
@@ -527,7 +530,18 @@ public class GolemsDontDiePlugin extends Plugin
 				saveGolemsSoon();
 			}),
 			() -> clientThread.invoke(this::reviveMissing),
-			golem -> clientThread.invoke(() -> findGolem(golem)));
+			golem -> clientThread.invoke(() -> findGolem(golem)),
+			golem ->
+			{
+				// Gone if the plugin stopped between the click and this: see shutDown.
+				GolemPage open = page;
+				if (open != null)
+				{
+					open.show(golem, panel);
+				}
+			});
+		// Swing throughout, and it only reads the golem it is given: see GolemPage.
+		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)));
 		menu.setOnRenamed(golem ->
 		{
 			if (!running || panel == null)
@@ -624,6 +638,12 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			clientToolbar.removeNavigation(navButton);
 			navButton = null;
+		}
+		if (page != null)
+		{
+			GolemPage closing = page;
+			page = null;
+			javax.swing.SwingUtilities.invokeLater(closing::close);
 		}
 		panel = null;
 	}
@@ -2102,6 +2122,15 @@ public class GolemsDontDiePlugin extends Plugin
 				places.add(whereabouts.of(golem, roamContext.getTick()));
 			}
 			panel.showPlaces(listed, places);
+
+			// And the page, if one is open, which is one golem and may not be among those listed.
+			if (page != null && page.isOpen())
+			{
+				Golem shown = page.getShowing();
+				String where = whereabouts.of(shown, roamContext.getTick());
+				boolean living = shown != null && golems.contains(shown) && !shown.isDying();
+				javax.swing.SwingUtilities.invokeLater(() -> page.showPlace(living ? where : "Gone", living));
+			}
 
 			// And the order, now and then: nearest first, but not so often that the list shuffles
 			// under a name being typed.

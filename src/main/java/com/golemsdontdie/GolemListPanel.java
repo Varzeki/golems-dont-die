@@ -46,6 +46,10 @@ class GolemListPanel extends PluginPanel
 	/** Golems listed at once. A player who has crafted for months has thousands. */
 	private static final int PER_PAGE = 50;
 
+	/** The face from the world map, already drawn to be read at fifteen pixels. */
+	private static final javax.swing.Icon FACE = new javax.swing.ImageIcon(
+		net.runelite.client.util.ImageUtil.loadImageResource(GolemListPanel.class, "/golem-map-icon.png"));
+
 	private final JPanel rows = new JPanel();
 	private final JLabel summary = new JLabel();
 
@@ -82,6 +86,9 @@ class GolemListPanel extends PluginPanel
 	/** Asks for a golem to be pointed at, or for the pointing to stop when given null. */
 	private final Consumer<Golem> onFind;
 
+	/** Asks for one golem's own page to be opened. */
+	private final Consumer<Golem> onOpen;
+
 	/** The bar offering to stop pointing, shown only while a golem is being pointed at. */
 	private final JButton finding = new JButton();
 
@@ -114,11 +121,12 @@ class GolemListPanel extends PluginPanel
 	}
 
 	GolemListPanel(Consumer<Golem> onRemove, java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive,
-		Consumer<Golem> onFind)
+		Consumer<Golem> onFind, Consumer<Golem> onOpen)
 	{
 		super(false);
 		this.onRemove = onRemove;
 		this.onFind = onFind;
+		this.onOpen = onOpen;
 		this.onRename = onRename;
 		this.onRevive = onRevive;
 
@@ -510,6 +518,13 @@ class GolemListPanel extends PluginPanel
 		find.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
 		find.addActionListener(e -> onFind.accept(golem));
 
+		JButton page = new JButton(FACE);
+		page.setToolTipText("This golem's page");
+		page.setFocusPainted(false);
+		page.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		page.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+		page.addActionListener(e -> onOpen.accept(golem));
+
 		JButton remove = new JButton("✕");
 		remove.setToolTipText("Remove this golem");
 		remove.setFont(ROW);
@@ -520,6 +535,7 @@ class GolemListPanel extends PluginPanel
 		remove.addActionListener(e -> onRemove.accept(golem));
 		JPanel buttons = new JPanel(new BorderLayout(4, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		buttons.add(page, BorderLayout.WEST);
 		buttons.add(find, BorderLayout.CENTER);
 		buttons.add(remove, BorderLayout.EAST);
 		panel.add(buttons, BorderLayout.EAST);

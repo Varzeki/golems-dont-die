@@ -24,10 +24,13 @@ class GolemStore
 	private static final String FIELD_SEPARATOR = ",";
 
 	/**
-	 * Ten numbers plus the nickname. Two more are optional: whether the golem is in an
-	 * instance, and when it may next sail.
+	 * Ten numbers plus the nickname. Three more are optional: whether the golem is in an
+	 * instance, when it may next sail, and its seed.
 	 */
 	private static final int FIELD_COUNT = 11;
+
+	/** How many optional fields may follow the eleven. */
+	private static final int OPTIONAL_FIELDS = 3;
 
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
@@ -51,6 +54,9 @@ class GolemStore
 		String nickname;
 		boolean inInstance;
 		long shoreLeaveUntil;
+
+		/** The golem's own number, or 0 for a save written before it was kept. See revive. */
+		long seed;
 	}
 
 	/** Encodes a live roster for the config store. */
@@ -82,7 +88,8 @@ class GolemStore
 					: golem.getNickname().replaceAll(ILLEGAL_IN_NICKNAME, ""))
 				.append(FIELD_SEPARATOR).append(golem.isInInstance() ? 1 : 0)
 				// Real time, so a golem that landed just before logout is still ashore after it.
-				.append(FIELD_SEPARATOR).append(golem.getShoreLeaveUntil());
+				.append(FIELD_SEPARATOR).append(golem.getShoreLeaveUntil())
+				.append(FIELD_SEPARATOR).append(golem.getId());
 		}
 		return out.toString();
 	}
@@ -104,7 +111,7 @@ class GolemStore
 			}
 			// -1 keeps a trailing empty nickname as a field rather than dropping it.
 			String[] fields = entry.split(FIELD_SEPARATOR, -1);
-			if (fields.length < FIELD_COUNT || fields.length > FIELD_COUNT + 2)
+			if (fields.length < FIELD_COUNT || fields.length > FIELD_COUNT + OPTIONAL_FIELDS)
 			{
 				log.debug("Dropping malformed saved golem '{}'", entry);
 				continue;
@@ -126,6 +133,7 @@ class GolemStore
 				saved.nickname = nickname.isEmpty() ? null : nickname;
 				saved.inInstance = fields.length > FIELD_COUNT && "1".equals(fields[FIELD_COUNT].trim());
 				saved.shoreLeaveUntil = fields.length > FIELD_COUNT + 1 ? Long.parseLong(fields[FIELD_COUNT + 1].trim()) : 0;
+				saved.seed = fields.length > FIELD_COUNT + 2 ? Long.parseLong(fields[FIELD_COUNT + 2].trim()) : 0;
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -155,11 +163,15 @@ class GolemStore
 
 		WorldPoint home = new WorldPoint(saved.homeX, saved.homeY, saved.plane);
 
-		// The index is what makes the seed unique. Position alone is not enough: two golems
-		// saved on the same tile — what happens on a spawn tile — would share a seed, and a
-		// Golem's entire gait comes out of that one number. Position still contributes, so a
-		// golem keeps a stable character across reloads.
-		long seed = ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
+		// A golem's seed is its character: its gait comes out of it, and so do its traits. It is
+		// saved with the golem for that reason — worked out from where it stood, it changed every
+		// time the golem moved, and a golem came back a different one.
+		//
+		// Saves written before it was kept have none, and one is made for them the old way: from
+		// the position and the index, the index because two golems on one tile — which is what a
+		// spawn tile gives you — would otherwise share a seed and a gait.
+		long seed = saved.seed != 0 ? saved.seed
+			: ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
 		Golem golem = Golem.onTile(snapshot, home, seed, at);
 		golem.setNickname(saved.nickname);
 		golem.setInInstance(saved.inInstance);
