@@ -1740,6 +1740,61 @@ public class GolemsDontDiePlugin extends Plugin
 		homeRegions = regions;
 	}
 
+	/** Golems whose space is checked for a way out this tick. See sendHomeIfSealedIn. */
+	private static final int SWEEP_PER_TICK = 32;
+
+	/** Where the sweep has got to in the roster. */
+	private int sweptTo;
+
+	/**
+	 * Brings a golem home from a place it could never leave.
+	 *
+	 * <p>A golem only ever walks inside the space it is standing in — every other way of getting
+	 * anywhere is a transport or a crossing. So a space no transport and no dock touches is one
+	 * nothing could have walked out of, and a golem in one is there because something put it
+	 * there: an older rescue that reached across a channel, a route since withdrawn, a saved
+	 * position from a build that let it happen. It would wander that shore until the game shut.
+	 *
+	 * <p>Swept a few golems a tick rather than all of them every tick. Nothing about a sealed
+	 * space changes from one second to the next, and ten thousand golems would otherwise each ask
+	 * the mesh where they were, forever.
+	 */
+	private void sweepForSealedIn()
+	{
+		int roster = golems.size();
+		for (int i = 0; i < Math.min(SWEEP_PER_TICK, roster); i++)
+		{
+			if (sweptTo >= roster)
+			{
+				sweptTo = 0;
+			}
+			sendHomeIfSealedIn(golems.get(sweptTo++));
+		}
+	}
+
+	private void sendHomeIfSealedIn(Golem golem)
+	{
+		if (golem.isDying() || golem.inTransition()
+			|| golem.isSailing(roamContext.getTick()) || golem.isInInstance())
+		{
+			return;
+		}
+		int x = golem.getFineX() / Golem.TILE;
+		int y = golem.getFineY() / Golem.TILE;
+		if (!worldMesh.isSealed(x, y, golem.getPlane()))
+		{
+			return;
+		}
+
+		WorldPoint at = golem.currentTile();
+		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
+		log.debug("Golem {} was sealed in at {}; brought home", golem.getId(), at);
+		noteRescue(golem, at, plinth, "sealed in");
+		golem.relocate(plinth);
+		golem.setInInstance(false);
+		golem.noteUnstuck(roamContext.getTick());
+	}
+
 	/**
 	 * Puts a golem back on the plinth if it is anywhere but home, for "Restrict Golem ambition".
 	 * By region, which is all home is: the island, its caves and its upper floors are regions,
@@ -2410,6 +2465,9 @@ public class GolemsDontDiePlugin extends Plugin
 			applyLearnedRoutes();
 			obstacleData.save();
 		}
+
+		// A few golems a tick, asked whether the ground they are on goes anywhere.
+		sweepForSealedIn();
 
 		// Every tick, so a golem keeps up with the map as it is panned. Closed, this is one widget
 		// lookup and nothing else.

@@ -371,6 +371,96 @@ class WorldMesh
 	/** How many of them came from transports, for the log. */
 	private int transportFloors;
 
+	/**
+	 * Spaces with a way out of them: one a transport starts or ends in, or one a dock stands on.
+	 *
+	 * <p>A golem can only ever walk within the space it is in; everything else is a transport or a
+	 * crossing. So a space touched by neither is one nothing can enter and nothing can leave — and
+	 * a golem found in one did not walk there, and will wander it until the game shuts. The two
+	 * are kept apart because the transport marks are rebuilt whenever a route is learned and the
+	 * dock marks are not.
+	 */
+	private final boolean[] transportExits = new boolean[1 << 16];
+	private final boolean[] dockExits = new boolean[1 << 16];
+
+	/**
+	 * How large a space may be and still count as somewhere a golem is trapped. Beyond this it is
+	 * a country, not a pen: the mainland's own tables are incomplete in places, and the map is
+	 * full of blank ground the game leaves passable — one such space runs to a million tiles, and
+	 * a golem loose in it is lost rather than shut in.
+	 */
+	private static final int TRAP_TILES = 4096;
+
+	/** Spaces already measured, by component: tiles, counted no further than {@link #TRAP_TILES}. */
+	private final Map<Integer, Integer> spaceSizes = new HashMap<>();
+
+	/**
+	 * True if this tile is in a small space with no way out of it.
+	 *
+	 * <p>A golem only ever walks within the space it is standing in, so a space no transport and
+	 * no dock touches is one it can never leave. Silence is not a yes: a tile the mesh has no
+	 * component for is left alone, and so is anywhere large enough to be somewhere.
+	 */
+	boolean isSealed(int x, int y, int plane)
+	{
+		int component = componentAt(x, y, plane);
+		if (component == 0 || transportExits[component] || dockExits[component])
+		{
+			return false;
+		}
+		return sizeOf(component, x, y, plane) <= TRAP_TILES;
+	}
+
+	/**
+	 * The tiles in a space, counted once and remembered, and no further than a space needs to be
+	 * before the answer stops mattering.
+	 */
+	private int sizeOf(int component, int x, int y, int plane)
+	{
+		Integer known = spaceSizes.get(component);
+		if (known != null)
+		{
+			return known;
+		}
+
+		java.util.Set<Long> seen = new java.util.HashSet<>();
+		java.util.Deque<int[]> queue = new java.util.ArrayDeque<>();
+		seen.add((long) x << 20 | y);
+		queue.add(new int[]{x, y});
+		int size = 0;
+		while (!queue.isEmpty() && size <= TRAP_TILES)
+		{
+			int[] at = queue.poll();
+			size++;
+			for (int d = 0; d < SPREAD_X.length; d++)
+			{
+				int nx = at[0] + SPREAD_X[d];
+				int ny = at[1] + SPREAD_Y[d];
+				if (seen.add((long) nx << 20 | ny) && componentAt(nx, ny, plane) == component)
+				{
+					queue.add(new int[]{nx, ny});
+				}
+			}
+		}
+
+		spaceSizes.put(component, size);
+		return size;
+	}
+
+	/** The eight ways out of a tile, as the component fill itself used. */
+	private static final int[] SPREAD_X = {1, -1, 0, 0, 1, -1, 1, -1};
+	private static final int[] SPREAD_Y = {0, 0, 1, -1, 1, 1, -1, -1};
+
+	/** Marks the space a dock's quayside stands in as one a golem can leave — by sea. */
+	void admitDockExit(int x, int y, int plane)
+	{
+		int component = componentAt(x, y, plane);
+		if (component != 0)
+		{
+			dockExits[component] = true;
+		}
+	}
+
 	/** Admits the floor under a dock's quayside, if it is a floor at all. */
 	void admitDockFloor(int x, int y, int plane)
 	{
@@ -403,6 +493,7 @@ class WorldMesh
 	void admitTransportEnds(java.util.List<GolemTransport> transports)
 	{
 		java.util.Arrays.fill(landComponents, false);
+		java.util.Arrays.fill(transportExits, false);
 		transportFloors = 0;
 		admittedFloors = 0;
 		for (boolean dock : dockFloors)
@@ -419,6 +510,14 @@ class WorldMesh
 
 	private void admit(int x, int y, int plane)
 	{
+		// A way out of the space, whatever the floor turns out to be: a transport into a space
+		// the land fill already knew is still the way a golem leaves it.
+		int exit = componentAt(x, y, plane);
+		if (exit != 0)
+		{
+			transportExits[exit] = true;
+		}
+
 		// Instances are rebuilt each visit; their coordinates name no lasting floor.
 		if (x >= 6400 || isLand(x, y, plane) || isOcean(x, y, plane))
 		{

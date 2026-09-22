@@ -167,13 +167,17 @@ class SailingDocks
 		// sails there has nowhere to step off.
 		for (Dock dock : docks)
 		{
+			// Every dock is a way out of the space it stands in, cave docks included: that is the
+			// whole point of a port.
+			WorldPoint shore = dock.getShore();
+			mesh.admitDockExit(shore.getX(), shore.getY(), shore.getPlane());
+
 			// Only docks on the sea: a cave dock stands on ground the fill knows, and admitting more
 			// there admitted the cave's lake.
 			if (!dock.isOnOpenSea())
 			{
 				continue;
 			}
-			WorldPoint shore = dock.getShore();
 			mesh.admitDockFloor(shore.getX(), shore.getY(), shore.getPlane());
 		}
 

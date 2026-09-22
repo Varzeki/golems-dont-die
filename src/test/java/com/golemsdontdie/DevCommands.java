@@ -287,6 +287,13 @@ public class DevCommands extends Plugin
 						say("  " + field(history, "voyages") + " voyages, "
 							+ field(history, "transports") + " shortcuts, "
 							+ field(history, "walked") + " tiles walked");
+						Object mesh = field(golemPlugin, "worldMesh");
+						if (mesh != null)
+						{
+							say("  sealed in: " + answer(mesh, "isSealed",
+								new Class<?>[]{int.class, int.class, int.class},
+								new Object[]{at.getX(), at.getY(), at.getPlane()}));
+						}
 						if (++said >= 5)
 						{
 							break;
