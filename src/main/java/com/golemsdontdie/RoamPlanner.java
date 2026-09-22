@@ -924,10 +924,22 @@ class RoamPlanner
 	{
 
 		// Where the golem is now decides where it may be put: the nearest walkable tile to one in a
-		// wall is often inside the building. Zero means the mesh has nothing to say, and is a match.
-		int origin = mesh.componentAt(at.getX(), at.getY(), at.getPlane());
+		// wall is often inside the building.
+		// Off the shore of the cave's lake the golem's own space is the water, and keeping to it
+		// would find nothing but more water; that call asks for any side of the shore.
+		int origin = sameSpace ? mesh.componentAt(at.getX(), at.getY(), at.getPlane()) : 0;
+		if (sameSpace && origin == 0)
+		{
+			// The mesh has nothing to say about the tile itself — it is in a wall, or off the
+			// shipped map. Then the ground it was standing beside speaks for it, because a golem
+			// being picked up belongs back where it came from. Without this the search was free to
+			// take the nearest walkable tile in any direction for thirty-two tiles, which across a
+			// channel is another island: golems turned up on shores no golem can walk to.
+			origin = beside(at);
+		}
+		int reach = sameSpace && origin == 0 ? UNKNOWN_REACH : 32;
 
-		for (int radius = 1; radius <= 32; radius++)
+		for (int radius = 1; radius <= reach; radius++)
 		{
 			for (int dx = -radius; dx <= radius; dx++)
 			{
@@ -940,7 +952,7 @@ class RoamPlanner
 					}
 					int x = at.getX() + dx;
 					int y = at.getY() + dy;
-					if (sameSpace && origin != 0)
+					if (origin != 0)
 					{
 						int here = mesh.componentAt(x, y, at.getPlane());
 						if (here != 0 && here != origin)
@@ -956,6 +968,30 @@ class RoamPlanner
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * How far a golem may be moved when nothing at all is known about where it is standing. A
+	 * rescue is nearly always a tile or two; the long reach is for a golem in a wall, which has
+	 * a component to be kept to.
+	 */
+	private static final int UNKNOWN_REACH = 4;
+
+	/** The space the ground around this tile belongs to, or 0 if that ground says nothing either. */
+	private int beside(WorldPoint at)
+	{
+		for (int dx = -1; dx <= 1; dx++)
+		{
+			for (int dy = -1; dy <= 1; dy++)
+			{
+				int space = mesh.componentAt(at.getX() + dx, at.getY() + dy, at.getPlane());
+				if (space != 0)
+				{
+					return space;
+				}
+			}
+		}
+		return 0;
 	}
 
 	/**

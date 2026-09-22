@@ -12,6 +12,8 @@ import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.CommandExecuted;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -80,6 +82,7 @@ public class DevCommands extends Plugin
 			case "gremove":
 			case "gmap":
 			case "gwhere":
+			case "gpath":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -130,23 +133,133 @@ public class DevCommands extends Plugin
 				say("map at " + (centre == null ? "?" : centre.getX() + "," + centre.getY())
 					+ ", zoom " + map.getWorldMapZoom()
 					+ "; the plugin says underground=" + under + ", faces=" + faces);
+				say("the plugin measured the map's offset as " + field(points, "offsetX") + ","
+					+ field(points, "offsetY") + " (measured=" + field(points, "measured") + ")");
+
+				// What the client will and will not draw, which is the question behind every
+				// "there are golems there and the map is empty".
+				net.runelite.api.worldmap.WorldMapData data = map.getWorldMapData();
+				Widget window = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
+				int minX = 0;
+				int maxX = 0;
+				int minY = 0;
+				int maxY = 0;
+				if (window != null && centre != null)
+				{
+					float zoom = map.getWorldMapZoom();
+					int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2);
+					int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2);
+					minX = centre.getX() - halfWidth;
+					maxX = centre.getX() + halfWidth;
+					minY = centre.getY() - halfHeight;
+					maxY = centre.getY() + halfHeight;
+					say("the map widget is " + (int) window.getBounds().getWidth() + "x"
+						+ (int) window.getBounds().getHeight() + "px, showing x " + minX + ".." + maxX
+						+ ", y " + minY + ".." + maxY);
+					say("the map " + (data == null ? "has no data"
+						: data.surfaceContainsPosition(centre.getX(), centre.getY())
+							? "holds its own centre" : "does NOT hold its own centre"));
+				}
+
+				// A dungeon is drawn on the map in a space of its own, nothing like the coordinates
+				// the dungeon really has. If that is so, this is the offset between them: the same
+				// player, counted twice.
+				Player me = client.getLocalPlayer();
+				if (me != null && centre != null)
+				{
+					WorldPoint real = me.getWorldLocation();
+					say("the player is really at " + real.getX() + "," + real.getY() + " plane "
+						+ real.getPlane() + "; the map calls that " + centre.getX() + "," + centre.getY()
+						+ " (offset " + (centre.getX() - real.getX()) + "," + (centre.getY() - real.getY())
+						+ ")");
+					say("the map " + (data == null || !data.surfaceContainsPosition(real.getX(), real.getY())
+						? "does NOT hold" : "holds") + " the player's real tile.");
+
+					// An instanced cave stands somewhere other than the map it was built from, and
+					// the map draws the map. If that is what the offset is, this says so.
+					net.runelite.api.WorldView wv = client.getTopLevelWorldView();
+					boolean instance = wv != null && wv.isInstance();
+					say("the player is " + (instance ? "in an instance" : "not in an instance")
+						+ (instance ? ", built from " + WorldPoint.fromLocalInstance(client,
+							me.getLocalLocation()) : ""));
+				}
+
+				// The map's own regions. Each one is somewhere on the map, and the icons inside it
+				// carry the coordinates the region really has, which between them say where a real
+				// tile is drawn on a map that does not use real coordinates.
+				net.runelite.api.worldmap.WorldMapRenderer renderer = map.getWorldMapRenderer();
+				if (renderer != null && renderer.isLoaded())
+				{
+					net.runelite.api.worldmap.WorldMapRegion[][] grid = renderer.getMapRegions();
+					say("the map holds " + grid.length + "x" + (grid.length == 0 ? 0 : grid[0].length)
+						+ " regions");
+					int shown = 0;
+					for (int i = 0; i < grid.length && shown < 8; i++)
+					{
+						for (int j = 0; j < grid[i].length && shown < 8; j++)
+						{
+							if (grid[i][j] == null || grid[i][j].getMapIcons() == null
+								|| grid[i][j].getMapIcons().isEmpty())
+							{
+								continue;
+							}
+							WorldPoint icon = grid[i][j].getMapIcons().iterator().next().getCoordinate();
+							say("  cell [" + i + "][" + j + "] has an icon really at "
+								+ icon.getX() + "," + icon.getY() + " plane " + icon.getPlane());
+							shown++;
+						}
+					}
+				}
+
+				int offX = points == null ? 0 : (int) field(points, "offsetX");
+				int offY = points == null ? 0 : (int) field(points, "offsetY");
 				int below = 0;
+				int onMap = 0;
+				int inView = 0;
 				Golem deep = null;
 				for (Golem one : golems)
 				{
-					if (one.currentTile().getY() >= 6400)
+					WorldPoint at = one.currentTile();
+					below += at.getY() >= 6400 ? 1 : 0;
+					if (at.getY() >= 6400 && deep == null)
 					{
-						below++;
 						deep = one;
 					}
+					if (data == null)
+					{
+						continue;
+					}
+					int x = at.getX();
+					int y = at.getY();
+					if (!data.surfaceContainsPosition(x, y))
+					{
+						if ((offX != 0 || offY != 0) && data.surfaceContainsPosition(x + offX, y + offY))
+						{
+							x += offX;
+							y += offY;
+						}
+						else if (y >= 6400 && data.surfaceContainsPosition(x, y - 6400))
+						{
+							y -= 6400;
+						}
+						else
+						{
+							continue;
+						}
+					}
+					onMap++;
+					inView += x >= minX && x <= maxX && y >= minY && y <= maxY ? 1 : 0;
 				}
-				say(below + " golems underground.");
-				if (deep != null)
+				say(below + " golems underground; " + onMap + " belong on this map, " + inView
+					+ " of those are in view.");
+
+				if (deep != null && data != null)
 				{
 					WorldPoint at = deep.currentTile();
-					boolean folding = !Boolean.TRUE.equals(under);
-					say("one of them at " + at.getX() + "," + at.getY() + ", drawn at "
-						+ at.getX() + "," + (folding ? at.getY() - 6400 : at.getY()));
+					say("one underground at " + at.getX() + "," + at.getY() + ": the map "
+						+ (data.surfaceContainsPosition(at.getX(), at.getY()) ? "holds" : "does not hold")
+						+ " it there, and " + (data.surfaceContainsPosition(at.getX(), at.getY() - 6400)
+							? "holds" : "does not hold") + " it folded to the surface.");
 				}
 				Golem golem = nearestOne(golems);
 				if (golem != null)
@@ -169,6 +282,11 @@ public class DevCommands extends Plugin
 						WorldPoint at = one.currentTile();
 						say(called + " at " + at.getX() + "," + at.getY() + " plane " + at.getPlane()
 							+ ", " + (one.isSailing(client.getTickCount()) ? "sailing" : "ashore"));
+						// How it came to be there, for a golem found somewhere a player cannot walk.
+						Object history = field(one, "history");
+						say("  " + field(history, "voyages") + " voyages, "
+							+ field(history, "transports") + " shortcuts, "
+							+ field(history, "walked") + " tiles walked");
 						if (++said >= 5)
 						{
 							break;
@@ -182,9 +300,31 @@ public class DevCommands extends Plugin
 				break;
 			}
 
+			case "gpath":
+			{
+				// Whether a golem could have walked from the plinth to a tile, over the map this
+				// client has actually harvested rather than the one that shipped.
+				if (args.length < 2)
+				{
+					say("::gpath x y");
+					break;
+				}
+				int goalX = number(args[0], 0);
+				int goalY = number(args[1], 0);
+				Object memory = field(golemPlugin, "islandMemory");
+				if (memory == null)
+				{
+					say("No island map.");
+					break;
+				}
+				say(reachable(memory, goalX, goalY) + " from the plinth to " + goalX + "," + goalY);
+				break;
+			}
+
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
 				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap  ::gwhere [name]");
+				say("::gpath x y");
 				break;
 
 			case "golems":
@@ -378,6 +518,85 @@ public class DevCommands extends Plugin
 	}
 
 	/** Up the hierarchy, because an injected singleton may be a subclass of the class it names. */
+	/**
+	 * Walks the live island map out from the plinth, the way a golem does, and says whether it
+	 * arrives. The shipped map can be read offline; this is the one this client has learned.
+	 */
+	private String reachable(Object memory, int goalX, int goalY)
+	{
+		final int[] dx = {1, -1, 0, 0, 1, -1, 1, -1};
+		final int[] dy = {0, 0, 1, -1, 1, 1, -1, -1};
+		java.util.Set<Long> seen = new java.util.HashSet<>();
+		java.util.Deque<int[]> queue = new java.util.ArrayDeque<>();
+		int startX = 2596;
+		int startY = 2256;
+		seen.add((long) startX << 20 | startY);
+		queue.add(new int[]{startX, startY});
+
+		while (!queue.isEmpty() && seen.size() < 40000)
+		{
+			int[] at = queue.poll();
+			for (int d = 0; d < dx.length; d++)
+			{
+				int nx = at[0] + dx[d];
+				int ny = at[1] + dy[d];
+				if (nx < 2400 || nx > 2800 || ny < 2100 || ny > 2400
+					|| !seen.add((long) nx << 20 | ny))
+				{
+					continue;
+				}
+				if (!walkable(memory, nx, ny) || !steppable(memory, at[0], at[1], dx[d], dy[d]))
+				{
+					continue;
+				}
+				if (nx == goalX && ny == goalY)
+				{
+					return "the golems' own map walks there, " + seen.size() + " tiles searched:";
+				}
+				queue.add(new int[]{nx, ny});
+			}
+		}
+		return "no walk over the golems' own map reaches it, " + seen.size() + " tiles searched:";
+	}
+
+	private static boolean walkable(Object memory, int x, int y)
+	{
+		Object out = answer(memory, "isKnownWalkable", new Class<?>[]{int.class, int.class, int.class},
+			new Object[]{x, y, 0});
+		return Boolean.TRUE.equals(out);
+	}
+
+	private static boolean steppable(Object memory, int x, int y, int dx, int dy)
+	{
+		Object out = answer(memory, "canStep",
+			new Class<?>[]{int.class, int.class, int.class, int.class, int.class},
+			new Object[]{x, y, 0, dx, dy});
+		return Boolean.TRUE.equals(out);
+	}
+
+	/** As call, but handing back what the method answered. */
+	private static Object answer(Object target, String name, Class<?>[] types, Object[] args)
+	{
+		for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass())
+		{
+			try
+			{
+				Method method = type.getDeclaredMethod(name, types);
+				method.setAccessible(true);
+				return method.invoke(target, args);
+			}
+			catch (NoSuchMethodException ignored)
+			{
+				// Not on this one; try the class it came from.
+			}
+			catch (ReflectiveOperationException e)
+			{
+				return null;
+			}
+		}
+		return null;
+	}
+
 	private static Object field(Object target, String name)
 	{
 		for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass())
