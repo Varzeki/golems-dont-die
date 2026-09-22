@@ -81,6 +81,61 @@ class GolemNameplateOverlay extends Overlay
 				OverlayUtil.renderTextLocation(graphics, at, name, colour);
 			}
 		}
+
+		pointAtFound(graphics, wv);
 		return null;
 	}
+
+	/** How far above a golem's head the arrow floats, and how far it bobs. */
+	private static final int ARROW_GAP = 70;
+	private static final int ARROW_BOB = 5;
+
+	/** How wide and tall the arrow is drawn, in pixels. */
+	private static final int ARROW_WIDE = 14;
+	private static final int ARROW_TALL = 12;
+
+	/**
+	 * Draws an arrow over the golem being looked for.
+	 *
+	 * <p>Drawn here rather than left to the game's hint arrow, which points at a tile and moves
+	 * once a tick: over a walking golem that reads as an arrow trailing along behind it. This one
+	 * is drawn at wherever the golem is this frame, which is where the golem looks.
+	 */
+	private void pointAtFound(Graphics2D graphics, net.runelite.api.WorldView wv)
+	{
+		Golem golem = plugin.getFinding();
+		FakeGolem drawn = golem == null ? null : golem.getRenderer();
+		if (drawn == null || golem.getDrawPlane() != wv.getPlane())
+		{
+			return;
+		}
+		int localX = golem.getDrawFineX() - wv.getBaseX() * Golem.TILE;
+		int localY = golem.getDrawFineY() - wv.getBaseY() * Golem.TILE;
+		if (!Golem.isInScene(wv, localX, localY))
+		{
+			return;
+		}
+
+		int bob = (int) (Math.sin(System.currentTimeMillis() / 220.0) * ARROW_BOB);
+		Point at = Perspective.localToCanvas(client, new LocalPoint(localX, localY, wv),
+			wv.getPlane(), drawn.getModelHeight() + ARROW_GAP + golem.jumpArc() + golem.deckLift());
+		if (at == null)
+		{
+			return;
+		}
+
+		int x = at.getX();
+		int y = at.getY() + bob;
+		java.awt.Polygon arrow = new java.awt.Polygon(
+			new int[]{x - ARROW_WIDE / 2, x + ARROW_WIDE / 2, x},
+			new int[]{y - ARROW_TALL, y - ARROW_TALL, y}, 3);
+		graphics.setColor(java.awt.Color.BLACK);
+		graphics.setStroke(new java.awt.BasicStroke(3f));
+		graphics.drawPolygon(arrow);
+		graphics.setColor(ARROW_COLOUR);
+		graphics.fillPolygon(arrow);
+	}
+
+	/** The game's own hint arrow yellow. */
+	private static final java.awt.Color ARROW_COLOUR = new java.awt.Color(0xFFE700);
 }

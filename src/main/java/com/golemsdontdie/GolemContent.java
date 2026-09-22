@@ -280,6 +280,9 @@ final class GolemContent
 	// Celebrations
 	// ---------------------------------------------------------------------------
 
+	/** EMOTE_WAVE, which a friendly golem gives the player. Framemap 0, as the dances are. */
+	static final int ANIM_EMOTE_WAVE = 863;
+
 	/**
 	 * The fireworks that go off over a levelling player, drawn over a dancing golem instead.
 	 *

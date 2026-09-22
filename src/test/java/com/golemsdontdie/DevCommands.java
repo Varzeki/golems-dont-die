@@ -122,6 +122,17 @@ public class DevCommands extends Plugin
 				net.runelite.api.Point centre = map.getWorldMapPosition();
 				say("map at " + (centre == null ? "?" : centre.getX() + "," + centre.getY())
 					+ ", zoom " + map.getWorldMapZoom());
+				int under = 0;
+				int named = 0;
+				for (Golem one : golems)
+				{
+					if (one.currentTile().getY() >= 6400)
+					{
+						under++;
+						named += one.getNickname() != null ? 1 : 0;
+					}
+				}
+				say(under + " golems underground, " + named + " of them named.");
 				Golem golem = nearestOne(golems);
 				if (golem != null)
 				{

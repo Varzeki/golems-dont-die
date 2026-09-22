@@ -357,6 +357,12 @@ class Golem
 	/** Set when a move wants something drawn beside the golem, such as the air guitar's guitar. */
 	private boolean propPending;
 
+	/** The tick a golem dancing of its own accord stops; 0 when it is not. See GolemTrait. */
+	private int partyUntil;
+
+	/** The tick a golem waving at the player puts its hand down; 0 when it is not. */
+	private int greetUntil;
+
 	/** Set when the golem is inside the loaded scene and should be drawn. */
 	@Getter
 	@Setter
@@ -2002,6 +2008,37 @@ class Golem
 			+ (dwellRemaining > 0 ? " dwell=" + dwellRemaining : "");
 	}
 
+	/**
+	 * Starts this golem dancing where it stands, for its own reasons rather than a celebration:
+	 * the life of the party, with a crowd around it. No fireworks — those are for the occasions.
+	 */
+	void startParty(int untilTick)
+	{
+		partyUntil = untilTick;
+		nextDanceMove();
+	}
+
+	boolean isPartying(int tick)
+	{
+		return tick < partyUntil;
+	}
+
+	/**
+	 * Turns the golem to face something and waves at it, for as long as the wave takes.
+	 *
+	 * @param facing the orientation to turn to, in the game's 2048ths
+	 */
+	void greet(int untilTick, int facing)
+	{
+		greetUntil = untilTick;
+		targetOrientation = facing & 2047;
+	}
+
+	boolean isGreeting(int tick)
+	{
+		return tick < greetUntil;
+	}
+
 	void nextDanceMove()
 	{
 		if (danceRandom == null)
@@ -2023,6 +2060,17 @@ class Golem
 		return wanted;
 	}
 
+	/**
+	 * The tick as the last frame saw it, so the pose can be asked about without one: the renderer
+	 * asks what to play from its own callback, which has no tick to hand.
+	 */
+	private int tickNow;
+
+	void setTickNow(int tick)
+	{
+		tickNow = tick;
+	}
+
 	/** The animation this golem should be playing right now. -1 if it has none. */
 	int currentPoseAnimation()
 	{
@@ -2042,10 +2090,16 @@ class Golem
 		{
 			return walking ? gaitWalk : gaitIdle;
 		}
+		// A wave at the player, which stops for nothing except the things above: a golem halfway
+		// up a ladder has its hands full.
+		if (!walking && greetUntil > 0 && tickNow < greetUntil)
+		{
+			return GolemContent.ANIM_EMOTE_WAVE;
+		}
 		// Last of all, and never over anything else: a golem climbing, crossing or at the helm has
 		// a pose already, and one halfway through a recorded motion is having its frames set by
 		// hand. Dancing is what a golem does when it is doing nothing.
-		if (dancing && !walking)
+		if ((dancing || partyUntil > 0 && tickNow < partyUntil) && !walking)
 		{
 			if (danceMove == null)
 			{

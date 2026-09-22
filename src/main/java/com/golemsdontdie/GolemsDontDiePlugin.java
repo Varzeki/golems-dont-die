@@ -845,6 +845,12 @@ public class GolemsDontDiePlugin extends Plugin
 	/** The golem being pointed at, or null. See findGolem. */
 	private Golem finding;
 
+	/** The golem being pointed at, for the overlay that draws the arrow over it. */
+	Golem getFinding()
+	{
+		return finding;
+	}
+
 	/** How near a golem being looked for counts as found, in tiles. */
 	private static final int FOUND_TILES = 8;
 
@@ -891,6 +897,10 @@ public class GolemsDontDiePlugin extends Plugin
 			findGolem(null);
 			return;
 		}
+
+		// The game's own arrow points at a tile and moves when the tick says so, which beside a
+		// walking golem reads as an arrow trailing it. It stays for the minimap and for a golem
+		// out of the scene; the one over its head is drawn by GolemNameplateOverlay, every frame.
 		client.setHintArrow(at);
 	}
 
@@ -1373,6 +1383,8 @@ public class GolemsDontDiePlugin extends Plugin
 		// frame, which is fifty times as often and would fill the sky in a second.
 		// Fireworks are rolled once a tick rather than once a frame, which is fifty times as often,
 		// and every few ticks rather than every one: the clip is about three ticks long.
+		boolean social = tick != lastSocialTick;
+		lastSocialTick = tick;
 		boolean celebrating = celebration.isDancing(tick);
 		int since = celebration.startedAt(tick);
 		boolean fireworksDue = celebrating && tick != lastFireworkTick && since % FIREWORK_EVERY == 0;
@@ -1398,7 +1410,12 @@ public class GolemsDontDiePlugin extends Plugin
 
 			// Only the golems the player can see dance: one three regions away would be standing
 			// still for nobody, and it has walking to be getting on with.
-			golem.setDancing(celebrating && tier == GolemTier.SCENE);
+			golem.setTickNow(tick);
+			golem.setDancing(celebrating && tier == GolemTier.SCENE || golem.isPartying(tick));
+			if (social && tier == GolemTier.SCENE)
+			{
+				beSociable(golem, tick, playerAt);
+			}
 
 			if (tier == GolemTier.FAR)
 			{
@@ -1944,6 +1961,27 @@ public class GolemsDontDiePlugin extends Plugin
 	/** The last tick fireworks were rolled for, so the roll is per tick and not per frame. */
 	private int lastFireworkTick = -1;
 
+	/** How near another golem has to be to count as company, in tiles. */
+	private static final int COMPANY_TILES = 10;
+
+	/** How many others the life of the party wants around it before it dances. */
+	private static final int COMPANY = 2;
+
+	/** The chance per tick that a golem with company dances, and how long it dances for. */
+	private static final float PARTY_CHANCE = 0.006f;
+	private static final int PARTY_TICKS = 12;
+
+	/** How near the player a friendly golem waves, the chance it does, and how long a wave takes. */
+	private static final int GREET_TILES = 6;
+	private static final float GREET_CHANCE = 0.05f;
+	private static final int GREET_TICKS = 4;
+
+	/** The last tick the golems were asked whether they felt sociable. */
+	private int lastSocialTick = -1;
+
+	/** Whose fireworks go off and who feels like dancing: the golems' own generators are theirs. */
+	private final java.util.Random moods = new java.util.Random();
+
 	/** Models for the celebration, built once each: see GolemContent. */
 	private final Map<Integer, Model> celebrationModels = new HashMap<>();
 
@@ -2022,6 +2060,57 @@ public class GolemsDontDiePlugin extends Plugin
 			log.debug("Celebration model {} would not load", modelId, e);
 			return null;
 		}
+	}
+
+	/**
+	 * What a golem does because of what it is like: the life of the party dances when there is a
+	 * crowd to dance in, and a friendly golem waves at the player.
+	 *
+	 * <p>Once a tick per golem in the scene, and only for the two traits that ask for it, so the
+	 * count of who is nearby is paid for by the few golems that have them.
+	 */
+	private void beSociable(Golem golem, int tick, WorldPoint playerAt)
+	{
+		if (golem.isDancing() || golem.isGreeting(tick) || golem.isDying())
+		{
+			return;
+		}
+
+		if (playerAt != null && GolemTrait.FRIENDLY.in(golem.getTraits())
+			&& moods.nextFloat() < GREET_CHANCE)
+		{
+			WorldPoint at = golem.currentTile();
+			if (at.getPlane() == playerAt.getPlane() && at.distanceTo2D(playerAt) <= GREET_TILES)
+			{
+				// Turned to face the player: a wave over its shoulder is not a greeting.
+				int dx = playerAt.getX() - at.getX();
+				int dy = playerAt.getY() - at.getY();
+				golem.greet(tick + GREET_TICKS, (int) (Math.atan2(-dx, dy) * 1024 / Math.PI) & 2047);
+				return;
+			}
+		}
+
+		if (GolemTrait.LIFE_OF_THE_PARTY.in(golem.getTraits())
+			&& moods.nextFloat() < PARTY_CHANCE && company(golem) >= COMPANY)
+		{
+			golem.startParty(tick + PARTY_TICKS);
+		}
+	}
+
+	/** How many other golems are within a few tiles of this one, counted up to what is asked. */
+	private int company(Golem golem)
+	{
+		WorldPoint at = golem.currentTile();
+		int near = 0;
+		for (Golem other : drawnGolems)
+		{
+			if (other != golem && other.getPlane() == at.getPlane()
+				&& other.currentTile().distanceTo2D(at) <= COMPANY_TILES && ++near >= COMPANY)
+			{
+				return near;
+			}
+		}
+		return near;
 	}
 
 	/** Unregisters scenery whose animation has run out. */

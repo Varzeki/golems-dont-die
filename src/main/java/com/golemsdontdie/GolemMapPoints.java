@@ -148,11 +148,11 @@ class GolemMapPoints
 			return;
 		}
 
-		// How near two golems have to be to share a face, in tiles: a face's width at this zoom.
-		// Zoomed all the way in that is a tile, so every golem has its own face; pulled back it
-		// grows, and the groups grow with it.
+		// How near two golems have to be to share a face, in tiles: half a face's width at this
+		// zoom, so two faces touching is what merges them rather than two faces near each other.
+		// Zoomed all the way in that is a tile, and every golem has a face of its own.
 		float zoom = map.getWorldMapZoom();
-		int cellTiles = Math.max(1, Math.round(FACE_PIXELS / zoom));
+		int cellTiles = Math.max(1, Math.round(FACE_PIXELS / zoom / 2f));
 		Point centre = map.getWorldMapPosition();
 		int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2) + MARGIN;
 		int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2) + MARGIN;
@@ -164,6 +164,7 @@ class GolemMapPoints
 
 		gather(golems, named, cellTiles, centre.getX() - halfWidth, centre.getX() + halfWidth,
 			centre.getY() - halfHeight, centre.getY() + halfHeight);
+		join(cellTiles);
 		draw();
 	}
 
@@ -272,6 +273,73 @@ class GolemMapPoints
 			cell.y = (int) (cell.sumY / cell.count);
 		}
 	}
+
+	/**
+	 * Joins up groups whose faces would still overlap.
+	 *
+	 * <p>Gathering takes each golem into the nearest group it can reach, which leaves groups that
+	 * grew towards each other afterwards: two faces a few pixels apart, which is what a player
+	 * sees as two heads on top of one another. This is the pass that puts those together, run a
+	 * few times over because a joined group is larger and reaches further than either half did.
+	 */
+	private void join(int cellTiles)
+	{
+		for (int pass = 0; pass < JOIN_PASSES; pass++)
+		{
+			boolean joined = false;
+			for (int i = 0; i < used; i++)
+			{
+				Cell one = cellList.get(i);
+				if (one.count == 0)
+				{
+					continue;
+				}
+				for (int j = i + 1; j < used; j++)
+				{
+					Cell other = cellList.get(j);
+					if (other.count == 0 || other.plane != one.plane)
+					{
+						continue;
+					}
+					// Two heads overlap when they are nearer than the two half-widths together.
+					int reach = (int) (cellTiles * (CROWD_SIZES[sizeFor(one.count)]
+						+ CROWD_SIZES[sizeFor(other.count)]));
+					if (Math.max(Math.abs(one.x - other.x), Math.abs(one.y - other.y)) > reach)
+					{
+						continue;
+					}
+					one.count += other.count;
+					one.sumX += other.sumX;
+					one.sumY += other.sumY;
+					one.x = (int) (one.sumX / one.count);
+					one.y = (int) (one.sumY / one.count);
+					other.count = 0;
+					joined = true;
+				}
+			}
+			if (!joined)
+			{
+				break;
+			}
+		}
+
+		// Close the gaps the joining left, so draw() can walk the first `used` of them.
+		int kept = 0;
+		for (int i = 0; i < used; i++)
+		{
+			Cell cell = cellList.get(i);
+			if (cell.count > 0)
+			{
+				cellList.set(i, cellList.get(kept));
+				cellList.set(kept, cell);
+				kept++;
+			}
+		}
+		used = kept;
+	}
+
+	/** How many times the joining is run over. A joined group reaches further than its halves. */
+	private static final int JOIN_PASSES = 3;
 
 	/** The key of a cell of the lookup grid. */
 	private static long bucket(int x, int y)
