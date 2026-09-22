@@ -901,9 +901,18 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		// The game's own arrow points at a tile and moves when the tick says so, which beside a
-		// walking golem reads as an arrow trailing it. It stays for the minimap and for a golem
-		// out of the scene; the one over its head is drawn by GolemNameplateOverlay, every frame.
-		client.setHintArrow(at);
+		// walking golem reads as an arrow trailing it. So it is used only where the plugin cannot
+		// draw its own: a golem out of the scene, where the arrow's other half — the marker on the
+		// minimap — is the whole of what a player can go on. In the scene the two were drawn one
+		// on top of the other, and GolemNameplateOverlay's is the better of them.
+		if (finding.getRenderer() != null)
+		{
+			client.clearHintArrow();
+		}
+		else
+		{
+			client.setHintArrow(at);
+		}
 	}
 
 	/** Golems the game says have been crafted, as read this session, or -1 if unread. */
@@ -2081,9 +2090,16 @@ public class GolemsDontDiePlugin extends Plugin
 	/** How many others the life of the party wants around it before it dances. */
 	private static final int COMPANY = 2;
 
-	/** The chance per tick that a golem with company dances, and how long it dances for. */
-	private static final float PARTY_CHANCE = 0.006f;
-	private static final int PARTY_TICKS = 12;
+	/**
+	 * The chance per tick that a golem with company dances, and how long it dances for.
+	 *
+	 * <p>Only about a golem in sixteen has the trait at all, and it needs two others beside it, so
+	 * the roll has to be generous or the thing never happens where anyone is watching: at a
+	 * thirtieth of this a full evening's play turned up nothing. As it stands an eligible golem in
+	 * a crowd dances about every half minute, and the crowd is where the player is.
+	 */
+	private static final float PARTY_CHANCE = 0.02f;
+	private static final int PARTY_TICKS = 17;
 
 	/** How near the player a friendly golem waves, the chance it does, and how long a wave takes. */
 	private static final int GREET_TILES = 6;

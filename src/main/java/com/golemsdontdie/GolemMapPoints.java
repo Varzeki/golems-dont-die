@@ -123,6 +123,10 @@ class GolemMapPoints
 	@Inject
 	private Whereabouts whereabouts;
 
+	/** Read only to tell sea from land, for the fold above. */
+	@Inject
+	private WorldMesh mesh;
+
 	@Inject
 	private GolemsDontDieConfig config;
 
@@ -369,8 +373,14 @@ class GolemMapPoints
 					x += offsetX;
 					y += offsetY;
 				}
-				else if (y >= UNDERGROUND && showing.surfaceContainsPosition(x, y - UNDERGROUND))
+				else if (y >= UNDERGROUND && showing.surfaceContainsPosition(x, y - UNDERGROUND)
+					&& !mesh.isOcean(x, y - UNDERGROUND, 0))
 				{
+					// Most dungeons are dug at their surface coordinates plus this, and drawing one
+					// over the ground above it is what a player expects. Not all of them are: the
+					// Observatory's dungeon folds into open water west of Falador, and a golem was
+					// on the map in the middle of the sea labelled with the cave it was really in.
+					// Where the fold lands in the sea it is no place at all, so nothing is drawn.
 					y -= UNDERGROUND;
 				}
 				else

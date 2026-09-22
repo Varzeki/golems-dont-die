@@ -84,6 +84,7 @@ public class DevCommands extends Plugin
 			case "gwhere":
 			case "gpath":
 			case "gcutoff":
+			case "gparty":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -308,6 +309,53 @@ public class DevCommands extends Plugin
 				break;
 			}
 
+			case "gparty":
+			{
+				// Who could dance of their own accord, and whether the dance itself works: the
+				// trait is rare and the roll is rarer, so waiting for one is no way to test it.
+				int drawn = 0;
+				int partiers = 0;
+				Golem pick = null;
+				for (Golem one : golems)
+				{
+					if (one.getRenderer() == null)
+					{
+						continue;
+					}
+					drawn++;
+					if (!GolemTrait.LIFE_OF_THE_PARTY.in(one.getTraits()))
+					{
+						continue;
+					}
+					partiers++;
+					int near = 0;
+					WorldPoint at = one.currentTile();
+					for (Golem other : golems)
+					{
+						if (other != one && other.getRenderer() != null
+							&& other.getPlane() == at.getPlane()
+							&& other.currentTile().distanceTo2D(at) <= 10)
+						{
+							near++;
+						}
+					}
+					say("  " + names.of(one) + " at " + at.getX() + "," + at.getY()
+						+ " has " + near + " golems within 10 tiles");
+					if (pick == null)
+					{
+						pick = one;
+					}
+				}
+				say(partiers + " of " + drawn + " golems in the scene are the life of the party.");
+				if (pick != null)
+				{
+					call(pick, "startParty", new Class<?>[]{int.class},
+						new Object[]{client.getTickCount() + 17});
+					say("Made " + names.of(pick) + " dance.");
+				}
+				break;
+			}
+
 			case "gcutoff":
 			{
 				// What the plugin makes of the world right now: how many golems stand on ground
@@ -365,7 +413,7 @@ public class DevCommands extends Plugin
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
 				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap  ::gwhere [name]");
-				say("::gpath x y  ::gcutoff");
+				say("::gpath x y  ::gcutoff  ::gparty");
 				break;
 
 			case "golems":

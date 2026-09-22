@@ -87,12 +87,12 @@ class GolemNameplateOverlay extends Overlay
 	}
 
 	/** How far above a golem's head the arrow floats, and how far it bobs. */
-	private static final int ARROW_GAP = 70;
-	private static final int ARROW_BOB = 5;
+	private static final int ARROW_GAP = 80;
+	private static final int ARROW_BOB = 6;
 
-	/** How wide and tall the arrow is drawn, in pixels. */
-	private static final int ARROW_WIDE = 14;
-	private static final int ARROW_TALL = 12;
+	/** How wide and tall the arrow is drawn, in pixels. The game's own is about this size. */
+	private static final int ARROW_WIDE = 30;
+	private static final int ARROW_TALL = 26;
 
 	/**
 	 * Draws an arrow over the golem being looked for.
@@ -130,7 +130,7 @@ class GolemNameplateOverlay extends Overlay
 			new int[]{x - ARROW_WIDE / 2, x + ARROW_WIDE / 2, x},
 			new int[]{y - ARROW_TALL, y - ARROW_TALL, y}, 3);
 		graphics.setColor(java.awt.Color.BLACK);
-		graphics.setStroke(new java.awt.BasicStroke(3f));
+		graphics.setStroke(new java.awt.BasicStroke(4f));
 		graphics.drawPolygon(arrow);
 		graphics.setColor(ARROW_COLOUR);
 		graphics.fillPolygon(arrow);
