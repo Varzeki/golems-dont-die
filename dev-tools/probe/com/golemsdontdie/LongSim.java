@@ -40,6 +40,13 @@ public class LongSim
 	/** How often golems are counted by region, as the plugin does every ten game ticks. */
 	private static final int CENSUS_TICKS = 10;
 
+	/**
+	 * -Dtrait=NAME gives every golem that one trait and nothing else, to watch what a taste does
+	 * on its own. The ordinary run draws traits from each golem's seed, which gives a handful of
+	 * each: enough to see a preference, not enough to see why one fades.
+	 */
+	private static final String FORCED_TRAIT = System.getProperty("trait");
+
 	/** -Dtrace=N prints every plan of the first N golems for -DtraceTicks ticks. */
 	private static final int TRACE = Integer.getInteger("trace", 0);
 	private static final int TRACE_TICKS = Integer.getInteger("traceTicks", 3000);
@@ -360,7 +367,9 @@ public class LongSim
 		{
 			this.at = at;
 			this.random = new Random(seed);
-			this.traits = GolemTrait.of(seed);
+			this.traits = FORCED_TRAIT == null
+				? GolemTrait.of(seed)
+				: GolemTrait.valueOf(FORCED_TRAIT).mask();
 			transportMemory.setTraits(traits);
 		}
 
