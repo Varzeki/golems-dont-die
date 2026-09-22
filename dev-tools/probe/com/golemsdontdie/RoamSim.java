@@ -89,6 +89,13 @@ public class RoamSim
 		set(planner, "transports", network);
 		set(planner, "abilities", abilities);
 		RoamContext context = new RoamContext(memory, pathfinder, network, abilities);
+		// Golems have tastes in weather and in obstacles, and the planner reads them: a run without
+		// them measures a planner nobody has. See GolemClimate and GolemTrait.
+		PlaceNames places = new PlaceNames();
+		places.load();
+		GolemClimate climate = new GolemClimate();
+		climate.learn(places);
+		context.setClimates(climate);
 
 		// Sailing, from the shipped buoys as SailingDocks builds them at login. Every dock is
 		// open: the maxed client has every level and quest.
@@ -287,6 +294,7 @@ public class RoamSim
 			this.at = at;
 			this.random = new Random(seed);
 			this.home = at;
+			transportMemory.setTraits(GolemTrait.of(seed));
 			if (!SAILING)
 			{
 				transportMemory.setShoreLeaveUntil(Long.MAX_VALUE);
