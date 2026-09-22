@@ -3,6 +3,7 @@ package com.golemsdontdie;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;
+import java.io.File;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import net.runelite.api.coords.WorldPoint;
@@ -16,6 +17,30 @@ import net.runelite.api.coords.WorldPoint;
  */
 public class PageProbe
 {
+	/**
+	 * A golem's picture. One the dev client exported if there is one — see PortraitExport — and a
+	 * grey figure of the same size if not, since nothing here can draw a model.
+	 */
+	private static java.awt.image.BufferedImage standIn() throws Exception
+	{
+		File exported = new File(net.runelite.client.RuneLite.RUNELITE_DIR,
+			"golem-exports/portrait-0.png");
+		if (exported.isFile())
+		{
+			return javax.imageio.ImageIO.read(exported);
+		}
+		java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+			GolemPortrait.WIDTH, GolemPortrait.HEIGHT, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		java.awt.Graphics2D g = image.createGraphics();
+		g.setColor(new java.awt.Color(90, 88, 84));
+		g.fillOval(GolemPortrait.WIDTH / 2 - 16, 14, 32, 30);
+		g.fillRect(GolemPortrait.WIDTH / 2 - 22, 46, 44, 60);
+		g.fillRect(GolemPortrait.WIDTH / 2 - 34, 50, 12, 44);
+		g.fillRect(GolemPortrait.WIDTH / 2 + 22, 50, 12, 44);
+		g.dispose();
+		return image;
+	}
+
 	public static void main(String[] args) throws Exception
 	{
 		if (args.length > 0 && args[0].equals("scan"))
@@ -41,11 +66,20 @@ public class PageProbe
 		golem.setNickname(args.length > 2 ? args[2] : "Pebble");
 		System.out.println("traits: " + GolemTrait.list(golem.getTraits()));
 
+		// A record to look at, since nothing here plays the game.
+		golem.getHistory().restore(System.currentTimeMillis() - 86400000L * 96, 1483, 37, 214_500,
+			2412, 3812, 2 | 4, new WorldPoint(2596, 2256, 0));
+
+		java.awt.image.BufferedImage picture = standIn();
 		GolemPage page = new GolemPage(g -> System.out.println("find " + g.getNickname()));
 		SwingUtilities.invokeAndWait(() ->
 		{
 			page.show(golem, null);
-			page.showPlace("Wyrmscraig", true);
+			page.showPlace("Neitiznot", true);
+			page.setFurthest("Neitiznot");
+			// The real picture is drawn from the golem's model, which needs a running client; this
+			// is a stand-in of the same size, to see the frame it hangs in.
+			page.showPicture(golem, picture);
 		});
 		// Painted after the window is up, so the look and feel has done its work.
 		Thread.sleep(500);

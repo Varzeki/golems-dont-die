@@ -254,6 +254,9 @@ public class GolemsDontDiePlugin extends Plugin
 	private GolemPage page;
 
 	@Inject
+	private GolemPortrait portraits;
+
+	@Inject
 	private Whereabouts whereabouts;
 
 	@Inject
@@ -538,6 +541,9 @@ public class GolemsDontDiePlugin extends Plugin
 				if (open != null)
 				{
 					open.show(golem, panel);
+					// The picture and the name of the furthest place it has been both need the
+					// client thread, so the page goes up first and they arrive a frame later.
+					clientThread.invoke(() -> dressPage(open, golem));
 				}
 			});
 		// Swing throughout, and it only reads the golem it is given: see GolemPage.
@@ -646,6 +652,23 @@ public class GolemsDontDiePlugin extends Plugin
 			javax.swing.SwingUtilities.invokeLater(closing::close);
 		}
 		panel = null;
+	}
+
+	/**
+	 * Draws the golem's portrait and names the furthest place it has been, then hands both to the
+	 * page. Client thread: models, animation frames and the place names all live here.
+	 */
+	private void dressPage(GolemPage open, Golem golem)
+	{
+		java.awt.image.BufferedImage drawn = portraits.of(golem);
+		GolemHistory history = golem.getHistory();
+		String far = history.getFurthest() <= 0 ? null
+			: placeNames.nameFor(history.getFurthestX(), history.getFurthestY(), 0);
+		javax.swing.SwingUtilities.invokeLater(() ->
+		{
+			open.setFurthest(far);
+			open.showPicture(golem, drawn);
+		});
 	}
 
 	/** Runs one step of shutdown, logging rather than throwing if it fails. */
@@ -2145,6 +2168,14 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			ticksSinceCensus = 0;
 			census.recount(golems);
+
+			// The same pass keeps each golem's own tally: where it has got to, and how much ground
+			// it has covered since the last one. See GolemHistory.
+			for (Golem golem : golems)
+			{
+				WorldPoint at = golem.currentTile();
+				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome());
+			}
 		}
 
 		if (saveGolemsAt >= 0 && client.getTickCount() >= saveGolemsAt)

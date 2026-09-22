@@ -383,6 +383,10 @@ class Golem
 	@Getter
 	private final int traits;
 
+	/** What it has done since it was made. See GolemHistory. */
+	@Getter
+	private final GolemHistory history = new GolemHistory();
+
 	Golem(GolemSnapshot snapshot, WorldPoint home, long seed, int startFineX, int startFineY)
 	{
 		this.snapshot = snapshot;
@@ -422,6 +426,19 @@ class Golem
 		return localX >= 0 && localY >= 0
 			&& localX < wv.getSizeX() * TILE
 			&& localY < wv.getSizeY() * TILE;
+	}
+
+	/**
+	 * Takes on a plan, and keeps the tally with it: a voyage is only ever known about here, the
+	 * planner having worked it out for a golem it was handed the memory of and not the golem.
+	 */
+	private void adopt(Itinerary plan)
+	{
+		itinerary = plan;
+		if (plan != null && plan.isVoyage())
+		{
+			history.sailed();
+		}
 	}
 
 	/** The tile the golem is standing on or walking out of. */
@@ -506,7 +523,7 @@ class Golem
 			{
 				return true;
 			}
-			itinerary = planner.plan(currentTile(), context.getTick(), random, transportMemory, context);
+			adopt(planner.plan(currentTile(), context.getTick(), random, transportMemory, context));
 			return true;
 		}
 
@@ -523,6 +540,7 @@ class Golem
 			if (itinerary != null && itinerary.isFinished(context.getTick()) && itinerary.transport() != null)
 			{
 				noteInstance(itinerary.transport());
+				history.tookTransport();
 			}
 			WorldPoint resolved = itinerary != null
 				? itinerary.positionAt(context.getTick())
@@ -635,6 +653,7 @@ class Golem
 		if (itinerary != null && itinerary.transport() != null)
 		{
 			noteInstance(itinerary.transport());
+			history.tookTransport();
 		}
 		WorldPoint at = itinerary == null ? currentTile() : itinerary.destination();
 		this.fineX = at.getX() * TILE + TILE / 2;
@@ -645,7 +664,7 @@ class Golem
 			return false;
 		}
 
-		itinerary = planner.plan(at, tick, random, transportMemory, context);
+		adopt(planner.plan(at, tick, random, transportMemory, context));
 		if (itinerary == null)
 		{
 			// Nowhere found: stand a moment before looking again. See RoamPlanner.idle.
@@ -939,7 +958,7 @@ class Golem
 
 		path.clear();
 		stepping = false;
-		itinerary = crossing;
+		adopt(crossing);
 		return true;
 	}
 
@@ -1260,7 +1279,7 @@ class Golem
 		}
 		path.clear();
 		stepping = false;
-		itinerary = crossing;
+		adopt(crossing);
 		return true;
 	}
 
@@ -1392,6 +1411,7 @@ class Golem
 			lastHopTick = context.getTick();
 		}
 		transportMemory.used(transport, context.getTick(), cooldownFor(transport, context));
+		history.tookTransport();
 		// On landing, not now: a golem climbing into the pew is still in the cathedral.
 		landingInstance = transport.entersInstance() ? 1 : transport.leavesInstance() ? 0 : -1;
 

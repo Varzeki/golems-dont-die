@@ -1,0 +1,261 @@
+package com.golemsdontdie;
+
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import net.runelite.api.Animation;
+import net.runelite.api.AnimationController;
+import net.runelite.api.Client;
+import net.runelite.api.JagexColor;
+import net.runelite.api.Model;
+
+/**
+ * A picture of one golem, drawn from its own model: the golem's page has a portrait of the golem
+ * it is about rather than the same picture twenty thousand times.
+ *
+ * <p>The pose and the angle come out of the golem's seed, so each golem stands a little
+ * differently and always the same way — one caught mid-idle, another square on, another half
+ * turned away.
+ *
+ * <p>Drawn here rather than by the client. The scene renderer draws what is in the scene, and a
+ * golem on the other side of the world is not; the model itself is all that is needed, so the
+ * faces are sorted by depth and filled flat, which at this size reads as the low-poly figure it
+ * is. Client thread only — the models and the animation frames belong to it.
+ */
+@Singleton
+class GolemPortrait
+{
+	/** The picture's size, which is also what the page's frame is built around. */
+	static final int WIDTH = 110;
+	static final int HEIGHT = 140;
+
+	/** How far the figure may be turned from square on, either way, in degrees. */
+	private static final int TURN = 60;
+
+	/** How far it may lean, either way, in degrees: enough to tell two golems apart. */
+	private static final int LEAN = 3;
+
+	/** The closest and furthest a golem stands, as a share of the room in the frame. */
+	private static final float NEAREST = 1f;
+	private static final float FURTHEST = 0.86f;
+
+	/** Room left around the figure, in pixels, so nothing touches the frame. */
+	private static final int MARGIN = 10;
+
+	/** Gamma the client's own colour palette is built with, and so this one. */
+	private static final double BRIGHTNESS = 0.8;
+
+	@Inject
+	private Client client;
+
+	@Inject
+	private GolemModelFactory models;
+
+	/** A golem's portrait, or null if its model is not to hand. */
+	BufferedImage of(Golem golem)
+	{
+		if (golem == null || client == null || models == null)
+		{
+			return null;
+		}
+		Model model = models.modelFor(golem.getSnapshot());
+		if (model == null)
+		{
+			return null;
+		}
+
+		// Its own pose, from its own number: a frame of the idle animation, and an angle.
+		long seed = golem.getId();
+		Animation idle = client.loadAnimation(GolemContent.GOLEM_IDLE_ANIMATION);
+		if (idle != null && idle.getNumFrames() > 0)
+		{
+			AnimationController controller = new AnimationController(client, idle);
+			controller.setFrame((int) Math.floorMod(seed >> 5, idle.getNumFrames()));
+			Model posed = controller.animate(model);
+			if (posed != null)
+			{
+				model = posed;
+			}
+		}
+		double turn = Math.toRadians(Math.floorMod(seed >> 17, TURN * 2L) - TURN);
+		double lean = Math.toRadians(Math.floorMod(seed >> 29, LEAN * 2L) - LEAN);
+		float zoom = NEAREST - (NEAREST - FURTHEST) * (Math.floorMod(seed >> 41, 16L) / 15f);
+		return draw(model, turn, lean, zoom);
+	}
+
+	private static BufferedImage draw(Model model, double turn, double lean, float zoom)
+	{
+		int count = model.getVerticesCount();
+		float[] modelX = model.getVerticesX();
+		float[] modelY = model.getVerticesY();
+		float[] modelZ = model.getVerticesZ();
+		if (count == 0 || modelX == null || modelY == null || modelZ == null)
+		{
+			return null;
+		}
+
+		// Turned about the upright axis, which in a model is y and runs downwards.
+		float[] x = new float[count];
+		float[] y = new float[count];
+		float[] depth = new float[count];
+		float sin = (float) Math.sin(turn);
+		float cos = (float) Math.cos(turn);
+		float leftmost = Float.MAX_VALUE;
+		float rightmost = -Float.MAX_VALUE;
+		float top = Float.MAX_VALUE;
+		float bottom = -Float.MAX_VALUE;
+		float leanSin = (float) Math.sin(lean);
+		float leanCos = (float) Math.cos(lean);
+		for (int v = 0; v < count; v++)
+		{
+			float across = modelX[v] * cos - modelZ[v] * sin;
+			depth[v] = modelX[v] * sin + modelZ[v] * cos;
+			// And a lean, about the axis into the picture: a golem stood a little off true.
+			x[v] = across * leanCos - modelY[v] * leanSin;
+			y[v] = across * leanSin + modelY[v] * leanCos;
+			leftmost = Math.min(leftmost, x[v]);
+			rightmost = Math.max(rightmost, x[v]);
+			top = Math.min(top, y[v]);
+			bottom = Math.max(bottom, y[v]);
+		}
+
+		// Fitted to the frame, the same scale both ways so nothing is stretched.
+		float wide = Math.max(1f, rightmost - leftmost);
+		float tall = Math.max(1f, bottom - top);
+		float scale = zoom * Math.min((WIDTH - 2f * MARGIN) / wide, (HEIGHT - 2f * MARGIN) / tall);
+		float offsetX = WIDTH / 2f - (leftmost + rightmost) / 2f * scale;
+		float offsetY = HEIGHT / 2f - (top + bottom) / 2f * scale;
+
+		BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = image.createGraphics();
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+		// Something behind it, so the figure is stood in a place rather than cut out of the air.
+		g.setPaint(new java.awt.GradientPaint(0, 0, BEHIND_TOP, 0, HEIGHT, BEHIND_BOTTOM));
+		g.fillRect(0, 0, WIDTH, HEIGHT);
+
+		int faces = model.getFaceCount();
+		int[] first = model.getFaceIndices1();
+		int[] second = model.getFaceIndices2();
+		int[] third = model.getFaceIndices3();
+		int[] colour1 = model.getFaceColors1();
+		int[] colour2 = model.getFaceColors2();
+		int[] colour3 = model.getFaceColors3();
+		byte[] clear = model.getFaceTransparencies();
+
+		// Furthest first, so nearer faces cover them: a depth buffer for two hundred triangles at
+		// this size would be the same picture and a great deal more of it.
+		Integer[] order = new Integer[faces];
+		float[] away = new float[faces];
+		for (int f = 0; f < faces; f++)
+		{
+			order[f] = f;
+			away[f] = depth[first[f]] + depth[second[f]] + depth[third[f]];
+		}
+		java.util.Arrays.sort(order, (one, other) -> Float.compare(away[other], away[one]));
+
+		int[] pointsX = new int[3];
+		int[] pointsY = new int[3];
+		for (int index = 0; index < faces; index++)
+		{
+			int f = order[index];
+			if (clear != null && (clear[f] & 0xFF) >= 254)
+			{
+				continue;
+			}
+			// The third colour is not always a colour: -1 means the face is one flat shade, and -2
+			// that it is not drawn at all. Taken for colour, -1 came out white and washed a golden
+			// golem out to sand.
+			int shade = colour3[f];
+			if (shade == -2)
+			{
+				continue;
+			}
+			int a = first[f];
+			int b = second[f];
+			int c = third[f];
+			pointsX[0] = Math.round(x[a] * scale + offsetX);
+			pointsX[1] = Math.round(x[b] * scale + offsetX);
+			pointsX[2] = Math.round(x[c] * scale + offsetX);
+			pointsY[0] = Math.round(y[a] * scale + offsetY);
+			pointsY[1] = Math.round(y[b] * scale + offsetY);
+			pointsY[2] = Math.round(y[c] * scale + offsetY);
+
+			// One colour for the face, the mean of its three: the client shades across a triangle,
+			// and a golem is small enough here that the difference is a pixel either way.
+			g.setColor(new Color(shade == -1 ? rgb(colour1[f])
+				: mean(colour1[f], colour2[f], shade)));
+			g.fillPolygon(pointsX, pointsY, 3);
+		}
+		g.dispose();
+		return image;
+	}
+
+	/** Behind the golem: dark above, and the ground it stands on catching a little light. */
+	private static final Color BEHIND_TOP = new Color(24, 23, 22);
+	private static final Color BEHIND_BOTTOM = new Color(46, 44, 41);
+
+	private static int mean(int one, int two, int three)
+	{
+		int first = rgb(one);
+		int second = rgb(two);
+		int third = rgb(three);
+		int red = ((first >> 16 & 0xFF) + (second >> 16 & 0xFF) + (third >> 16 & 0xFF)) / 3;
+		int green = ((first >> 8 & 0xFF) + (second >> 8 & 0xFF) + (third >> 8 & 0xFF)) / 3;
+		int blue = ((first & 0xFF) + (second & 0xFF) + (third & 0xFF)) / 3;
+		return red << 16 | green << 8 | blue;
+	}
+
+	/**
+	 * A model's colour as RGB. Models carry the game's own packed HSL, and the client turns it into
+	 * colour through a palette built once at startup; this is that conversion for one colour, with
+	 * the game's offsets to hue and saturation and the same gamma.
+	 */
+	private static int rgb(int hsl)
+	{
+		double hue = (double) JagexColor.unpackHue((short) hsl) / 64.0 + 0.0078125;
+		double saturation = (double) JagexColor.unpackSaturation((short) hsl) / 8.0 + 0.0625;
+		double lightness = (double) JagexColor.unpackLuminance((short) hsl) / 128.0;
+
+		double red = lightness;
+		double green = lightness;
+		double blue = lightness;
+		if (saturation != 0)
+		{
+			double q = lightness < 0.5 ? lightness * (1.0 + saturation)
+				: lightness + saturation - lightness * saturation;
+			double p = 2.0 * lightness - q;
+			red = component(p, q, hue + 1.0 / 3.0);
+			green = component(p, q, hue);
+			blue = component(p, q, hue - 1.0 / 3.0);
+		}
+		return byteOf(red) << 16 | byteOf(green) << 8 | byteOf(blue);
+	}
+
+	/** One channel, gamma-corrected and kept inside a byte: the palette's 256 rounds up to it. */
+	private static int byteOf(double channel)
+	{
+		return Math.min(255, (int) (Math.pow(channel, BRIGHTNESS) * 256));
+	}
+
+	private static double component(double p, double q, double hue)
+	{
+		double at = hue < 0 ? hue + 1 : hue > 1 ? hue - 1 : hue;
+		if (at < 1.0 / 6.0)
+		{
+			return p + (q - p) * 6.0 * at;
+		}
+		if (at < 0.5)
+		{
+			return q;
+		}
+		if (at < 2.0 / 3.0)
+		{
+			return p + (q - p) * (2.0 / 3.0 - at) * 6.0;
+		}
+		return p;
+	}
+}

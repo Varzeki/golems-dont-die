@@ -62,7 +62,36 @@ public class GolemStoreTest
 	public void aGarbledRecordIsDropped()
 	{
 		GolemStore store = new GolemStore();
-		assertEquals(0, store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble,1,600,7,8,9").size());
+		StringBuilder toolong = new StringBuilder("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble");
+		for (int extra = 0; extra < 11; extra++)
+		{
+			toolong.append(",1");
+		}
+		assertEquals(0, store.deserialise(toolong.toString()).size());
 		assertEquals(0, store.deserialise("1234,2596,2256").size());
+	}
+
+	/** A golem's history goes with it, and comes back as it was. */
+	@Test
+	public void aHistorySurvivesTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem golem = golem(99L, "Chip");
+		golem.getHistory().tookTransport();
+		golem.getHistory().tookTransport();
+		golem.getHistory().sailed();
+		// Two samples: the first only says where it is, the second is the ground between them.
+		golem.getHistory().sample(2596, 2256, 0, PLINTH);
+		golem.getHistory().sample(2600, 2256, 2, PLINTH);
+
+		GolemStore.SavedGolem saved = store.deserialise(store.serialise(
+			java.util.Collections.singletonList(golem))).get(0);
+
+		assertEquals(2, saved.transports);
+		assertEquals(1, saved.voyages);
+		assertEquals(4, saved.walked);
+		assertEquals(2600, saved.furthestX);
+		assertEquals(2, saved.floors & 3);
+		assertEquals(golem.getHistory().getFirstSeen(), saved.firstSeen);
 	}
 }

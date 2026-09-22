@@ -24,13 +24,16 @@ class GolemStore
 	private static final String FIELD_SEPARATOR = ",";
 
 	/**
-	 * Ten numbers plus the nickname. Three more are optional: whether the golem is in an
-	 * instance, when it may next sail, and its seed.
+	 * Ten numbers plus the nickname. The rest are optional: whether the golem is in an instance,
+	 * when it may next sail, its seed, and the seven of its history.
 	 */
 	private static final int FIELD_COUNT = 11;
 
 	/** How many optional fields may follow the eleven. */
-	private static final int OPTIONAL_FIELDS = 3;
+	private static final int OPTIONAL_FIELDS = 10;
+
+	/** Where the history starts among the optional fields. */
+	private static final int HISTORY_AT = FIELD_COUNT + 3;
 
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
@@ -57,6 +60,15 @@ class GolemStore
 
 		/** The golem's own number, or 0 for a save written before it was kept. See revive. */
 		long seed;
+
+		/** Its history, in the order GolemHistory.restore takes them; all zero if there was none. */
+		long firstSeen;
+		int transports;
+		int voyages;
+		int walked;
+		int furthestX;
+		int furthestY;
+		int floors;
 	}
 
 	/** Encodes a live roster for the config store. */
@@ -90,6 +102,14 @@ class GolemStore
 				// Real time, so a golem that landed just before logout is still ashore after it.
 				.append(FIELD_SEPARATOR).append(golem.getShoreLeaveUntil())
 				.append(FIELD_SEPARATOR).append(golem.getId());
+			GolemHistory history = golem.getHistory();
+			out.append(FIELD_SEPARATOR).append(history.getFirstSeen())
+				.append(FIELD_SEPARATOR).append(history.getTransports())
+				.append(FIELD_SEPARATOR).append(history.getVoyages())
+				.append(FIELD_SEPARATOR).append(history.getWalked())
+				.append(FIELD_SEPARATOR).append(history.getFurthestX())
+				.append(FIELD_SEPARATOR).append(history.getFurthestY())
+				.append(FIELD_SEPARATOR).append(history.getFloors());
 		}
 		return out.toString();
 	}
@@ -134,6 +154,16 @@ class GolemStore
 				saved.inInstance = fields.length > FIELD_COUNT && "1".equals(fields[FIELD_COUNT].trim());
 				saved.shoreLeaveUntil = fields.length > FIELD_COUNT + 1 ? Long.parseLong(fields[FIELD_COUNT + 1].trim()) : 0;
 				saved.seed = fields.length > FIELD_COUNT + 2 ? Long.parseLong(fields[FIELD_COUNT + 2].trim()) : 0;
+				if (fields.length >= HISTORY_AT + 7)
+				{
+					saved.firstSeen = Long.parseLong(fields[HISTORY_AT].trim());
+					saved.transports = Integer.parseInt(fields[HISTORY_AT + 1].trim());
+					saved.voyages = Integer.parseInt(fields[HISTORY_AT + 2].trim());
+					saved.walked = Integer.parseInt(fields[HISTORY_AT + 3].trim());
+					saved.furthestX = Integer.parseInt(fields[HISTORY_AT + 4].trim());
+					saved.furthestY = Integer.parseInt(fields[HISTORY_AT + 5].trim());
+					saved.floors = Integer.parseInt(fields[HISTORY_AT + 6].trim());
+				}
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -174,6 +204,11 @@ class GolemStore
 			: ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
 		Golem golem = Golem.onTile(snapshot, home, seed, at);
 		golem.setNickname(saved.nickname);
+		if (saved.firstSeen != 0)
+		{
+			golem.getHistory().restore(saved.firstSeen, saved.transports, saved.voyages, saved.walked,
+				saved.furthestX, saved.furthestY, saved.floors, home);
+		}
 		golem.setInInstance(saved.inInstance);
 		golem.setShoreLeaveUntil(saved.shoreLeaveUntil);
 		return golem;

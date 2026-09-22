@@ -44,6 +44,15 @@ class GolemPage
 	private final JPanel traits = new JPanel();
 	private final JButton find = new JButton("Find");
 
+	/** The scrolling part, so a page opened on another golem starts at the top of it. */
+	private final JScrollPane scroll;
+
+	/** The golem's own picture, in its frame. Empty until the client thread has drawn one. */
+	private final JLabel picture = new JLabel();
+
+	/** What the golem has done, filled in beside the picture. */
+	private final JPanel record = new JPanel();
+
 	/** Points the arrow at the golem, on the client thread. */
 	private final Consumer<Golem> onFind;
 
@@ -62,21 +71,48 @@ class GolemPage
 		place.setFont(BODY);
 		place.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 
-		JPanel heading = new JPanel();
-		heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
-		heading.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		heading.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+		// The picture in a frame, as a picture should be: a dark mount and a line around it.
+		picture.setPreferredSize(new Dimension(GolemPortrait.WIDTH, GolemPortrait.HEIGHT));
+		picture.setHorizontalAlignment(JLabel.CENTER);
+		picture.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		picture.setOpaque(true);
+		JPanel framed = new JPanel(new BorderLayout());
+		framed.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		framed.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR),
+			BorderFactory.createEmptyBorder(3, 3, 3, 3)));
+		framed.add(picture, BorderLayout.CENTER);
+		JPanel mount = new JPanel(new BorderLayout());
+		mount.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		mount.add(framed, BorderLayout.NORTH);
+
+		record.setLayout(new BoxLayout(record, BoxLayout.Y_AXIS));
+		record.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+		JPanel words = new JPanel();
+		words.setLayout(new BoxLayout(words, BoxLayout.Y_AXIS));
+		words.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		words.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
 		title.setAlignmentX(Component.LEFT_ALIGNMENT);
 		place.setAlignmentX(Component.LEFT_ALIGNMENT);
-		heading.add(title);
-		heading.add(Box.createVerticalStrut(4));
-		heading.add(place);
+		record.setAlignmentX(Component.LEFT_ALIGNMENT);
+		words.add(title);
+		words.add(Box.createVerticalStrut(4));
+		words.add(place);
+		words.add(Box.createVerticalStrut(10));
+		words.add(record);
+
+		JPanel heading = new JPanel(new BorderLayout());
+		heading.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		heading.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+		heading.add(mount, BorderLayout.WEST);
+		heading.add(words, BorderLayout.CENTER);
 
 		traits.setLayout(new BoxLayout(traits, BoxLayout.Y_AXIS));
 		traits.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		traits.setBorder(BorderFactory.createEmptyBorder(0, 12, 10, 12));
 
-		JScrollPane scroll = new JScrollPane(traits);
+		scroll = new JScrollPane(traits);
 		scroll.setBorder(BorderFactory.createEmptyBorder());
 		// Never sideways: the lines wrap to the window, so there is nothing off to the right.
 		scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -136,7 +172,11 @@ class GolemPage
 		title.setText(golem.getNickname() == null ? "Unnamed golem" : golem.getNickname());
 		place.setText(" ");
 		find.setEnabled(true);
+		picture.setIcon(null);
+		listRecord(golem);
 		listTraits(golem);
+		// From the top: the page a player left scrolled halfway is not where the next one starts.
+		SwingUtilities.invokeLater(() -> scroll.getViewport().setViewPosition(new java.awt.Point(0, 0)));
 
 		if (!frame.isVisible())
 		{
@@ -158,6 +198,19 @@ class GolemPage
 		return showing;
 	}
 
+	/**
+	 * Hangs the golem's picture, drawn on the client thread after the page was opened.
+	 *
+	 * @param of the golem it is of, ignored if the page has moved on to another
+	 */
+	void showPicture(Golem of, java.awt.image.BufferedImage drawn)
+	{
+		if (of == showing && drawn != null)
+		{
+			picture.setIcon(new javax.swing.ImageIcon(drawn));
+		}
+	}
+
 	/** The line under the name: where the golem is, or that it is gone. */
 	void showPlace(String where, boolean living)
 	{
@@ -172,6 +225,69 @@ class GolemPage
 		frame.setVisible(false);
 		frame.dispose();
 	}
+
+	/** What the golem has done, in the plainest words the numbers allow. */
+	private void listRecord(Golem golem)
+	{
+		record.removeAll();
+		GolemHistory history = golem.getHistory();
+
+		if (history.getFirstSeen() > 0)
+		{
+			line(record, "Known since " + DAY.format(new java.util.Date(history.getFirstSeen())));
+		}
+		line(record, "Walked about " + NUMBERS.format(history.getWalked()) + " tiles");
+		line(record, history.getTransports() == 1 ? "Used one shortcut"
+			: "Used " + NUMBERS.format(history.getTransports()) + " shortcuts");
+		if (history.getVoyages() > 0)
+		{
+			line(record, history.getVoyages() == 1 ? "Sailed once"
+				: "Sailed " + NUMBERS.format(history.getVoyages()) + " times");
+		}
+		if (history.getFurthest() > 0)
+		{
+			String where = furthest == null ? "" : " — " + furthest;
+			line(record, "Been " + NUMBERS.format(history.getFurthest()) + " tiles from home" + where);
+		}
+		if (history.hasBeenUnderground())
+		{
+			line(record, "Been underground");
+		}
+		if (history.getHighestFloor() > 0)
+		{
+			line(record, "Been up " + (history.getHighestFloor() == 1 ? "one floor"
+				: history.getHighestFloor() + " floors"));
+		}
+		record.revalidate();
+		record.repaint();
+	}
+
+	/** One line of the record. */
+	private static void line(JPanel into, String text)
+	{
+		JLabel label = new JLabel(text);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		label.setAlignmentX(Component.LEFT_ALIGNMENT);
+		into.add(label);
+	}
+
+	/** What to call the furthest place the golem has been, or null if nothing knows. */
+	private String furthest;
+
+	/** Told after the page is up, because naming a place is the client thread's business. */
+	void setFurthest(String place)
+	{
+		furthest = place;
+		if (showing != null)
+		{
+			listRecord(showing);
+		}
+	}
+
+	private static final java.text.NumberFormat NUMBERS = java.text.NumberFormat.getIntegerInstance();
+
+	private static final java.text.SimpleDateFormat DAY = new java.text.SimpleDateFormat("d MMM yyyy");
 
 	private void listTraits(Golem golem)
 	{
