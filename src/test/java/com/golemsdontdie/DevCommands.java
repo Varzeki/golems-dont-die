@@ -112,10 +112,33 @@ public class DevCommands extends Plugin
 				break;
 
 			case "golems":
+			{
+				int tick = client.getTickCount();
+				int sailing = 0;
+				StringBuilder where = new StringBuilder();
+				for (Golem golem : golems)
+				{
+					if (golem.isSailing(tick))
+					{
+						sailing++;
+						WorldPoint at = golem.seaPosition(tick);
+						if (sailing <= 3)
+						{
+							where.append(at == null ? " (nowhere?)"
+								: " " + at.getX() + "," + at.getY() + " bound for "
+								+ golem.saveTile().getX() + "," + golem.saveTile().getY());
+						}
+					}
+				}
 				say(golems.size() + " golems, " + named(golems) + " named, "
-					+ inScene(golems) + " in the scene; the game says "
+					+ inScene(golems) + " in the scene, " + sailing + " at sea; the game says "
 					+ client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT) + " crafted.");
+				if (sailing > 0)
+				{
+					say("at sea:" + where);
+				}
 				break;
+			}
 
 			case "gguitar":
 			{

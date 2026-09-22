@@ -330,12 +330,13 @@ class GolemMapPoints
 		{
 			super(at, face);
 			this.cell = cell;
-			setJumpOnClick(true);
+			// No "Focus on" entry: it is a second thing to read beside the tooltip, in a menu the
+			// map puts up whether or not anything was asked of it.
+			setJumpOnClick(false);
 		}
 
-		/** What the map's own "Focus on" entry calls this face. */
-		@Override
-		public String getName()
+		/** What this face is of: a golem's name, or how many golems are standing together. */
+		private String title()
 		{
 			if (cell == null || cell.count == 0)
 			{
@@ -355,14 +356,16 @@ class GolemMapPoints
 		@Override
 		public String getTooltip()
 		{
-			if (cell == null || cell.count == 0)
+			// Never nothing while the face is on the map: with no tooltip of ours the map falls
+			// back on its own, which is the game's white one over whatever is underneath.
+			if (cell == null || cell.count == 0 || cell.first == null)
 			{
-				return null;
+				return "Golems";
 			}
 			String place = whereabouts.of(cell.first, tick);
 			// A golem with a name already wears it on the map, so the tooltip only adds where it is.
 			// One without a name is just a golem: the place is the whole of what there is to say.
-			return cell.count == 1 && !isNamed(cell.first) ? place : getName() + " — " + place;
+			return cell.count == 1 && !isNamed(cell.first) ? place : title() + " — " + place;
 		}
 	}
 }

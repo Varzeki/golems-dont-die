@@ -154,6 +154,21 @@ class GolemPage
 		body.add(scroll, BorderLayout.CENTER);
 		body.add(buttons, BorderLayout.SOUTH);
 
+		// The client's own look and feel draws window frames when it is asked to, which is how the
+		// page comes up in the client's dark chrome rather than the desktop's.
+		if (javax.swing.UIManager.getLookAndFeel() != null
+			&& javax.swing.UIManager.getLookAndFeel().getSupportsWindowDecorations())
+		{
+			frame.setUndecorated(true);
+			frame.getRootPane().setWindowDecorationStyle(javax.swing.JRootPane.FRAME);
+		}
+		java.awt.image.BufferedImage icon = net.runelite.client.util.ImageUtil.loadImageResource(
+			GolemPage.class, "/golem-icon.png");
+		if (icon != null)
+		{
+			frame.setIconImage(icon);
+		}
+
 		frame.setContentPane(body);
 		frame.setMinimumSize(new Dimension(320, 260));
 		frame.setSize(new Dimension(380, 420));

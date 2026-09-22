@@ -55,42 +55,66 @@ class GolemListPanel extends PluginPanel
 	 */
 	private static final java.awt.Dimension SQUEEZED = new Dimension(24, 16);
 
-	/** The info button, drawn rather than drawn from a file: a letter in a circle at 14 pixels. */
-	private static final javax.swing.Icon INFO = info();
+	/**
+	 * The two button icons, painted rather than stored as pixels.
+	 *
+	 * <p>A fourteen pixel image is fourteen pixels, and on a screen the client is scaling it is a
+	 * blurred fourteen pixels. Painting into the graphics it is given puts the lines wherever the
+	 * scale asks for them.
+	 */
+	private static final javax.swing.Icon INFO = new Drawn(false);
+	private static final javax.swing.Icon TARGET = new Drawn(true);
 
-	/** The find button: a ring and a cross, which is what the hint arrow does at the other end. */
-	private static final javax.swing.Icon TARGET = target();
-
-	private static javax.swing.Icon target()
+	/** An (i) in a ring, or a ring with a cross through it. */
+	private static final class Drawn implements javax.swing.Icon
 	{
-		int size = 14;
-		java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(size, size,
-			java.awt.image.BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g = image.createGraphics();
-		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g.setColor(Color.WHITE);
-		g.drawOval(3, 3, size - 7, size - 7);
-		g.drawLine(size / 2, 0, size / 2, 2);
-		g.drawLine(size / 2, size - 3, size / 2, size - 1);
-		g.drawLine(0, size / 2, 2, size / 2);
-		g.drawLine(size - 3, size / 2, size - 1, size / 2);
-		g.dispose();
-		return new javax.swing.ImageIcon(image);
-	}
+		private static final int SIZE = 14;
 
-	private static javax.swing.Icon info()
-	{
-		int size = 14;
-		java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(size, size,
-			java.awt.image.BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g = image.createGraphics();
-		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g.setColor(ColorScheme.LIGHT_GRAY_COLOR);
-		g.drawOval(0, 0, size - 1, size - 1);
-		g.fillRect(size / 2 - 1, 3, 2, 2);
-		g.fillRect(size / 2 - 1, 6, 2, 5);
-		g.dispose();
-		return new javax.swing.ImageIcon(image);
+		private final boolean target;
+
+		private Drawn(boolean target)
+		{
+			this.target = target;
+		}
+
+		@Override
+		public int getIconWidth()
+		{
+			return SIZE;
+		}
+
+		@Override
+		public int getIconHeight()
+		{
+			return SIZE;
+		}
+
+		@Override
+		public void paintIcon(java.awt.Component on, Graphics g, int x, int y)
+		{
+			Graphics2D drawing = (Graphics2D) g.create();
+			drawing.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			drawing.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+			drawing.translate(x, y);
+			drawing.setColor(ColorScheme.LIGHT_GRAY_COLOR);
+			drawing.setStroke(new java.awt.BasicStroke(1.4f));
+			if (target)
+			{
+				// A ring with a cross through it: what the hint arrow does at the other end.
+				drawing.draw(new java.awt.geom.Ellipse2D.Float(3.5f, 3.5f, SIZE - 7f, SIZE - 7f));
+				drawing.draw(new java.awt.geom.Line2D.Float(SIZE / 2f, 0.5f, SIZE / 2f, 2.5f));
+				drawing.draw(new java.awt.geom.Line2D.Float(SIZE / 2f, SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f));
+				drawing.draw(new java.awt.geom.Line2D.Float(0.5f, SIZE / 2f, 2.5f, SIZE / 2f));
+				drawing.draw(new java.awt.geom.Line2D.Float(SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f, SIZE / 2f));
+			}
+			else
+			{
+				drawing.draw(new java.awt.geom.Ellipse2D.Float(0.7f, 0.7f, SIZE - 2.4f, SIZE - 2.4f));
+				drawing.fill(new java.awt.geom.Ellipse2D.Float(SIZE / 2f - 0.9f, 3f, 1.8f, 1.8f));
+				drawing.fill(new java.awt.geom.Rectangle2D.Float(SIZE / 2f - 0.8f, 6f, 1.6f, 5f));
+			}
+			drawing.dispose();
+		}
 	}
 
 	private final JPanel rows = new JPanel();

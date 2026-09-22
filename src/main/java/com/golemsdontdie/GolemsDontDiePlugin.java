@@ -1358,11 +1358,12 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Something is being celebrated. Fireworks are rolled for once a tick rather than once a
 		// frame, which is fifty times as often and would fill the sky in a second.
+		// Fireworks are rolled once a tick rather than once a frame, which is fifty times as often,
+		// and every few ticks rather than every one: the clip is about three ticks long.
 		boolean celebrating = celebration.isDancing(tick);
-		boolean fireworksDue = celebrating && tick != lastFireworkTick;
+		int since = celebration.startedAt(tick);
+		boolean fireworksDue = celebrating && tick != lastFireworkTick && since % FIREWORK_EVERY == 0;
 		lastFireworkTick = celebrating ? tick : lastFireworkTick;
-		float fireworkChance = celebration.startedAt(tick) < FIREWORK_OPENING
-			? FIREWORK_CHANCE_AT_FIRST : FIREWORK_CHANCE;
 
 		for (Golem golem : golems)
 		{
@@ -1425,7 +1426,7 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				spawnDanceProp(golem, wv);
 			}
-			if (fireworksDue && tier == GolemTier.SCENE && fireworkRandom.nextFloat() < fireworkChance)
+			if (fireworksDue && tier == GolemTier.SCENE)
 			{
 				spawnFirework(golem, wv);
 			}
@@ -1921,20 +1922,11 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * The chance per dancing golem per tick that fireworks go off over it, and the better chance
-	 * for the first few ticks: a celebration should start with a bang rather than work up to one.
+	 * How often fireworks go off over a dancing golem, in ticks: every golem at the start of a
+	 * celebration and every few ticks until it is over. The clip runs 1.8 seconds, so this is as
+	 * near continuous as it can be without stacking one lot on the next.
 	 */
-	private static final float FIREWORK_CHANCE = 0.18f;
-	private static final float FIREWORK_CHANCE_AT_FIRST = 0.6f;
-
-	/** How long "at first" lasts, in ticks. */
-	private static final int FIREWORK_OPENING = 3;
-
-	/** Whose fireworks go off, and nothing else: the golems' own generators are their own. */
-	private final java.util.Random fireworkRandom = new java.util.Random();
-
-	/** How many lots of fireworks may be in the air at once, so a crowd does not fill the sky. */
-	private static final int MOST_FIREWORKS = 10;
+	private static final int FIREWORK_EVERY = 3;
 
 	/** The last tick fireworks were rolled for, so the roll is per tick and not per frame. */
 	private int lastFireworkTick = -1;
@@ -1948,18 +1940,6 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void spawnFirework(Golem golem, WorldView wv)
 	{
-		int live = 0;
-		for (FakeProp prop : props)
-		{
-			if (prop.getAnimationId() == GolemContent.FIREWORK_ANIMATION)
-			{
-				live++;
-			}
-		}
-		if (live >= MOST_FIREWORKS)
-		{
-			return;
-		}
 		spawnAtGolem(golem, wv, GolemContent.FIREWORK_MODEL, GolemContent.FIREWORK_ANIMATION,
 			GolemContent.FIREWORK_CYCLES);
 	}
