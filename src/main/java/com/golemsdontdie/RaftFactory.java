@@ -8,8 +8,8 @@ import net.runelite.api.Model;
 import net.runelite.api.ModelData;
 
 /**
- * Builds the boat drawn under a golem at sea, once: Sailing's raft, assembled from its hull, sail
- * and helm models. See {@link GolemContent#RAFT_HULL_MODEL}.
+ * Builds the boats drawn under golems at sea, one of each kind: hull, mast, sail and helm, each
+ * assembled once and shared by everyone sailing that size. See {@link GolemBoat}.
  */
 @Slf4j
 @Singleton
@@ -25,50 +25,57 @@ class RaftFactory
 	@Inject
 	private Client client;
 
-	private Model model;
-	private boolean searched;
+	/** One built model per kind of boat, and whether building it has been tried. */
+	private final java.util.Map<GolemBoat, Model> models = new java.util.EnumMap<>(GolemBoat.class);
+	private final java.util.Set<GolemBoat> searched = java.util.EnumSet.noneOf(GolemBoat.class);
 
-	/**
-	 * The boat model, or null if it could not be built.
-	 *
-	 * <p>Built once and shared by every golem at sea; safe because the client's transformation
-	 * clones vertices rather than writing to its source. Client thread only.
-	 */
+	/** The raft, which is what a golem sailing alone takes. */
 	Model raftModel()
 	{
-		if (searched)
+		return boatModel(GolemBoat.RAFT);
+	}
+
+	/**
+	 * A boat's model, or null if it could not be built.
+	 *
+	 * <p>Built once per kind and shared by everyone sailing one; safe because the client's
+	 * transformation clones vertices rather than writing to its source. Client thread only.
+	 */
+	Model boatModel(GolemBoat boat)
+	{
+		Model built = models.get(boat);
+		if (built != null || !searched.add(boat))
 		{
-			return model;
+			return built;
 		}
-		searched = true;
 
 		try
 		{
-			ModelData hull = client.loadModelData(GolemContent.RAFT_HULL_MODEL);
-			ModelData mast = client.loadModelData(GolemContent.RAFT_SAIL_MODEL);
-			ModelData cloth = client.loadModelData(GolemContent.RAFT_SAIL_CLOTH_MODEL);
+			ModelData hull = client.loadModelData(boat.getHullModel());
+			ModelData mast = client.loadModelData(boat.getMastModel());
+			ModelData cloth = client.loadModelData(boat.getClothModel());
 			ModelData helm = client.loadModelData(GolemContent.RAFT_HELM_MODEL);
 			if (hull == null || mast == null || cloth == null || helm == null)
 			{
-				log.debug("Raft models not loaded yet");
-				searched = false;
+				log.debug("{} models not loaded yet", boat);
+				searched.remove(boat);
 				return null;
 			}
 			// Painted as the objects paint them; the raw models are place-holder purple.
-			hull = recolour(hull.cloneVertices().cloneColors(), GolemContent.RAFT_HULL_RECOLOUR_FROM,
-				GolemContent.RAFT_HULL_RECOLOUR_TO);
+			hull = recolour(hull.cloneVertices().cloneColors(), boat.getHullFrom(), boat.getHullTo());
 			helm = recolour(helm.cloneVertices().cloneColors(), GolemContent.RAFT_HELM_RECOLOUR_FROM,
 				GolemContent.RAFT_HELM_RECOLOUR_TO);
 			// Hull, mast and sail sit on the middle tile; the helm is its own tile at the stern.
-			helm = helm.translate(0, 0, GolemContent.RAFT_HELM_OFFSET);
+			helm = helm.translate(0, 0, boat.getHelmOffset());
 			ModelData merged = client.mergeModels(hull, mast.cloneVertices(), cloth.cloneVertices(), helm);
-			model = merged.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
-			log.debug("Raft model built from hull, sail and helm");
-			return model;
+			Model made = merged.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
+			models.put(boat, made);
+			log.debug("{} built from hull, sail and helm", boat);
+			return made;
 		}
 		catch (RuntimeException e)
 		{
-			log.debug("Could not build the boat model", e);
+			log.debug("Could not build {}", boat, e);
 			return null;
 		}
 	}
@@ -84,7 +91,7 @@ class RaftFactory
 
 	void clear()
 	{
-		model = null;
-		searched = false;
+		models.clear();
+		searched.clear();
 	}
 }

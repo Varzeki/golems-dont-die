@@ -85,6 +85,7 @@ public class DevCommands extends Plugin
 			case "gpath":
 			case "gcutoff":
 			case "gparty":
+			case "gboat":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -309,6 +310,39 @@ public class DevCommands extends Plugin
 				break;
 			}
 
+			case "gboat":
+			{
+				// A boat beside the player, to see whether its parts were put together right: the
+				// bigger hulls carry their mast and sail at an offset of their own, and nothing
+				// says whether it is the right one but looking.
+				GolemBoat kind = GolemBoat.RAFT;
+				if (args.length > 0)
+				{
+					try
+					{
+						kind = GolemBoat.valueOf(args[0].toUpperCase());
+					}
+					catch (IllegalArgumentException e)
+					{
+						say("::gboat raft|skiff|sloop");
+						break;
+					}
+				}
+				Object factory = field(golemPlugin, "raftFactory");
+				Object model = factory == null ? null : answer(factory, "boatModel",
+					new Class<?>[]{GolemBoat.class}, new Object[]{kind});
+				Player me = client.getLocalPlayer();
+				if (model == null || me == null)
+				{
+					say("No model for " + kind + " yet; sail once so the cache has it.");
+					break;
+				}
+				showBoat((net.runelite.api.Model) model, me);
+				say("Put a " + kind + " beside you: " + kind.getBerths() + " berths, helm offset "
+					+ kind.getHelmOffset());
+				break;
+			}
+
 			case "gparty":
 			{
 				// Who could dance of their own accord, and whether the dance itself works: the
@@ -413,7 +447,7 @@ public class DevCommands extends Plugin
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
 				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap  ::gwhere [name]");
-				say("::gpath x y  ::gcutoff  ::gparty");
+				say("::gpath x y  ::gcutoff  ::gparty  ::gboat [raft|skiff|sloop]");
 				break;
 
 			case "golems":
@@ -684,6 +718,24 @@ public class DevCommands extends Plugin
 			}
 		}
 		return null;
+	}
+
+	/** The boat last put out by ::gboat, so a second call replaces it rather than stacking. */
+	private net.runelite.api.RuneLiteObject shownBoat;
+
+	/** Puts a boat model on the player's own tile, facing the way the player faces. */
+	private void showBoat(net.runelite.api.Model model, Player me)
+	{
+		if (shownBoat != null)
+		{
+			client.removeRuneLiteObject(shownBoat);
+		}
+		net.runelite.api.RuneLiteObject boat = client.createRuneLiteObject();
+		boat.setModel(model);
+		boat.setLocation(me.getLocalLocation(), client.getTopLevelWorldView().getPlane());
+		boat.setOrientation(me.getCurrentOrientation());
+		boat.setActive(true);
+		shownBoat = boat;
 	}
 
 	private static Object field(Object target, String name)
