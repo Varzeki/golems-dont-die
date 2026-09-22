@@ -50,12 +50,6 @@ public class DevCommands extends Plugin
 	private ClientThread clientThread;
 
 	@Inject
-	private GolemCelebration celebration;
-
-	@Inject
-	private GolemNames names;
-
-	@Inject
 	private Provider<PluginManager> plugins;
 
 	@Subscribe
@@ -91,6 +85,17 @@ public class DevCommands extends Plugin
 			say("The golem plugin is not running.");
 			return;
 		}
+		// Taken from the plugin rather than injected: every plugin gets an injector of its own, so
+		// an injected copy would be a second GolemCelebration that nothing reads. It would also not
+		// build at all — the config is only bound in the golem plugin's own injector.
+		GolemCelebration celebration = (GolemCelebration) field(golemPlugin, "celebration");
+		GolemNames names = (GolemNames) field(golemPlugin, "names");
+		if (celebration == null || names == null)
+		{
+			say("Could not reach into the plugin.");
+			return;
+		}
+
 		List<Golem> golems = roster(golemPlugin);
 		int count = args.length > 0 ? number(args[0], 10) : 10;
 
