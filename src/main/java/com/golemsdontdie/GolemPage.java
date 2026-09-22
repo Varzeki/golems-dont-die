@@ -154,13 +154,20 @@ class GolemPage
 		body.add(scroll, BorderLayout.CENTER);
 		body.add(buttons, BorderLayout.SOUTH);
 
-		// The client's own look and feel draws window frames when it is asked to, which is how the
-		// page comes up in the client's dark chrome rather than the desktop's.
-		if (javax.swing.UIManager.getLookAndFeel() != null
-			&& javax.swing.UIManager.getLookAndFeel().getSupportsWindowDecorations())
+		// The client's own chrome, the way the client asks for it: undecorated, and the root pane
+		// told to draw a frame. Asking the look and feel first whether it supports decorations
+		// said no and left the page in the desktop's chrome.
+		try
 		{
 			frame.setUndecorated(true);
 			frame.getRootPane().setWindowDecorationStyle(javax.swing.JRootPane.FRAME);
+		}
+		catch (RuntimeException e)
+		{
+			// A look and feel that will not draw a frame leaves us with the desktop's, which is
+			// not what we wanted but is a window a player can still move and close.
+			frame.dispose();
+			frame.setUndecorated(false);
 		}
 		java.awt.image.BufferedImage icon = net.runelite.client.util.ImageUtil.loadImageResource(
 			GolemPage.class, "/golem-icon.png");
@@ -316,7 +323,6 @@ class GolemPage
 			JLabel label = new JLabel(trait.getLabel());
 			label.setFont(BODY);
 			label.setForeground(ColorScheme.BRAND_ORANGE);
-			label.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 			// A text area rather than a label, for the wrapping: a trait's line is a sentence, the
 			// window is narrow, and it is resizable, so the width to wrap at is not ours to pick.
@@ -328,12 +334,19 @@ class GolemPage
 			line.setWrapStyleWord(true);
 			line.setEditable(false);
 			line.setFocusable(false);
-			line.setAlignmentX(Component.LEFT_ALIGNMENT);
-			line.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 
-			traits.add(label);
-			traits.add(line);
+			// Each trait in a panel of its own, so the list cannot stretch the text areas to fill
+			// the window: a page with two traits on it had half a window between them.
+			JPanel one = new JPanel(new BorderLayout());
+			one.setBackground(ColorScheme.DARK_GRAY_COLOR);
+			one.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+			one.setAlignmentX(Component.LEFT_ALIGNMENT);
+			one.add(label, BorderLayout.NORTH);
+			one.add(line, BorderLayout.CENTER);
+			traits.add(one);
 		}
+		// And the slack goes to the bottom rather than between them.
+		traits.add(Box.createVerticalGlue());
 		traits.revalidate();
 		traits.repaint();
 	}

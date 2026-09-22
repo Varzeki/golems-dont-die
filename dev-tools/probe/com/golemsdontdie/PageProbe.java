@@ -71,7 +71,9 @@ public class PageProbe
 			2412, 3812, new WorldPoint(2596, 2256, 0));
 
 		java.awt.image.BufferedImage picture = standIn();
-		GolemPage page = new GolemPage(g -> System.out.println("find " + g.getNickname()));
+		GolemNames names = new GolemNames();
+		names.load();
+		GolemPage page = new GolemPage(g -> System.out.println("find " + g.getNickname()), names);
 		SwingUtilities.invokeAndWait(() ->
 		{
 			page.show(golem, null);

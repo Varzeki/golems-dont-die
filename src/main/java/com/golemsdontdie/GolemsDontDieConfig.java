@@ -98,7 +98,7 @@ public interface GolemsDontDieConfig extends Config
 
 	@ConfigItem(
 		keyName = "mapGolems",
-		name = "Golems on the world map",
+		name = "On the world map",
 		description = "Shows golems on the world map. A named golem wears its name; hover any of them "
 			+ "to see where it is. Golems close together on the map are drawn as one face with a count.",
 		section = golemsSection,

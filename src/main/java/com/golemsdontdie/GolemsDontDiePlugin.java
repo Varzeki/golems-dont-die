@@ -2334,11 +2334,14 @@ public class GolemsDontDiePlugin extends Plugin
 			// thousands, five times a second, would be the most expensive thing the plugin does.
 			List<Golem> listed = panel.onScreenGolems();
 			List<String> places = new ArrayList<>(listed.size());
+			List<Integer> away = new ArrayList<>(listed.size());
+			WorldPoint standing = PlayerPosition.of(client);
 			for (Golem golem : listed)
 			{
 				places.add(whereabouts.of(golem, roamContext.getTick()));
+				away.add(standing == null ? -1 : standing.distanceTo2D(golem.currentTile()));
 			}
-			panel.showPlaces(listed, places);
+			panel.showPlaces(listed, places, away);
 
 			// And the page, if one is open, which is one golem and may not be among those listed.
 			if (page != null && page.isOpen())

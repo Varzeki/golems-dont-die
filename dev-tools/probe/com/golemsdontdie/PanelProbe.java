@@ -47,6 +47,7 @@ public class PanelProbe
 			128, 128, 1, -1, -1, -1, plinth, 0);
 		List<Golem> golems = new ArrayList<>();
 		List<String> places = new ArrayList<>();
+		List<Integer> away = new ArrayList<>();
 		for (int i = 0; i < count; i++)
 		{
 			Golem golem = Golem.onTile(snapshot, plinth, i * 7919 + 3, plinth);
@@ -56,6 +57,7 @@ public class PanelProbe
 			}
 			golems.add(golem);
 			places.add(i % 3 == 0 ? "Sailing to Port Khazard" : "Taverley Dungeon");
+			away.add(i * 137 + 12);
 		}
 
 		SwingUtilities.invokeAndWait(() ->
@@ -72,7 +74,7 @@ public class PanelProbe
 			{
 			});
 			panel.refresh(golems, missing, true);
-			panel.showPlaces(golems, places);
+			panel.showPlaces(golems, places, away);
 
 			JFrame frame = new JFrame("Golems");
 			frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);

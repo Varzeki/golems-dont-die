@@ -52,6 +52,9 @@ class GolemMapPoints
 	/** The face's size on screen, in pixels, which sets how far apart two faces must be. */
 	private static final int FACE_PIXELS = 15;
 
+	/** How far below the surface the underground is drawn, in tiles. */
+	private static final int UNDERGROUND = 6400;
+
 	/** Named faces kept before the oldest are dropped: renaming in the sidebar makes one a keystroke. */
 	private static final int MOST_LABELS = 256;
 
@@ -174,10 +177,22 @@ class GolemMapPoints
 			int y = golem.getFineY() / Golem.TILE;
 			if (golem.isSailing(tick))
 			{
-				// Drawn at the port it is bound for: a raft mid-ocean is nowhere to look for it.
-				WorldPoint landing = golem.saveTile();
-				x = landing.getX();
-				y = landing.getY();
+				// Where the raft is now, which on a map is where you would look for it. The golem's
+				// own tile is the port it is bound for — that is what a crossing saves — so the
+				// crossing itself is asked where it has got to.
+				WorldPoint at = golem.seaPosition(tick);
+				if (at != null)
+				{
+					x = at.getX();
+					y = at.getY();
+				}
+			}
+			// The map draws a dungeon over the ground above it, so a golem underground belongs at
+			// the surface coordinates it is beneath. Left where it stood it sat a hundred regions
+			// north of the map, where nobody ever saw it.
+			if (y >= UNDERGROUND)
+			{
+				y -= UNDERGROUND;
 			}
 			// The golem being looked for is kept whether or not the map is looking at it: its face
 			// snaps to the edge to say which way it lies.
@@ -256,9 +271,10 @@ class GolemMapPoints
 		String name = cell.count == 1 && isNamed(cell.first) ? cell.first.getNickname().trim() : null;
 		if (name == null)
 		{
-			if (point.getImage() != face)
+			BufferedImage head = faceFor(cell.count);
+			if (point.getImage() != head)
 			{
-				point.setImage(face);
+				point.setImage(head);
 				point.setImagePoint(null);
 			}
 			return;
@@ -274,6 +290,38 @@ class GolemMapPoints
 			point.setImagePoint(new Point(withName.getWidth() / 2,
 				withName.getHeight() - face.getHeight() / 2));
 		}
+	}
+
+	/**
+	 * How many golems a face has to stand for before it is drawn larger, and how much larger.
+	 *
+	 * <p>Zooming out puts more golems in a cell, which is what makes the heads grow as the map
+	 * pulls back and split again as it comes in.
+	 */
+	private static final int[] CROWDS = {1, 3, 10, 40};
+	private static final float[] CROWD_SIZES = {1f, 1.35f, 1.8f, 2.3f};
+
+	/** The faces, one per size, drawn from the shipped one the first time each is wanted. */
+	private final BufferedImage[] faces = new BufferedImage[CROWDS.length];
+
+	/** The face to draw for a cell holding this many golems. */
+	private BufferedImage faceFor(int count)
+	{
+		int size = 0;
+		for (int i = 1; i < CROWDS.length; i++)
+		{
+			if (count >= CROWDS[i])
+			{
+				size = i;
+			}
+		}
+		if (faces[size] == null)
+		{
+			faces[size] = size == 0 ? face
+				: ImageUtil.resizeImage(face, Math.round(face.getWidth() * CROWD_SIZES[size]),
+					Math.round(face.getHeight() * CROWD_SIZES[size]), true);
+		}
+		return faces[size];
 	}
 
 	/** The face with a name above it, drawn once per name and kept. */

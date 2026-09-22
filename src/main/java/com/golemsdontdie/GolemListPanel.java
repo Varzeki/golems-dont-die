@@ -128,6 +128,9 @@ class GolemListPanel extends PluginPanel
 	private final JLabel pageLabel = new JLabel();
 	private final JPanel paging = new JPanel(new BorderLayout());
 
+	/** Says what the order is, under the pager: the list is nearest first and nothing said so. */
+	private final JLabel order = new JLabel("Closest first");
+
 	/** The whole roster, as the client thread last gave it. */
 	private List<Golem> roster = java.util.Collections.emptyList();
 
@@ -283,11 +286,21 @@ class GolemListPanel extends PluginPanel
 		above.add(revive, BorderLayout.NORTH);
 		above.add(finding, BorderLayout.SOUTH);
 
+		order.setFont(FontManager.getRunescapeSmallFont());
+		order.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		order.setHorizontalAlignment(SwingConstants.CENTER);
+		order.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+
+		JPanel below = new JPanel(new BorderLayout());
+		below.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		below.add(paging, BorderLayout.NORTH);
+		below.add(order, BorderLayout.SOUTH);
+
 		JPanel controls = new JPanel(new BorderLayout());
 		controls.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		controls.add(above, BorderLayout.NORTH);
 		controls.add(search, BorderLayout.CENTER);
-		controls.add(paging, BorderLayout.SOUTH);
+		controls.add(below, BorderLayout.SOUTH);
 
 		JPanel header = new JPanel(new BorderLayout());
 		header.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -459,21 +472,40 @@ class GolemListPanel extends PluginPanel
 	 * <p>Given as a list in step with the golems rather than read from them here: they belong to the
 	 * client thread, and this is Swing's.
 	 */
-	void showPlaces(List<Golem> golems, List<String> places)
+	/**
+	 * Says where each golem on the page is and how far off, under its name.
+	 *
+	 * @param places   where each golem is, in words
+	 * @param distance how many tiles away each one is, or -1 where that cannot be said
+	 */
+	void showPlaces(List<Golem> golems, List<String> places, List<Integer> distance)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
 			for (int i = 0; i < golems.size() && i < places.size(); i++)
 			{
 				Row row = shown.get(golems.get(i));
-				String place = places.get(i);
-				if (row != null && row.place != null && !row.place.getText().equals(place))
+				if (row == null || row.place == null)
 				{
-					row.place.setText(place);
+					continue;
+				}
+				// How far off first, then where: a row is two hundred pixels wide and "Sailing to
+				// Port Khazard" fills most of it, so whichever goes second is the one that clips.
+				int away = i < distance.size() ? distance.get(i) : -1;
+				String said = away < 0 ? places.get(i)
+					: TILES.format(away) + " tiles away · " + places.get(i);
+				if (!row.place.getText().equals(said))
+				{
+					row.place.setText(said);
+					// The row is 200 pixels wide and a place can be "Sailing to Port Khazard", so
+					// what will not fit is still readable by hovering it.
+					row.place.setToolTipText(said);
 				}
 			}
 		});
 	}
+
+	private static final java.text.NumberFormat TILES = java.text.NumberFormat.getIntegerInstance();
 
 	/** Shows or hides the bar offering to stop pointing at a golem. */
 	void setFinding(String name)
