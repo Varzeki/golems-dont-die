@@ -27,8 +27,28 @@ public class PortraitExport extends Plugin
 {
 	private static final Logger log = LoggerFactory.getLogger(PortraitExport.class);
 
-	/** Seeds to draw: different poses and angles out of the same model. */
-	private static final long[] SEEDS = {0, 7, 12345, -42, 987654321L, 555};
+	/** How many golems to draw on the first sheet: different poses and angles, same model. */
+	private static final int GOLEMS = 12;
+
+	/** Seeds to draw: the first few that draw a distinct hand, and one life of the party. */
+	private static long[] seeds()
+	{
+		long[] seeds = new long[GOLEMS];
+		int found = 0;
+		for (long seed = 0; found < GOLEMS - 1 && seed < 100_000; seed += 7)
+		{
+			seeds[found++] = seed;
+		}
+		for (long seed = 0; seed < 100_000; seed++)
+		{
+			if (GolemTrait.LIFE_OF_THE_PARTY.in(GolemTrait.of(seed)))
+			{
+				seeds[GOLEMS - 1] = seed;
+				break;
+			}
+		}
+		return seeds;
+	}
 
 	@Inject
 	private Client client;
@@ -74,21 +94,64 @@ public class PortraitExport extends Plugin
 		dir.mkdirs();
 
 		// One sheet of them all, side by side, and each on its own.
-		BufferedImage sheet = new BufferedImage(GolemPortrait.WIDTH * SEEDS.length, GolemPortrait.HEIGHT,
+		long[] seeds = seeds();
+		BufferedImage sheet = new BufferedImage(GolemPortrait.WIDTH * 6, GolemPortrait.HEIGHT * 2,
 			BufferedImage.TYPE_INT_ARGB);
-		for (int i = 0; i < SEEDS.length; i++)
+		for (int i = 0; i < seeds.length; i++)
 		{
-			Golem golem = Golem.onTile(snapshot, plinth, SEEDS[i], plinth);
+			Golem golem = Golem.onTile(snapshot, plinth, seeds[i], plinth);
 			BufferedImage drawn = portraits.of(golem);
 			if (drawn == null)
 			{
-				log.warn("No portrait for seed {}", SEEDS[i]);
+				log.warn("No portrait for seed {}", seeds[i]);
 				continue;
 			}
-			ImageIO.write(drawn, "png", new File(dir, "portrait-" + SEEDS[i] + ".png"));
-			sheet.getGraphics().drawImage(drawn, i * GolemPortrait.WIDTH, 0, null);
+			ImageIO.write(drawn, "png", new File(dir, "portrait-" + seeds[i] + ".png"));
+			sheet.getGraphics().drawImage(drawn, (i % 6) * GolemPortrait.WIDTH,
+				(i / 6) * GolemPortrait.HEIGHT, null);
 		}
 		ImageIO.write(sheet, "png", new File(dir, "portraits.png"));
+
+		// Which way the model faces, and what its animations look like held still: a golem turned
+		// every thirty degrees, and a strip of frames from each animation worth drawing.
+		Golem golem = Golem.onTile(snapshot, plinth, 0, plinth);
+		sheet = new BufferedImage(GolemPortrait.WIDTH * 12, GolemPortrait.HEIGHT, BufferedImage.TYPE_INT_ARGB);
+		for (int at = 0; at < 12; at++)
+		{
+			BufferedImage drawn = portraits.of(golem, at * 30, GolemContent.GOLEM_IDLE_ANIMATION, 0);
+			if (drawn != null)
+			{
+				sheet.getGraphics().drawImage(drawn, at * GolemPortrait.WIDTH, 0, null);
+			}
+		}
+		ImageIO.write(sheet, "png", new File(dir, "portraits-around.png"));
+
+		// Everything worth holding still: the golem's own two, the making of it, and the human
+		// animations it plays at obstacles, which are the only ones with any attitude in them.
+		int[] animations = {
+			GolemContent.GOLEM_IDLE_ANIMATION, GolemContent.GOLEM_WALK_ANIMATION,
+			GolemContent.ANIM_LADDER_GRAB, GolemContent.ANIM_BALANCE_WALK,
+			GolemContent.ANIM_TIGHTROPE, GolemContent.ANIM_JUMP_STEPPINGSTONE, 10031,
+		};
+
+		sheet = new BufferedImage(GolemPortrait.WIDTH * 8, GolemPortrait.HEIGHT * animations.length,
+			BufferedImage.TYPE_INT_ARGB);
+		for (int row = 0; row < animations.length; row++)
+		{
+			for (int frame = 0; frame < 8; frame++)
+			{
+				// Spread across the animation rather than the first eight frames of it.
+				net.runelite.api.Animation loaded = client.loadAnimation(animations[row]);
+				int at = loaded == null ? frame : frame * Math.max(1, loaded.getNumFrames()) / 8;
+				BufferedImage drawn = portraits.of(golem, 0, animations[row], at);
+				if (drawn != null)
+				{
+					sheet.getGraphics().drawImage(drawn, frame * GolemPortrait.WIDTH,
+						row * GolemPortrait.HEIGHT, null);
+				}
+			}
+		}
+		ImageIO.write(sheet, "png", new File(dir, "portraits-poses.png"));
 		log.info("Portraits written to {}", dir);
 	}
 }

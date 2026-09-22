@@ -32,8 +32,38 @@ class GolemPortrait
 	static final int WIDTH = 110;
 	static final int HEIGHT = 140;
 
-	/** How far the figure may be turned from square on, either way, in degrees. */
-	private static final int TURN = 60;
+	/**
+	 * Which way round the model has to be turned to face the viewer, in degrees. Found by drawing
+	 * one golem the whole way round; see PortraitExport.
+	 */
+	private static final int FACING = 0;
+
+	/** How far a golem may be turned off facing the viewer, either way, in degrees. */
+	private static final int TURN = 12;
+
+	/**
+	 * The poses a golem may be caught in, one frame of each: standing mostly, since a portrait is
+	 * a golem stood for its portrait, and now and then mid-stride, arms out, or one hand raised.
+	 *
+	 * <p>Picked from what the golem already plays in the world. Two more were tried and left out:
+	 * squeezing through a gap leans the whole model at the viewer, and a climb turns its head away.
+	 * The listing is the weighting — a pose named twice comes up twice as often.
+	 */
+	private static final int[] POSES = {
+		GolemContent.GOLEM_IDLE_ANIMATION,
+		GolemContent.GOLEM_IDLE_ANIMATION,
+		GolemContent.GOLEM_IDLE_ANIMATION,
+		GolemContent.GOLEM_IDLE_ANIMATION,
+		GolemContent.GOLEM_WALK_ANIMATION,
+		GolemContent.GOLEM_WALK_ANIMATION,
+		GolemContent.ANIM_LADDER_GRAB,
+		GolemContent.ANIM_BALANCE_WALK,
+		GolemContent.ANIM_TIGHTROPE,
+		GolemContent.ANIM_JUMP_STEPPINGSTONE,
+	};
+
+	/** What the life of the party is doing in its picture. The emote, as a player would dance it. */
+	private static final int DANCING = 10031;
 
 	/** How far it may lean, either way, in degrees: enough to tell two golems apart. */
 	private static final int LEAN = 3;
@@ -67,26 +97,56 @@ class GolemPortrait
 			return null;
 		}
 
-		// Its own pose, from its own number: a frame of the idle animation, and an angle.
+		// Its own pose, out of its own number: one of the animations it plays, held at one frame.
 		long seed = golem.getId();
-		Animation idle = client.loadAnimation(GolemContent.GOLEM_IDLE_ANIMATION);
-		if (idle != null && idle.getNumFrames() > 0)
-		{
-			AnimationController controller = new AnimationController(client, idle);
-			controller.setFrame((int) Math.floorMod(seed >> 5, idle.getNumFrames()));
-			Model posed = controller.animate(model);
-			if (posed != null)
-			{
-				model = posed;
-			}
-		}
-		double turn = Math.toRadians(Math.floorMod(seed >> 17, TURN * 2L) - TURN);
-		double lean = Math.toRadians(Math.floorMod(seed >> 29, LEAN * 2L) - LEAN);
-		float zoom = NEAREST - (NEAREST - FURTHEST) * (Math.floorMod(seed >> 41, 16L) / 15f);
-		return draw(model, turn, lean, zoom);
+		int pose = GolemTrait.LIFE_OF_THE_PARTY.in(golem.getTraits()) ? DANCING
+			: POSES[(int) Math.floorMod(seed >> 3, POSES.length)];
+		int turn = FACING + (int) Math.floorMod(seed >> 17, TURN * 2L) - TURN;
+		return draw(posed(model, pose, (int) (seed >> 5)), model, turn, seed);
 	}
 
-	private static BufferedImage draw(Model model, double turn, double lean, float zoom)
+	/**
+	 * The same picture at an angle and a pose of the caller's choosing, for the developer export
+	 * that draws a golem the whole way round to find which way it faces.
+	 */
+	BufferedImage of(Golem golem, int degrees, int animation, int frame)
+	{
+		Model model = golem == null || models == null ? null : models.modelFor(golem.getSnapshot());
+		return model == null ? null : draw(posed(model, animation, frame), model, degrees, 0);
+	}
+
+	/** The model held at one frame of an animation, or as it rests if there is no such animation. */
+	private Model posed(Model model, int animation, int frame)
+	{
+		Animation loaded = animation < 0 ? null : client.loadAnimation(animation);
+		if (loaded == null || loaded.getNumFrames() <= 0)
+		{
+			return model;
+		}
+		AnimationController controller = new AnimationController(client, loaded);
+		controller.setFrame(Math.floorMod(frame, loaded.getNumFrames()));
+		Model animated = controller.animate(model);
+		return animated == null ? model : animated;
+	}
+
+	/**
+	 * Draws the model turned to face the viewer, give or take, with the lean and the distance a
+	 * golem's own number gives it.
+	 */
+	private static BufferedImage draw(Model model, Model standing, int degrees, long seed)
+	{
+		double turn = Math.toRadians(degrees);
+		double lean = Math.toRadians(Math.floorMod(seed >> 29, LEAN * 2L) - LEAN);
+		float zoom = NEAREST - (NEAREST - FURTHEST) * (Math.floorMod(seed >> 41, 16L) / 15f);
+		return draw(model, standing, turn, lean, zoom);
+	}
+
+	/**
+	 * @param standing the same golem unposed, which sets the size it is drawn at: sized by the pose
+	 *                 instead, a golem with its arms out came out smaller than its neighbour and a
+	 *                 golem leaning at the viewer filled the frame.
+	 */
+	private static BufferedImage draw(Model model, Model standing, double turn, double lean, float zoom)
 	{
 		int count = model.getVerticesCount();
 		float[] modelX = model.getVerticesX();
@@ -125,7 +185,10 @@ class GolemPortrait
 		// Fitted to the frame, the same scale both ways so nothing is stretched.
 		float wide = Math.max(1f, rightmost - leftmost);
 		float tall = Math.max(1f, bottom - top);
-		float scale = zoom * Math.min((WIDTH - 2f * MARGIN) / wide, (HEIGHT - 2f * MARGIN) / tall);
+		// The pose may shrink the figure a little where it needs the room, but never enlarge it.
+		float resting = zoom * fit(standing);
+		float scale = Math.max(resting * CROWDED,
+			Math.min(resting, zoom * Math.min((WIDTH - 2f * MARGIN) / wide, (HEIGHT - 2f * MARGIN) / tall)));
 		float offsetX = WIDTH / 2f - (leftmost + rightmost) / 2f * scale;
 		float offsetY = HEIGHT / 2f - (top + bottom) / 2f * scale;
 
@@ -192,6 +255,38 @@ class GolemPortrait
 		}
 		g.dispose();
 		return image;
+	}
+
+	/** The smallest a pose that needs the room may be drawn, against the same golem standing. */
+	private static final float CROWDED = 0.8f;
+
+	/** The scale a golem is drawn at standing, which is the size every pose is framed against. */
+	private static float fit(Model standing)
+	{
+		float[] modelX = standing.getVerticesX();
+		float[] modelY = standing.getVerticesY();
+		float[] modelZ = standing.getVerticesZ();
+		float wide = 1f;
+		float tall = 1f;
+		if (modelX != null && modelY != null && modelZ != null)
+		{
+			float leftmost = Float.MAX_VALUE;
+			float rightmost = -Float.MAX_VALUE;
+			float top = Float.MAX_VALUE;
+			float bottom = -Float.MAX_VALUE;
+			for (int v = 0; v < standing.getVerticesCount(); v++)
+			{
+				// Across at any angle, so that turning a golem does not change its size.
+				float across = (float) Math.hypot(modelX[v], modelZ[v]);
+				leftmost = Math.min(leftmost, -across);
+				rightmost = Math.max(rightmost, across);
+				top = Math.min(top, modelY[v]);
+				bottom = Math.max(bottom, modelY[v]);
+			}
+			wide = Math.max(1f, rightmost - leftmost);
+			tall = Math.max(1f, bottom - top);
+		}
+		return Math.min((WIDTH - 2f * MARGIN) / wide, (HEIGHT - 2f * MARGIN) / tall);
 	}
 
 	/** Behind the golem: dark above, and the ground it stands on catching a little light. */
