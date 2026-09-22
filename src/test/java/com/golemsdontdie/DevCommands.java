@@ -120,19 +120,30 @@ public class DevCommands extends Plugin
 					break;
 				}
 				net.runelite.api.Point centre = map.getWorldMapPosition();
+				Object points = field(golemPlugin, "mapPoints");
+				Object under = points == null ? null : field(points, "underground");
+				Object faces = points == null ? null : field(points, "used");
 				say("map at " + (centre == null ? "?" : centre.getX() + "," + centre.getY())
-					+ ", zoom " + map.getWorldMapZoom());
-				int under = 0;
-				int named = 0;
+					+ ", zoom " + map.getWorldMapZoom()
+					+ "; the plugin says underground=" + under + ", faces=" + faces);
+				int below = 0;
+				Golem deep = null;
 				for (Golem one : golems)
 				{
 					if (one.currentTile().getY() >= 6400)
 					{
-						under++;
-						named += one.getNickname() != null ? 1 : 0;
+						below++;
+						deep = one;
 					}
 				}
-				say(under + " golems underground, " + named + " of them named.");
+				say(below + " golems underground.");
+				if (deep != null)
+				{
+					WorldPoint at = deep.currentTile();
+					boolean folding = !Boolean.TRUE.equals(under);
+					say("one of them at " + at.getX() + "," + at.getY() + ", drawn at "
+						+ at.getX() + "," + (folding ? at.getY() - 6400 : at.getY()));
+				}
 				Golem golem = nearestOne(golems);
 				if (golem != null)
 				{

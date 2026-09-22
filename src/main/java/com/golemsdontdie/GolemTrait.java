@@ -25,18 +25,18 @@ enum GolemTrait
 {
 	// ------------------------------------------------------------------ what a golem does
 
-	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice, and travels to find it.", 3, Clash.WEATHER),
-	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert, and stays once it gets there.", 3, Clash.WEATHER),
-	TEMPERATE("Temperate", "No use for snow or sand: it keeps to the green places.", 3, Clash.WEATHER),
+	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice.", 3, Clash.WEATHER),
+	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert.", 3, Clash.WEATHER),
+	TEMPERATE("Temperate", "It keeps to the green places.", 3, Clash.WEATHER),
 	HOMESICK("Homesick", "Never away from Wyrmscraig for long.", 3, Clash.WEATHER),
-	SEAFARER("Seafarer", "Takes to the water at every chance, and walks to docks it passes.", 3),
+	SEAFARER("Seafarer", "Takes to the water every chance it gets.", 3),
 	SPELUNKER("Spelunker", "Goes down whenever there is a down to go.", 3, Clash.FLOORS),
 	CLIMBER("Climber", "Ladders, stairs and cliffs: anything that leads up.", 3, Clash.FLOORS),
-	RESTLESS("Restless", "Walks further, and rarely stands still for long.", 3),
-	CROWD_SHY("Crowd-shy", "Keeps away from other golems, and leaves when they gather.", 3, Clash.CROWDS),
-	SOCIABLE("Sociable", "Thinks nothing of a crowd, and will happily join one.", 3, Clash.CROWDS),
-	CAUTIOUS("Cautious", "Will not risk a jump or a stepping stone.", 3, Clash.OBSTACLES),
-	SURE_FOOTED("Sure-footed", "Takes the obstacle rather than the way round it.", 3, Clash.OBSTACLES),
+	RESTLESS("Restless", "Can't stand still.", 3),
+	CROWD_SHY("Shy", "Keeps away from other golems.", 3, Clash.CROWDS),
+	SOCIABLE("Sociable", "Loves a crowd.", 3, Clash.CROWDS),
+	CAUTIOUS("Cautious", "Will not risk danger.", 3, Clash.OBSTACLES),
+	SURE_FOOTED("Sure-footed", "Actually likes Agility.", 3, Clash.OBSTACLES),
 
 	// ------------------------------------------------------------------ what a golem is
 	//
@@ -44,20 +44,19 @@ enum GolemTrait
 	// how a golem looks: they are all carved from the same rock, and a page saying otherwise would
 	// be contradicted by the golem standing in front of you.
 
-	FRIENDLY("Friendly", "Would wave, if anyone waved first.", 6),
-	LIFE_OF_THE_PARTY("Life of the party", "Would dance, given a crowd and a reason.", 4),
+	FRIENDLY("Friendly", "Will probably say hello.", 6),
+	LIFE_OF_THE_PARTY("Life of the party", "Loves to boogie.", 4),
 	PONDEROUS("Ponderous", "Thinks things over. At length.", 6),
-	WELL_TRAVELLED("Well-travelled", "Has been further than most, and is quietly pleased about it.", 4),
-	HUMS("Hums to itself", "A single note, somewhere below hearing.", 5),
-	OLD_SOUL("Old soul", "Older than it has any right to be, and acts it.", 4),
-	SUPERSTITIOUS("Superstitious", "Will not be the third golem through a door.", 4),
-	STOIC("Stoic", "Has never once complained.", 5),
-	CURIOUS("Curious", "Looks at things twice.", 5),
-	LUCKY("Lucky", "Nothing has gone badly for it yet.", 4),
+	HUMS("Hums to itself", "Hmmmmm.", 5),
+	OLD_SOUL("Old soul", "Just needs a nap.", 4),
+	SUPERSTITIOUS("Superstitious", "Avoids black cats.", 4),
+	STOIC("Stoic", "Never complains.", 5),
+	CURIOUS("Curious", "Always looking for something new.", 5),
+	LUCKY("Lucky", "Things just work out.", 4),
 	PATIENT("Patient", "Whatever it is waiting for, it will wait.", 5),
-	COUNTS_THINGS("Counts things", "Stones, steps, other golems. Quietly.", 5),
+	COUNTS_THINGS("Counts things", "Stones, steps, golems. Quietly.", 5),
 	FOND_OF_GOATS("Fond of goats", "Has views on the Wyrmscraig goat, and holds them firmly.", 4),
-	LOYAL("Loyal", "Would follow you anywhere, given the words.", 5);
+	LOYAL("Loyal", "Would never betray you.", 5);
 
 	/** What the golem's page calls this. */
 	private final String label;

@@ -2083,9 +2083,7 @@ public class GolemsDontDiePlugin extends Plugin
 			if (at.getPlane() == playerAt.getPlane() && at.distanceTo2D(playerAt) <= GREET_TILES)
 			{
 				// Turned to face the player: a wave over its shoulder is not a greeting.
-				int dx = playerAt.getX() - at.getX();
-				int dy = playerAt.getY() - at.getY();
-				golem.greet(tick + GREET_TICKS, (int) (Math.atan2(-dx, dy) * 1024 / Math.PI) & 2047);
+				golem.greet(tick + GREET_TICKS, playerAt.getX() - at.getX(), playerAt.getY() - at.getY());
 				return;
 			}
 		}

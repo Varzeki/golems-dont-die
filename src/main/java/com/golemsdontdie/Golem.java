@@ -811,19 +811,19 @@ class Golem
 		{
 			if (!stepping)
 			{
-				// Dancing: it finishes the step it is on and drops the rest of the walk. A leg is
-				// up to fifty tiles, so a golem that only stopped at the end of one would still be
-				// walking when the celebration was over.
-				if (dancing && !path.isEmpty())
+				// Dancing, or waving at the player: it finishes the step it is on and drops the
+				// rest of the walk. A leg is up to fifty tiles, so a golem that only stopped at the
+				// end of one would still be walking when the celebration was over.
+				boolean stopping = dancing || isGreeting(context.getTick());
+				if (stopping && !path.isEmpty())
 				{
 					path.clear();
 				}
 				if (path.isEmpty())
 				{
 					walking = false;
-					// And it goes nowhere else until the celebration is over: not even a shortcut
-					// under its nose.
-					if (dancing)
+					// And it goes nowhere else until it is done: not even a shortcut under its nose.
+					if (stopping)
 					{
 						return searched;
 					}
@@ -2026,12 +2026,14 @@ class Golem
 	/**
 	 * Turns the golem to face something and waves at it, for as long as the wave takes.
 	 *
-	 * @param facing the orientation to turn to, in the game's 2048ths
+	 * @param dx how far east the thing being waved at is
+	 * @param dy how far north it is
 	 */
-	void greet(int untilTick, int facing)
+	void greet(int untilTick, int dx, int dy)
 	{
 		greetUntil = untilTick;
-		targetOrientation = facing & 2047;
+		// headingFor, because an orientation worked out by hand faced the golem the other way.
+		targetOrientation = headingFor(dx, dy);
 	}
 
 	boolean isGreeting(int tick)
