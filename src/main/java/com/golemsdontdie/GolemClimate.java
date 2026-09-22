@@ -140,7 +140,7 @@ class GolemClimate
 	{
 		return toCold != null && memory != null
 			&& (memory.is(GolemTrait.LIKES_THE_COLD) || memory.is(GolemTrait.LIKES_THE_HEAT)
-			|| memory.is(GolemTrait.HOMESICK));
+			|| memory.is(GolemTrait.TEMPERATE) || memory.is(GolemTrait.HOMESICK));
 	}
 
 	/**
@@ -163,6 +163,10 @@ class GolemClimate
 		if (memory.is(GolemTrait.LIKES_THE_HEAT))
 		{
 			liking *= nearness(toHot, x, y, false);
+		}
+		if (memory.is(GolemTrait.TEMPERATE))
+		{
+			liking *= farness(toCold, x, y) * farness(toHot, x, y);
 		}
 		if (memory.is(GolemTrait.HOMESICK))
 		{
@@ -204,7 +208,16 @@ class GolemClimate
 	 */
 	float wanderlust(TransportMemory memory, int x, int y)
 	{
-		return cares(memory) && liking(memory, x, y) >= 1f ? SETTLED : 1f;
+		if (!cares(memory))
+		{
+			return 1f;
+		}
+		// Only a golem that went somewhere settles there. A temperate golem is not looking for
+		// anywhere in particular — it is avoiding two — so it never stops travelling.
+		boolean arrived = memory.is(GolemTrait.LIKES_THE_COLD) && isCold(x, y)
+			|| memory.is(GolemTrait.LIKES_THE_HEAT) && isHot(x, y)
+			|| memory.is(GolemTrait.HOMESICK) && nearness(toHome, x, y, true) >= 1f;
+		return arrived ? SETTLED : 1f;
 	}
 
 	/**
@@ -235,6 +248,25 @@ class GolemClimate
 	 * regions north of what it runs under.
 	 */
 	private static final int UNDERGROUND = 6400;
+
+	/**
+	 * The mirror of {@link #nearness}, for the golem that wants none of it: being in the place is
+	 * as bad as it gets, just outside is little better, and a long way off is all it asks.
+	 */
+	private static float farness(byte[] grid, int x, int y)
+	{
+		int region = x >> 6 << 8 | y >> 6;
+		if (region < 0 || region >= grid.length)
+		{
+			return 1f;
+		}
+		int away = grid[region];
+		if (away == 0)
+		{
+			return FLOOR;
+		}
+		return NEAR + (1f - NEAR) * Math.min(1f, (away - 1) / (float) (REACH - 1));
+	}
 
 	/** Whether a tile is one of the cold places. For the roaming simulation's report. */
 	boolean isCold(int x, int y)

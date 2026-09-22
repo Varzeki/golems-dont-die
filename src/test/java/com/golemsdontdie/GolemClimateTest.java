@@ -102,6 +102,31 @@ public class GolemClimateTest
 		assertTrue(climate.desire(hot, AL_KHARID_X, AL_KHARID_Y, WEISS_X, WEISS_Y) < 0.7f);
 	}
 
+	/** The temperate golem wants neither extreme, and never settles anywhere in particular. */
+	@Test
+	public void aTemperateGolemAvoidsBothExtremes()
+	{
+		TransportMemory mild = new TransportMemory();
+		mild.setTraits(GolemTrait.TEMPERATE.mask());
+		assertTrue(climate.cares(mild));
+		assertTrue("Varrock over the snow",
+			climate.liking(mild, VARROCK_X, VARROCK_Y) > climate.liking(mild, WEISS_X, WEISS_Y));
+		assertTrue("Varrock over the desert",
+			climate.liking(mild, VARROCK_X, VARROCK_Y) > climate.liking(mild, AL_KHARID_X, AL_KHARID_Y));
+		assertTrue("and it turns down the way into either",
+			climate.desire(mild, VARROCK_X, VARROCK_Y, AL_KHARID_X, AL_KHARID_Y) < 0.5f);
+		assertTrue("leaving the desert is never a discount",
+			climate.desire(mild, AL_KHARID_X, AL_KHARID_Y, VARROCK_X, VARROCK_Y) >= 1f);
+
+		// It is avoiding two places rather than looking for one, so it keeps moving.
+		assertEquals(1f, climate.wanderlust(mild, VARROCK_X, VARROCK_Y), 0.0001f);
+		TransportMemory cold = new TransportMemory();
+		cold.setTraits(GolemTrait.LIKES_THE_COLD.mask());
+		assertTrue("where a golem that came for the snow stays put",
+			climate.wanderlust(cold, WEISS_X, WEISS_Y) < 1f);
+		assertEquals(1f, climate.wanderlust(cold, VARROCK_X, VARROCK_Y), 0.0001f);
+	}
+
 	/** Home is the island, and the island's cave is part of it: a dungeon lies under its own ground. */
 	@Test
 	public void aHomesickGolemCountsTheCaveAsHome()

@@ -270,7 +270,7 @@ public class LongSim
 		Map<Long, Integer> regions = new HashMap<>();
 		Map<Long, Integer> tiles = new HashMap<>();
 		int stuck = 0, underground = 0, upstairs = 0, atSea = 0;
-		int[] tastes = new int[10];
+		int[] tastes = new int[12];
 		for (Sim g : golems)
 		{
 			WorldPoint p = g.itinerary == null ? g.at : g.itinerary.positionAt((int) Math.min(tick, Integer.MAX_VALUE));
@@ -291,6 +291,10 @@ public class LongSim
 			tastes[3] += hot && climate.isHot(p.getX(), p.getY()) ? 1 : 0;
 			tastes[4] += homesick ? 1 : 0;
 			tastes[5] += homesick && atHome(p) ? 1 : 0;
+			boolean mild = GolemTrait.TEMPERATE.in(g.traits);
+			boolean extreme = climate.isCold(p.getX(), p.getY()) || climate.isHot(p.getX(), p.getY());
+			tastes[10] += mild ? 1 : 0;
+			tastes[11] += mild && !extreme ? 1 : 0;
 			// And, as a control, where everyone else is.
 			tastes[6]++;
 			tastes[7] += climate.isCold(p.getX(), p.getY()) ? 1 : 0;

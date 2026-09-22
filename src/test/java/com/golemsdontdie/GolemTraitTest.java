@@ -37,6 +37,31 @@ public class GolemTraitTest
 			GolemTrait.of(12345), GolemTrait.of(12346));
 	}
 
+	/** A golem is never dealt two traits that pull against each other. See GolemTrait.clash. */
+	@Test
+	public void nothingIsDrawnAgainstItself()
+	{
+		GolemTrait[][] clashes = {
+			{GolemTrait.LIKES_THE_COLD, GolemTrait.LIKES_THE_HEAT, GolemTrait.TEMPERATE, GolemTrait.HOMESICK},
+			{GolemTrait.CROWD_SHY, GolemTrait.SOCIABLE},
+			{GolemTrait.CAUTIOUS, GolemTrait.SURE_FOOTED},
+			{GolemTrait.SPELUNKER, GolemTrait.CLIMBER},
+		};
+		for (long seed = 0; seed < 20_000; seed++)
+		{
+			int traits = GolemTrait.of(seed);
+			for (GolemTrait[] clash : clashes)
+			{
+				int found = 0;
+				for (GolemTrait trait : clash)
+				{
+					found += trait.in(traits) ? 1 : 0;
+				}
+				Assert.assertTrue("seed " + seed + " drew " + GolemTrait.list(traits), found <= 1);
+			}
+		}
+	}
+
 	@Test
 	public void everyTraitIsDrawnSometimesAndNoneTwice()
 	{

@@ -25,17 +25,18 @@ enum GolemTrait
 {
 	// ------------------------------------------------------------------ what a golem does
 
-	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice, and travels to find it.", 3),
-	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert, and stays once it gets there.", 3),
-	HOMESICK("Homesick", "Never away from Wyrmscraig for long.", 3),
+	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice, and travels to find it.", 3, Clash.WEATHER),
+	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert, and stays once it gets there.", 3, Clash.WEATHER),
+	TEMPERATE("Temperate", "No use for snow or sand: it keeps to the green places.", 3, Clash.WEATHER),
+	HOMESICK("Homesick", "Never away from Wyrmscraig for long.", 3, Clash.WEATHER),
 	SEAFARER("Seafarer", "Takes to the water at every chance, and walks to docks it passes.", 3),
-	SPELUNKER("Spelunker", "Goes down whenever there is a down to go.", 3),
-	CLIMBER("Climber", "Ladders, stairs and cliffs: anything that leads up.", 3),
+	SPELUNKER("Spelunker", "Goes down whenever there is a down to go.", 3, Clash.FLOORS),
+	CLIMBER("Climber", "Ladders, stairs and cliffs: anything that leads up.", 3, Clash.FLOORS),
 	RESTLESS("Restless", "Walks further, and rarely stands still for long.", 3),
-	CROWD_SHY("Crowd-shy", "Keeps away from other golems, and leaves when they gather.", 3),
-	SOCIABLE("Sociable", "Thinks nothing of a crowd, and will happily join one.", 3),
-	CAUTIOUS("Cautious", "Will not risk a jump or a stepping stone.", 3),
-	SURE_FOOTED("Sure-footed", "Takes the obstacle rather than the way round it.", 3),
+	CROWD_SHY("Crowd-shy", "Keeps away from other golems, and leaves when they gather.", 3, Clash.CROWDS),
+	SOCIABLE("Sociable", "Thinks nothing of a crowd, and will happily join one.", 3, Clash.CROWDS),
+	CAUTIOUS("Cautious", "Will not risk a jump or a stepping stone.", 3, Clash.OBSTACLES),
+	SURE_FOOTED("Sure-footed", "Takes the obstacle rather than the way round it.", 3, Clash.OBSTACLES),
 
 	// ------------------------------------------------------------------ what a golem is
 	//
@@ -70,11 +71,38 @@ enum GolemTrait
 	 */
 	private final int weight;
 
+	/**
+	 * Traits that pull against each other share a clash, and a golem is dealt at most one of them:
+	 * somewhere it wants to be, a view on crowds, a view on obstacles, and a direction in a
+	 * stairwell. A golem both homesick and fond of the cold wants to be in the snow on Wyrmscraig,
+	 * which is nowhere, and it would simply stand about.
+	 */
+	private final int clash;
+
+	/**
+	 * The clashes, in a class of their own: an enum constant may not name a field of its own enum,
+	 * and these are wanted in the list above.
+	 */
+	private static final class Clash
+	{
+		/** Where a golem wants to be: the weather it likes, or home. */
+		static final int WEATHER = 1;
+		static final int CROWDS = 2;
+		static final int OBSTACLES = 3;
+		static final int FLOORS = 4;
+	}
+
 	GolemTrait(String label, String description, int weight)
+	{
+		this(label, description, weight, 0);
+	}
+
+	GolemTrait(String label, String description, int weight, int clash)
 	{
 		this.label = label;
 		this.description = description;
 		this.weight = weight;
+		this.clash = clash;
 	}
 
 	private static final GolemTrait[] ALL = values();
@@ -121,9 +149,22 @@ enum GolemTrait
 					break;
 				}
 			}
-			traits |= 1 << drawn.ordinal();
+			traits |= drawn.mask();
 			total -= drawn.weight;
 			left.remove(drawn);
+			// Nothing that pulls against what it just drew: see clash.
+			if (drawn.clash != 0)
+			{
+				for (java.util.Iterator<GolemTrait> rest = left.iterator(); rest.hasNext(); )
+				{
+					GolemTrait trait = rest.next();
+					if (trait.clash == drawn.clash)
+					{
+						total -= trait.weight;
+						rest.remove();
+					}
+				}
+			}
 		}
 		return traits;
 	}

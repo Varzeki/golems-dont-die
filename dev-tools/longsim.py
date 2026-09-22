@@ -86,16 +86,19 @@ def main(patterns):
     shown = [t for t in ticks if tastes[t]]
     if shown:
         print()
-        print("Golems with a taste in places, and how often they are in one (all golems, for scale):")
-        print("  when           likes cold  likes heat    homesick  |  any in cold   any in heat    any home")
+        print("Golems with a taste in places, and how often they are in one (all golems, for scale).")
+        print("The temperate columns are the share in neither the cold nor the heat:")
+        print("  when           likes cold  likes heat    homesick   temperate  |  any in cold   any in heat"
+              "    any home  any temperate")
         step = max(1, len(shown) // 12)
         for t in shown[::step] + ([shown[-1]] if shown[-1] not in shown[::step] else []):
             c = tastes[t]
 
             def share(of, among):
                 return f"{100 * c[of] / c[among]:5.1f}%" if c[among] else "    -"
-            print(f"  {when(t)}       {share(1, 0)}      {share(3, 2)}      {share(5, 4)}  |"
-                  f"       {share(7, 6)}        {share(8, 6)}      {share(9, 6)}")
+            mild = f"{100 * (c[6] - c[7] - c[8]) / c[6]:5.1f}%" if c[6] else "    -"
+            print(f"  {when(t)}       {share(1, 0)}      {share(3, 2)}      {share(5, 4)}      {share(11, 10)}  |"
+                  f"       {share(7, 6)}        {share(8, 6)}      {share(9, 6)}          {mild}")
 
     # A sink fills over time: compare the first and last quarter of the run.
     quarter = max(1, len(ticks) // 4)
