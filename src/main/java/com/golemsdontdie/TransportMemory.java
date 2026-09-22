@@ -312,6 +312,17 @@ final class TransportMemory
 		shoreLeaveUntil = arrival + SHORE_LEAVE_MILLIS + spread;
 	}
 
+	/**
+	 * Takes back the shore leave a crossing booked. Shore leave is set when a voyage is planned
+	 * rather than when it ends, so a golem whose crossing is given up — held at the quayside to
+	 * wait for a crew — would sit out the leave for a voyage it never made, and by the time that
+	 * ran out the crew would be long gone.
+	 */
+	void clearShoreLeave()
+	{
+		shoreLeaveUntil = 0;
+	}
+
 	boolean onShoreLeave()
 	{
 		return clock.getAsLong() < shoreLeaveUntil;

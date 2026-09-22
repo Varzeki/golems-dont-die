@@ -80,12 +80,31 @@ class GolemCrews
 			{
 				hold(golem, tick);
 			}
-			if (!atSea && Boolean.TRUE.equals(was))
+			// Ashore and still signed on: landed this tick, or carried off its boat by a rescue
+			// and never noticed. Either way it is done sailing.
+			if (!atSea && (Boolean.TRUE.equals(was) || crews.containsKey(golem)))
 			{
 				land(golem);
 			}
 		}
 		sail(tick, context);
+		if (sailing.size() > golems.size())
+		{
+			forget(golems);
+		}
+	}
+
+	/**
+	 * Drops everything remembered about golems that are no longer on the roster. Golems do not
+	 * die, but reviving one builds it afresh, and the old object would be held here for ever.
+	 */
+	private void forget(List<Golem> golems)
+	{
+		java.util.Set<Golem> alive = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+		alive.addAll(golems);
+		sailing.keySet().retainAll(alive);
+		released.keySet().retainAll(alive);
+		crews.keySet().retainAll(alive);
 	}
 
 	/**
@@ -116,6 +135,9 @@ class GolemCrews
 		}
 		muster.waiting.add(golem);
 		golem.waitAshore(tick, MUSTER_TICKS);
+		// The crossing it gave up booked shore leave for its whole length; without this the golem
+		// could not sail again for as long as the voyage it is not taking would have lasted.
+		golem.getTransportMemory().clearShoreLeave();
 		sailing.put(golem, false);
 	}
 
@@ -184,6 +206,15 @@ class GolemCrews
 			golem.getTransportMemory().beginShoreLeaveOnArrival(tick + crossing.getDuration(), tick, random);
 			crews.put(golem, made);
 			sailing.put(golem, true);
+		}
+		// More waiting than the boat has berths: the rest are let go rather than left standing at
+		// a quayside whose crew has sailed.
+		for (Golem left : muster.waiting)
+		{
+			if (crews.get(left) != made)
+			{
+				released.put(left, tick);
+			}
 		}
 		log.debug("{} golems crewed a {} from {}", made.size(), boat, muster.dock.getName());
 		return true;

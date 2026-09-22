@@ -21,22 +21,22 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, 1, new int[][]{{0, 0}}),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
 	 * rest along a deck 324 units across and 714 long.
 	 */
-	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 320, 4,
-		new int[][]{{0, 0}, {-70, 180}, {70, 300}, {-40, 420}}),
+	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
+		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
 	 * 1,090 long.
 	 */
-	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, 8,
-		new int[][]{{0, 0}, {-110, 170}, {110, 170}, {-110, 380}, {110, 380}, {-110, 590},
-			{110, 590}, {0, 780}});
+	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, -240, 240, -554, 536, 8,
+		new int[][]{{0, 0}, {-120, 180}, {120, 180}, {-120, 400}, {120, 400}, {-120, 620},
+			{120, 620}, {0, 830}});
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -66,6 +66,16 @@ enum GolemBoat
 	 */
 	private final int helmOffset;
 
+	/**
+	 * How far the hull reaches, in its own model units: across, then along, bow first. Read out of
+	 * the cache by {@code dev-tools/PartRecon.java}, and here so that a berth can be checked
+	 * against the deck it is meant to be standing on rather than guessed at.
+	 */
+	private final int hullMinX;
+	private final int hullMaxX;
+	private final int hullMinZ;
+	private final int hullMaxZ;
+
 	/** How many golems this boat carries, the one at the helm included. */
 	private final int berths;
 
@@ -77,7 +87,7 @@ enum GolemBoat
 	private final int[][] deck;
 
 	GolemBoat(int hullModel, int mastModel, int clothModel, short[] hullFrom, short[] hullTo,
-		int helmOffset, int berths, int[][] deck)
+		int helmOffset, int hullMinX, int hullMaxX, int hullMinZ, int hullMaxZ, int berths, int[][] deck)
 	{
 		this.hullModel = hullModel;
 		this.mastModel = mastModel;
@@ -85,8 +95,22 @@ enum GolemBoat
 		this.hullFrom = hullFrom;
 		this.hullTo = hullTo;
 		this.helmOffset = helmOffset;
+		this.hullMinX = hullMinX;
+		this.hullMaxX = hullMaxX;
+		this.hullMinZ = hullMinZ;
+		this.hullMaxZ = hullMaxZ;
 		this.berths = berths;
 		this.deck = deck;
+	}
+
+	/**
+	 * Where a berth stands in the hull's own frame: across, and along with the stern positive. The
+	 * helm is at {@link #helmOffset} and everyone else is forward of it.
+	 */
+	int[] berthInHull(int berth)
+	{
+		int[] slot = deck[berth];
+		return new int[]{slot[0], helmOffset - slot[1]};
 	}
 
 	/** The smallest boat that carries this many golems; the raft for one. */
