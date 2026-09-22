@@ -28,12 +28,17 @@ class GolemNameplateOverlay extends Overlay
 	private final GolemsDontDiePlugin plugin;
 	private final GolemsDontDieConfig config;
 
+	/** What a golem is called: its own name, or the one the setting gives it. */
+	private final GolemNames names;
+
 	@Inject
-	GolemNameplateOverlay(Client client, GolemsDontDiePlugin plugin, GolemsDontDieConfig config)
+	GolemNameplateOverlay(Client client, GolemsDontDiePlugin plugin, GolemsDontDieConfig config,
+		GolemNames names)
 	{
 		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
+		this.names = names;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
 	}
@@ -55,7 +60,7 @@ class GolemNameplateOverlay extends Overlay
 		java.awt.Color colour = config.nameplateColour();
 		for (Golem golem : plugin.drawnGolems())
 		{
-			String name = golem.getNickname();
+			String name = names.of(golem);
 			FakeGolem drawn = golem.getRenderer();
 			if (name == null || name.trim().isEmpty() || drawn == null || golem.getDrawPlane() != wv.getPlane())
 			{

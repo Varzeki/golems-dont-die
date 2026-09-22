@@ -93,6 +93,12 @@ class GolemCelebration
 		return until > 0 && tick < until;
 	}
 
+	/** How long the golems have been at it, in ticks, so the fireworks can open loudly. */
+	int startedAt(int tick)
+	{
+		return until <= 0 ? Integer.MAX_VALUE : tick - (until - DANCE_TICKS);
+	}
+
 	/** Forgotten on login and on a world hop: the tick counter starts again on the other side. */
 	void reset()
 	{

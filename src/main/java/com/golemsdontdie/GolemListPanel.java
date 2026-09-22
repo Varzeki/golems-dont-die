@@ -44,11 +44,54 @@ class GolemListPanel extends PluginPanel
 	private static final Color PLACEHOLDER_COLOUR = new Color(120, 120, 120);
 
 	/** Golems listed at once. A player who has crafted for months has thousands. */
-	private static final int PER_PAGE = 50;
+	private static final int PER_PAGE = 15;
 
-	/** The face from the world map, already drawn to be read at fifteen pixels. */
-	private static final javax.swing.Icon FACE = new javax.swing.ImageIcon(
-		net.runelite.client.util.ImageUtil.loadImageResource(GolemListPanel.class, "/golem-map-icon.png"));
+	/**
+	 * The smallest a name or a place may be squeezed to, in pixels.
+	 *
+	 * <p>Without it the row is as wide as its longest line of text and the buttons at its end are
+	 * pushed off the edge, under the scrollbar: a text field and a label both ask for room enough
+	 * for all of their text, and a layout takes that as a floor.
+	 */
+	private static final java.awt.Dimension SQUEEZED = new Dimension(24, 16);
+
+	/** The info button, drawn rather than drawn from a file: a letter in a circle at 14 pixels. */
+	private static final javax.swing.Icon INFO = info();
+
+	/** The find button: a ring and a cross, which is what the hint arrow does at the other end. */
+	private static final javax.swing.Icon TARGET = target();
+
+	private static javax.swing.Icon target()
+	{
+		int size = 14;
+		java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(size, size,
+			java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = image.createGraphics();
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g.setColor(Color.WHITE);
+		g.drawOval(3, 3, size - 7, size - 7);
+		g.drawLine(size / 2, 0, size / 2, 2);
+		g.drawLine(size / 2, size - 3, size / 2, size - 1);
+		g.drawLine(0, size / 2, 2, size / 2);
+		g.drawLine(size - 3, size / 2, size - 1, size / 2);
+		g.dispose();
+		return new javax.swing.ImageIcon(image);
+	}
+
+	private static javax.swing.Icon info()
+	{
+		int size = 14;
+		java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(size, size,
+			java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = image.createGraphics();
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g.setColor(ColorScheme.LIGHT_GRAY_COLOR);
+		g.drawOval(0, 0, size - 1, size - 1);
+		g.fillRect(size / 2 - 1, 3, 2, 2);
+		g.fillRect(size / 2 - 1, 6, 2, 5);
+		g.dispose();
+		return new javax.swing.ImageIcon(image);
+	}
 
 	private final JPanel rows = new JPanel();
 	private final JLabel summary = new JLabel();
@@ -209,8 +252,10 @@ class GolemListPanel extends PluginPanel
 		finding.addActionListener(e -> onFind.accept(null));
 		finding.setVisible(false);
 
+		// A gap under the two buttons, which otherwise sit straight on top of the search field.
 		JPanel above = new JPanel(new BorderLayout());
 		above.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		above.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 		above.add(revive, BorderLayout.NORTH);
 		above.add(finding, BorderLayout.SOUTH);
 
@@ -232,7 +277,7 @@ class GolemListPanel extends PluginPanel
 
 		// Rows are pinned to the top of a filler panel so a short list does not stretch
 		// down the whole panel.
-		JPanel filler = new JPanel(new BorderLayout());
+		JPanel filler = new Tracking();
 		filler.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		filler.add(rows, BorderLayout.NORTH);
 
@@ -488,6 +533,7 @@ class GolemListPanel extends PluginPanel
 		place.setFont(FontManager.getRunescapeSmallFont());
 		place.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		place.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 0));
+		place.setMinimumSize(SQUEEZED);
 
 		// The dimmed prompt is the name the plugin would call it, so an unnamed golem still reads
 		// as somebody. Left as a prompt rather than put in the field: it is not a name until it
@@ -495,6 +541,7 @@ class GolemListPanel extends PluginPanel
 		String suggested = names.suggested(golem);
 		JTextField name = new PlaceholderField(golem.getNickname(),
 			suggested == null ? "Unnamed Golem" : suggested);
+		name.setMinimumSize(SQUEEZED);
 		Row[] self = new Row[1];
 		name.setToolTipText("Name this golem");
 		name.getDocument().addDocumentListener(new DocumentListener()
@@ -529,22 +576,14 @@ class GolemListPanel extends PluginPanel
 			}
 		});
 		// Name across the top, place beneath it.
-		JPanel text = new JPanel(new BorderLayout());
-		text.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		text.add(name, BorderLayout.CENTER);
-		text.add(place, BorderLayout.SOUTH);
-		panel.add(text, BorderLayout.CENTER);
-
-		JButton find = new JButton("Find");
+		JButton find = new JButton(TARGET);
 		find.setToolTipText("Point at this golem until you reach it");
-		find.setFont(ROW);
 		find.setFocusPainted(false);
 		find.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		find.setForeground(Color.WHITE);
-		find.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+		find.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
 		find.addActionListener(e -> onFind.accept(golem));
 
-		JButton page = new JButton(FACE);
+		JButton page = new JButton(INFO);
 		page.setToolTipText("This golem's page");
 		page.setFocusPainted(false);
 		page.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -559,12 +598,26 @@ class GolemListPanel extends PluginPanel
 		remove.setForeground(Color.LIGHT_GRAY);
 		remove.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
 		remove.addActionListener(e -> onRemove.accept(golem));
-		JPanel buttons = new JPanel(new BorderLayout(4, 0));
+		JPanel buttons = new JPanel(new BorderLayout(2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		buttons.add(page, BorderLayout.WEST);
 		buttons.add(find, BorderLayout.CENTER);
 		buttons.add(remove, BorderLayout.EAST);
-		panel.add(buttons, BorderLayout.EAST);
+
+		// The name shares the top of the row with the buttons; the place has the whole width of
+		// the row underneath, which is what it needs to say "Sailing to Port Khazard".
+		JPanel top = new JPanel(new BorderLayout(4, 0));
+		top.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		top.setMinimumSize(SQUEEZED);
+		top.add(name, BorderLayout.CENTER);
+		top.add(buttons, BorderLayout.EAST);
+
+		JPanel text = new JPanel(new BorderLayout());
+		text.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		text.setMinimumSize(SQUEEZED);
+		text.add(top, BorderLayout.CENTER);
+		text.add(place, BorderLayout.SOUTH);
+		panel.add(text, BorderLayout.CENTER);
 
 		// Spacing between rows, which a BoxLayout will not do on its own.
 		JPanel spaced = new JPanel(new BorderLayout());
@@ -575,6 +628,53 @@ class GolemListPanel extends PluginPanel
 		self[0] = new Row(spaced, name);
 		self[0].place = place;
 		return self[0];
+	}
+
+	/**
+	 * The list, kept to the width of what it is scrolled in.
+	 *
+	 * <p>A panel in a scroll pane is laid out at whatever width its contents ask for, and a row
+	 * asks for room enough for a long name and a long place. The list then ran on past the right
+	 * edge of the viewport, taking the buttons at the end of each row with it and leaving them
+	 * under the scrollbar. Tracking the viewport's width squeezes the text instead, which is what
+	 * a text field and a label are for.
+	 */
+	private static final class Tracking extends JPanel implements javax.swing.Scrollable
+	{
+		private Tracking()
+		{
+			super(new BorderLayout());
+		}
+
+		@Override
+		public Dimension getPreferredScrollableViewportSize()
+		{
+			return getPreferredSize();
+		}
+
+		@Override
+		public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction)
+		{
+			return 16;
+		}
+
+		@Override
+		public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction)
+		{
+			return visible.height;
+		}
+
+		@Override
+		public boolean getScrollableTracksViewportWidth()
+		{
+			return true;
+		}
+
+		@Override
+		public boolean getScrollableTracksViewportHeight()
+		{
+			return false;
+		}
 	}
 
 	/**

@@ -84,6 +84,20 @@ class GolemNames
 	}
 
 	/**
+	 * What to call this golem: the name the player gave it, the one the setting gives it, or null
+	 * if it has neither. What a nameplate says, and what the right-click menu calls it.
+	 */
+	String of(Golem golem)
+	{
+		if (golem == null)
+		{
+			return null;
+		}
+		String nickname = golem.getNickname();
+		return nickname != null && !nickname.isEmpty() ? nickname : suggested(golem);
+	}
+
+	/**
 	 * What to call this golem, or null if the player has named it or the setting is off.
 	 *
 	 * <p>Cheap enough to ask every time a row is drawn: one multiply and two array reads.

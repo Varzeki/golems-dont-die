@@ -41,6 +41,9 @@ class GolemMenu
 	@Inject
 	private ChatboxPanelManager chatboxPanelManager;
 
+	@Inject
+	private GolemNames names;
+
 	/** Told when a golem is named here, so the roster is saved and the sidebar shows it. */
 	private Consumer<Golem> onRenamed = golem ->
 	{
@@ -76,7 +79,7 @@ class GolemMenu
 
 		// Shown by its name. Every real golem is called "Golem", so this costs some of the
 		// disguise, but a name is only there because the player put it there.
-		String name = hovered.getNickname();
+		String name = names.of(hovered);
 		if (name == null || name.isEmpty())
 		{
 			name = hovered.getSnapshot().getName();

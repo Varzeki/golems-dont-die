@@ -28,15 +28,19 @@ import net.runelite.client.plugins.PluginManager;
  *
  * <pre>
  * ::golems              what the roster looks like
- * ::dance [seconds]     start a celebration now, whatever the settings say
- * ::levelup             as if a level went up, through the real path and its setting
- * ::collog              as if a collection log slot was filled
- * ::crafted             as if the golem count went up
- * ::bring [n]           teleport the nearest n golems to you (default 10)
- * ::traits              what the nearest golem is like, called, and has done
- * ::page                open the nearest golem's page
- * ::findme              point the arrow at the nearest golem
- * ::remove [n]          remove n golems, to leave some missing for the plinth to revive
+ * ::gdance [seconds]    start a celebration now, whatever the settings say
+ * ::gguitar             put the nearest golems on the air guitar
+ * ::glevel              as if a level went up, through the real path and its setting
+ * ::gcollog             as if a collection log slot was filled
+ * ::gcrafted            as if the golem count went up
+ * ::gbring [n]          teleport the nearest n golems to you (default 10)
+ * ::gtraits             what the nearest golem is like, called, and has done
+ * ::gpage               open the nearest golem's page
+ * ::gfind               point the arrow at the nearest golem
+ * ::gremove [n]         remove n golems, to leave some missing for the plinth to revive
+ *
+ * <p>All of them wear the g: ::dance belongs to somebody else's plugin, and the golems stood
+ * there while the player danced.
  * </pre>
  */
 @PluginDescriptor(name = "Golem Dev Commands (dev)", description = "Chat commands for testing golems",
@@ -60,16 +64,17 @@ public class DevCommands extends Plugin
 		switch (command)
 		{
 			case "golems":
-			case "dance":
-			case "levelup":
-			case "collog":
-			case "crafted":
-			case "bring":
-			case "traits":
-			case "page":
-			case "findme":
-			case "remove":
-			case "golemhelp":
+			case "gdance":
+			case "gguitar":
+			case "glevel":
+			case "gcollog":
+			case "gcrafted":
+			case "gbring":
+			case "gtraits":
+			case "gpage":
+			case "gfind":
+			case "gremove":
+			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
 			default:
@@ -101,9 +106,9 @@ public class DevCommands extends Plugin
 
 		switch (command)
 		{
-			case "golemhelp":
-				say("::golems  ::dance [s]  ::levelup  ::collog  ::crafted  ::bring [n]");
-				say("::traits  ::page  ::findme  ::remove [n]");
+			case "ghelp":
+				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
+				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]");
 				break;
 
 			case "golems":
@@ -112,7 +117,24 @@ public class DevCommands extends Plugin
 					+ client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT) + " crafted.");
 				break;
 
-			case "dance":
+			case "gguitar":
+			{
+				// The air guitar is one move in twelve, so it can go a whole celebration unseen.
+				// This puts the golems nearby on it, and the guitar should appear in their hands.
+				int given = 0;
+				for (Golem golem : nearest(golems, where(), count))
+				{
+					set(golem, "danceMove", GolemDance.AIR_GUITAR);
+					set(golem, "propPending", Boolean.TRUE);
+					given++;
+				}
+				call(celebration, "begin", new Class<?>[]{int.class},
+					new Object[]{client.getTickCount()});
+				say(given + " golems on the air guitar.");
+				break;
+			}
+
+			case "gdance":
 			{
 				// begin() adds its own ten seconds to whatever tick it is handed, so the tick it is
 				// handed is worked back from the length wanted.
@@ -123,7 +145,7 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "levelup":
+			case "glevel":
 			{
 				// Through the real path: seen once, then one higher, which is what a level-up is.
 				Skill skill = Skill.MINING;
@@ -134,13 +156,13 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "collog":
+			case "gcollog":
 				celebration.chatMessage("New item added to your collection log: Golem's heart",
 					client.getTickCount());
 				say("As if the collection log gained a slot.");
 				break;
 
-			case "crafted":
+			case "gcrafted":
 			{
 				int crafted = client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT);
 				celebration.golemCount(crafted, client.getTickCount());
@@ -149,7 +171,7 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "bring":
+			case "gbring":
 			{
 				Player player = client.getLocalPlayer();
 				if (player == null)
@@ -168,7 +190,7 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "traits":
+			case "gtraits":
 			{
 				Golem golem = nearestOne(golems);
 				if (golem == null)
@@ -185,7 +207,7 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "page":
+			case "gpage":
 			{
 				Golem golem = nearestOne(golems);
 				if (golem != null)
@@ -200,7 +222,7 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "findme":
+			case "gfind":
 			{
 				Golem golem = nearestOne(golems);
 				if (golem != null)
@@ -211,7 +233,7 @@ public class DevCommands extends Plugin
 				break;
 			}
 
-			case "remove":
+			case "gremove":
 			{
 				int removed = 0;
 				for (Golem golem : new ArrayList<>(golems))
@@ -306,6 +328,32 @@ public class DevCommands extends Plugin
 		sorted.sort((one, other) -> Integer.compare(
 			one.currentTile().distanceTo2D(at), other.currentTile().distanceTo2D(at)));
 		return sorted.subList(0, Math.min(count, sorted.size()));
+	}
+
+	/** Where the player is, or the plinth if there is no player yet. */
+	private WorldPoint where()
+	{
+		Player player = client.getLocalPlayer();
+		return player != null ? player.getWorldLocation()
+			: new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
+	}
+
+	private static void set(Object target, String name, Object value)
+	{
+		for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass())
+		{
+			try
+			{
+				Field field = type.getDeclaredField(name);
+				field.setAccessible(true);
+				field.set(target, value);
+				return;
+			}
+			catch (ReflectiveOperationException ignored)
+			{
+				// Not on this one; try the class it came from.
+			}
+		}
 	}
 
 	private Golem nearestOne(List<Golem> golems)

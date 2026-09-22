@@ -199,6 +199,16 @@ class Golem
 		return itinerary != null && itinerary.isVoyage() ? itinerary.destination() : currentTile();
 	}
 
+	/**
+	 * Where a golem on a crossing has got to, or null if it is not on one. Its own tile is the
+	 * port it is bound for — see {@link #saveTile} — so anything that wants the raft rather than
+	 * the landfall, such as the world map, asks the crossing itself.
+	 */
+	WorldPoint seaPosition(int tick)
+	{
+		return isSailing(tick) ? itinerary.positionAt(tick) : null;
+	}
+
 	/** Clears the watchdog after the golem has been moved somewhere it can walk. */
 	void noteUnstuck(int tick)
 	{
@@ -795,11 +805,18 @@ class Golem
 		{
 			if (!stepping)
 			{
+				// Dancing: it finishes the step it is on and drops the rest of the walk. A leg is
+				// up to fifty tiles, so a golem that only stopped at the end of one would still be
+				// walking when the celebration was over.
+				if (dancing && !path.isEmpty())
+				{
+					path.clear();
+				}
 				if (path.isEmpty())
 				{
 					walking = false;
-					// Dancing: the step it was on is finished, and it goes nowhere else until the
-					// celebration is over. Not even a shortcut under its nose.
+					// And it goes nowhere else until the celebration is over: not even a shortcut
+					// under its nose.
 					if (dancing)
 					{
 						return searched;

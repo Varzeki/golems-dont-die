@@ -98,8 +98,23 @@ class GolemHistory
 		}
 	}
 
+	/**
+	 * How far a tile is from home.
+	 *
+	 * <p>Underground counts as the ground above it: a dungeon is drawn a hundred regions north of
+	 * what it runs under, and a golem in the cave under the island is not six thousand tiles from
+	 * home, it is under it.
+	 */
 	private static int away(int x, int y, WorldPoint home)
 	{
-		return home == null ? 0 : Math.max(Math.abs(x - home.getX()), Math.abs(y - home.getY()));
+		if (home == null)
+		{
+			return 0;
+		}
+		int above = y >= UNDERGROUND ? y - UNDERGROUND : y;
+		return Math.max(Math.abs(x - home.getX()), Math.abs(above - home.getY()));
 	}
+
+	/** How far below the surface the underground is laid out, in tiles. */
+	private static final int UNDERGROUND = 6400;
 }
