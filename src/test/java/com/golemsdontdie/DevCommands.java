@@ -83,6 +83,7 @@ public class DevCommands extends Plugin
 			case "gmap":
 			case "gwhere":
 			case "gpath":
+			case "gcutoff":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -290,7 +291,7 @@ public class DevCommands extends Plugin
 						Object mesh = field(golemPlugin, "worldMesh");
 						if (mesh != null)
 						{
-							say("  sealed in: " + answer(mesh, "isSealed",
+							say("  cut off from home: " + answer(mesh, "isCutOff",
 								new Class<?>[]{int.class, int.class, int.class},
 								new Object[]{at.getX(), at.getY(), at.getPlane()}));
 						}
@@ -304,6 +305,39 @@ public class DevCommands extends Plugin
 				{
 					say("No golem called that.");
 				}
+				break;
+			}
+
+			case "gcutoff":
+			{
+				// What the plugin makes of the world right now: how many golems stand on ground
+				// that does not join up with home, before any of them are moved for it.
+				Object mesh = field(golemPlugin, "worldMesh");
+				if (mesh == null)
+				{
+					say("No mesh.");
+					break;
+				}
+				int cut = 0;
+				int said = 0;
+				for (Golem one : golems)
+				{
+					WorldPoint at = one.currentTile();
+					if (!Boolean.TRUE.equals(answer(mesh, "isCutOff",
+						new Class<?>[]{int.class, int.class, int.class},
+						new Object[]{at.getX(), at.getY(), at.getPlane()})))
+					{
+						continue;
+					}
+					cut++;
+					if (said++ < 5)
+					{
+						say("  cut off at " + at.getX() + "," + at.getY() + " plane " + at.getPlane());
+					}
+				}
+				say(cut + " of " + golems.size() + " golems are cut off from home; the sweep's own"
+					+ " share is " + field(golemPlugin, "cutOffShare")
+					+ " (moves nobody above " + field(golemPlugin, "MOST_CUT_OFF") + ")");
 				break;
 			}
 
@@ -331,7 +365,7 @@ public class DevCommands extends Plugin
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
 				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap  ::gwhere [name]");
-				say("::gpath x y");
+				say("::gpath x y  ::gcutoff");
 				break;
 
 			case "golems":

@@ -372,92 +372,137 @@ class WorldMesh
 	private int transportFloors;
 
 	/**
-	 * Spaces with a way out of them: one a transport starts or ends in, or one a dock stands on.
+	 * Which spaces can be walked to from home, and which can be walked home from.
 	 *
-	 * <p>A golem can only ever walk within the space it is in; everything else is a transport or a
-	 * crossing. So a space touched by neither is one nothing can enter and nothing can leave — and
-	 * a golem found in one did not walk there, and will wander it until the game shuts. The two
-	 * are kept apart because the transport marks are rebuilt whenever a route is learned and the
-	 * dock marks are not.
+	 * <p>A golem walks only inside the space it is standing in; a transport or a crossing is the
+	 * only way into another. So the spaces make a graph with the transports for edges, and a golem
+	 * belongs in the part of it home can reach and that can reach home. Anywhere else is a trap
+	 * whatever its size: a space of a million tiles with no route into it is a million tiles no
+	 * golem can arrive at, and only matters at all because one was put there.
+	 *
+	 * <p>One direction only, deliberately. Asking for a way back as well looked right and was
+	 * wrong: the tables hold one-way rows, and a pocket of Wyrmscraig entered by a drop with no
+	 * row back out had golems carried to the plinth and walking straight back into it, twice in
+	 * fifteen seconds. Ground a golem can reach is ground a golem may stand on; a golem that
+	 * cannot get out again is the stuck watchdog's business, not this one's.
 	 */
-	private final boolean[] transportExits = new boolean[1 << 16];
-	private final boolean[] dockExits = new boolean[1 << 16];
+	private boolean[] fromHome;
+
+	/** Every space a dock stands in. The sea joins them to each other. */
+	private final java.util.Set<Integer> ports = new java.util.HashSet<>();
+
+	/** Every space a transport touches, at either end. Rebuilt with the graph. */
+	private final java.util.Set<Integer> touched = new java.util.HashSet<>();
+
+	/** Space to the spaces a transport leads to. */
+	private final Map<Integer, java.util.List<Integer>> leadsTo = new HashMap<>();
 
 	/**
-	 * How large a space may be and still count as somewhere a golem is trapped. Beyond this it is
-	 * a country, not a pen: the mainland's own tables are incomplete in places, and the map is
-	 * full of blank ground the game leaves passable — one such space runs to a million tiles, and
-	 * a golem loose in it is lost rather than shut in.
-	 */
-	private static final int TRAP_TILES = 4096;
-
-	/** Spaces already measured, by component: tiles, counted no further than {@link #TRAP_TILES}. */
-	private final Map<Integer, Integer> spaceSizes = new HashMap<>();
-
-	/**
-	 * True if this tile is in a small space with no way out of it.
+	 * True if this tile is in a pocket too small to wander, that no route touches and no dock
+	 * stands in.
 	 *
-	 * <p>A golem only ever walks within the space it is standing in, so a space no transport and
-	 * no dock touches is one it can never leave. Silence is not a yes: a tile the mesh has no
-	 * component for is left alone, and so is anywhere large enough to be somewhere.
+	 * <p>The plainest trap there is, and the one answer here that barely leans on the tables: the
+	 * pocket is under fifty tiles by the shipped mesh's own reckoning, so a golem in it is walking
+	 * in circles, and with nothing starting or ending there it has neither a shortcut to take nor
+	 * one to reverse back out of. Judged on its own so that it still holds when the wider question
+	 * — does this ground join up with home — has been answered by a world the plugin has misread.
 	 */
-	boolean isSealed(int x, int y, int plane)
+	boolean isSealedPocket(int x, int y, int plane)
 	{
 		int component = componentAt(x, y, plane);
-		if (component == 0 || transportExits[component] || dockExits[component])
+		return component != 0 && isIsolated(x, y, plane)
+			&& !touched.contains(component) && !ports.contains(component);
+	}
+
+	/**
+	 * True if a golem here is somewhere it could not have walked to, or could not walk back from.
+	 * A tile with no component is left alone, and so is everywhere until the spaces are linked.
+	 */
+	boolean isCutOff(int x, int y, int plane)
+	{
+		int component = componentAt(x, y, plane);
+		if (component == 0 || fromHome == null)
 		{
 			return false;
 		}
-		return sizeOf(component, x, y, plane) <= TRAP_TILES;
+		return !fromHome[component];
 	}
 
 	/**
-	 * The tiles in a space, counted once and remembered, and no further than a space needs to be
-	 * before the answer stops mattering.
+	 * Works out which spaces home can reach and which can reach home, over the transports and the
+	 * docks known right now. Run once the tables are loaded, and again whenever a route is
+	 * learned: a learned route is a way through that did not exist a moment ago.
 	 */
-	private int sizeOf(int component, int x, int y, int plane)
+	void linkSpaces(int homeX, int homeY, int homePlane)
 	{
-		Integer known = spaceSizes.get(component);
-		if (known != null)
+		int home = componentAt(homeX, homeY, homePlane);
+		if (home == 0)
 		{
-			return known;
+			return;
 		}
 
-		java.util.Set<Long> seen = new java.util.HashSet<>();
-		java.util.Deque<int[]> queue = new java.util.ArrayDeque<>();
-		seen.add((long) x << 20 | y);
-		queue.add(new int[]{x, y});
-		int size = 0;
-		while (!queue.isEmpty() && size <= TRAP_TILES)
+		boolean[] out = new boolean[1 << 16];
+		walkSpaces(home, leadsTo, out);
+		fromHome = out;
+
+		int reached = 0;
+		for (boolean space : out)
 		{
-			int[] at = queue.poll();
-			size++;
-			for (int d = 0; d < SPREAD_X.length; d++)
+			reached += space ? 1 : 0;
+		}
+		log.debug("{} spaces are home's own, of the {} the transports name", reached, leadsTo.size());
+	}
+
+	/** Spreads out from home over one direction of the graph, the sea counting as one hop. */
+	private void walkSpaces(int home, Map<Integer, java.util.List<Integer>> edges, boolean[] seen)
+	{
+		java.util.Deque<Integer> queue = new java.util.ArrayDeque<>();
+		seen[home] = true;
+		queue.add(home);
+		boolean sailed = false;
+
+		while (!queue.isEmpty())
+		{
+			int at = queue.poll();
+
+			// One port reached is every port reached: a golem that can board can land wherever a
+			// boat goes, and the same backwards.
+			if (!sailed && ports.contains(at))
 			{
-				int nx = at[0] + SPREAD_X[d];
-				int ny = at[1] + SPREAD_Y[d];
-				if (seen.add((long) nx << 20 | ny) && componentAt(nx, ny, plane) == component)
+				sailed = true;
+				for (int port : ports)
 				{
-					queue.add(new int[]{nx, ny});
+					if (!seen[port])
+					{
+						seen[port] = true;
+						queue.add(port);
+					}
+				}
+			}
+
+			java.util.List<Integer> next = edges.get(at);
+			if (next == null)
+			{
+				continue;
+			}
+			for (int to : next)
+			{
+				if (!seen[to])
+				{
+					seen[to] = true;
+					queue.add(to);
 				}
 			}
 		}
-
-		spaceSizes.put(component, size);
-		return size;
 	}
 
-	/** The eight ways out of a tile, as the component fill itself used. */
-	private static final int[] SPREAD_X = {1, -1, 0, 0, 1, -1, 1, -1};
-	private static final int[] SPREAD_Y = {0, 0, 1, -1, 1, 1, -1, -1};
-
-	/** Marks the space a dock's quayside stands in as one a golem can leave — by sea. */
+	/** Marks the space a dock's quayside stands in as a port, which the sea joins to every other. */
 	void admitDockExit(int x, int y, int plane)
 	{
 		int component = componentAt(x, y, plane);
 		if (component != 0)
 		{
-			dockExits[component] = true;
+			ports.add(component);
 		}
 	}
 
@@ -493,7 +538,23 @@ class WorldMesh
 	void admitTransportEnds(java.util.List<GolemTransport> transports)
 	{
 		java.util.Arrays.fill(landComponents, false);
-		java.util.Arrays.fill(transportExits, false);
+		leadsTo.clear();
+		touched.clear();
+		for (GolemTransport t : transports)
+		{
+			for (int from : spacesAt(t.getFromX(), t.getFromY(), t.getFromPlane()))
+			{
+				touched.add(from);
+				for (int to : spacesAt(t.getToX(), t.getToY(), t.getToPlane()))
+				{
+					touched.add(to);
+					if (from != to)
+					{
+						leadsTo.computeIfAbsent(from, space -> new java.util.ArrayList<>()).add(to);
+					}
+				}
+			}
+		}
 		transportFloors = 0;
 		admittedFloors = 0;
 		for (boolean dock : dockFloors)
@@ -508,16 +569,40 @@ class WorldMesh
 		log.debug("{} floors admitted as land from transport ends", transportFloors);
 	}
 
+	/**
+	 * The spaces a transport's end touches: its own, or — where it stands on blocked ground, as a
+	 * door, a stile or a stepping stone does — the spaces around it. Nearly a third of the ends in
+	 * the tables have no component of their own, and reading those as "leads nowhere" cut whole
+	 * floors off from home.
+	 *
+	 * <p>Generous on purpose. Joining two spaces that a golem cannot really walk between leaves a
+	 * golem where it stands; refusing to join two that it can carries one home from somewhere it
+	 * belonged.
+	 */
+	private java.util.List<Integer> spacesAt(int x, int y, int plane)
+	{
+		int own = componentAt(x, y, plane);
+		if (own != 0)
+		{
+			return java.util.Collections.singletonList(own);
+		}
+		java.util.List<Integer> around = new java.util.ArrayList<>(4);
+		for (int dx = -1; dx <= 1; dx++)
+		{
+			for (int dy = -1; dy <= 1; dy++)
+			{
+				int space = componentAt(x + dx, y + dy, plane);
+				if (space != 0 && !around.contains(space))
+				{
+					around.add(space);
+				}
+			}
+		}
+		return around;
+	}
+
 	private void admit(int x, int y, int plane)
 	{
-		// A way out of the space, whatever the floor turns out to be: a transport into a space
-		// the land fill already knew is still the way a golem leaves it.
-		int exit = componentAt(x, y, plane);
-		if (exit != 0)
-		{
-			transportExits[exit] = true;
-		}
-
 		// Instances are rebuilt each visit; their coordinates name no lasting floor.
 		if (x >= 6400 || isLand(x, y, plane) || isOcean(x, y, plane))
 		{

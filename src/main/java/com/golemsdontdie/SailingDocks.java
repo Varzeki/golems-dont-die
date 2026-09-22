@@ -181,6 +181,10 @@ class SailingDocks
 			mesh.admitDockFloor(shore.getX(), shore.getY(), shore.getPlane());
 		}
 
+		// Now the ports are known, which spaces join up with home can be settled: a dock is the
+		// way in and out of every island that has one.
+		mesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
+
 		log.debug("Loaded {} sailing docks of {} rows; {} open to golems at Sailing level {}", docks.size(),
 			rows.size(), openDocks().size(), client.getRealSkillLevel(Skill.SAILING));
 

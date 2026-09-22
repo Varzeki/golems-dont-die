@@ -356,6 +356,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// A new route can lead onto a floor nothing else reaches: ground from now on.
 		worldMesh.admitTransportEnds(transports.all());
+		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		// A new route into an instance can mean a new room golems may stand in.
 		instanceRoomTiles = instanceRooms();
@@ -509,6 +510,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// Floors reached only by transports the land fill never had. See WorldMesh.
 		worldMesh.admitTransportEnds(transports.all());
+		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		roamContext = new RoamContext(islandMemory, pathfinder, transports, abilities);
 		roamContext.setKnowledge(obstacleKnowledge);
@@ -1740,39 +1742,82 @@ public class GolemsDontDiePlugin extends Plugin
 		homeRegions = regions;
 	}
 
-	/** Golems whose space is checked for a way out this tick. See sendHomeIfSealedIn. */
+	/** Golems asked whether they are cut off this tick. See sendHomeIfCutOff. */
 	private static final int SWEEP_PER_TICK = 32;
 
 	/** Where the sweep has got to in the roster. */
 	private int sweptTo;
 
+	/** Golems seen and golems cut off, over the pass being made now. */
+	private int sweepSeen;
+	private int sweepCutOff;
+
 	/**
-	 * Brings a golem home from a place it could never leave.
+	 * What share of the roster the last full pass found cut off, or -1 before the first pass has
+	 * finished. Nothing is moved until a pass has been made, and nothing is moved at all while
+	 * that share is absurd.
+	 */
+	private float cutOffShare = -1;
+
+	/**
+	 * The share of golems that may be cut off before the answer is disbelieved rather than acted
+	 * on. Whether a space joins up with home rests on the transport tables and the docks, and a
+	 * missing piece can strand whole countries: measured against the shipped tables alone, with
+	 * no docks to sail between them, ninety-nine per cent of the world's standable ground came
+	 * out unreachable — Varrock and Falador included. A world that answers like that is a world
+	 * the plugin has misread, and emptying it into the plinth would be the worst of the two
+	 * mistakes. So the sweep counts first and moves nobody.
+	 */
+	private static final float MOST_CUT_OFF = 0.25f;
+
+	/** Set once the warning about an unbelievable world has been given. */
+	private boolean saidWorldUnreadable;
+
+	/**
+	 * Brings a golem home from ground that does not join up with home.
 	 *
 	 * <p>A golem only ever walks inside the space it is standing in — every other way of getting
-	 * anywhere is a transport or a crossing. So a space no transport and no dock touches is one
-	 * nothing could have walked out of, and a golem in one is there because something put it
-	 * there: an older rescue that reached across a channel, a route since withdrawn, a saved
-	 * position from a build that let it happen. It would wander that shore until the game shut.
+	 * anywhere is a transport or a crossing. So the spaces and the transports make a graph, and a
+	 * golem belongs in the part of it that can be reached from the plinth and walked back to it.
+	 * Ground outside that is a trap however much of it there is: no golem could have arrived
+	 * there, so one that is there was put there — by a rescue that reached across a channel, by a
+	 * route since withdrawn, by a saved position from a build that allowed it. Most of the world
+	 * is outside it, because the obstacles that would let a golem in have not been learned yet.
+	 * That is the same statement from the other side, and the same answer: a golem cannot be
+	 * somewhere it cannot get to.
 	 *
-	 * <p>Swept a few golems a tick rather than all of them every tick. Nothing about a sealed
-	 * space changes from one second to the next, and ten thousand golems would otherwise each ask
-	 * the mesh where they were, forever.
+	 * <p>Swept a few golems a tick rather than all of them every tick. Nothing about the shape of
+	 * the world changes from one second to the next, and ten thousand golems would otherwise each
+	 * ask the mesh where they were, forever.
 	 */
-	private void sweepForSealedIn()
+	private void sweepForCutOff()
 	{
 		int roster = golems.size();
 		for (int i = 0; i < Math.min(SWEEP_PER_TICK, roster); i++)
 		{
 			if (sweptTo >= roster)
 			{
+				// A pass finished: what it counted is what the next pass may act on.
 				sweptTo = 0;
+				if (sweepSeen > 0)
+				{
+					cutOffShare = sweepCutOff / (float) sweepSeen;
+					if (cutOffShare > MOST_CUT_OFF && !saidWorldUnreadable)
+					{
+						saidWorldUnreadable = true;
+						log.warn("{} of {} golems stand on ground that does not join up with home."
+							+ " The world has been misread; none will be moved.",
+							sweepCutOff, sweepSeen);
+					}
+				}
+				sweepSeen = 0;
+				sweepCutOff = 0;
 			}
-			sendHomeIfSealedIn(golems.get(sweptTo++));
+			sendHomeIfCutOff(golems.get(sweptTo++));
 		}
 	}
 
-	private void sendHomeIfSealedIn(Golem golem)
+	private void sendHomeIfCutOff(Golem golem)
 	{
 		if (golem.isDying() || golem.inTransition()
 			|| golem.isSailing(roamContext.getTick()) || golem.isInInstance())
@@ -1781,15 +1826,29 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		int x = golem.getFineX() / Golem.TILE;
 		int y = golem.getFineY() / Golem.TILE;
-		if (!worldMesh.isSealed(x, y, golem.getPlane()))
+		// A pocket too small to wander with nothing leading in or out is a trap on the geometry
+		// alone, and is acted on whatever the wider question has answered. A stepping stone is the
+		// exception it always is: a golem between hops stands on one legitimately.
+		boolean pocket = worldMesh.isSealedPocket(x, y, golem.getPlane()) && !transports.hasOrigin(x, y);
+
+		sweepSeen++;
+		boolean cutOff = worldMesh.isCutOff(x, y, golem.getPlane());
+		sweepCutOff += cutOff ? 1 : 0;
+
+		// Cut off is counted before it is believed: not acted on until a whole pass has been made,
+		// and not while that pass says most of the world is unreachable, which means the tables are
+		// missing rather than the golems are lost.
+		boolean believable = cutOffShare >= 0 && cutOffShare <= MOST_CUT_OFF;
+		if (!pocket && !(cutOff && believable))
 		{
 			return;
 		}
 
 		WorldPoint at = golem.currentTile();
 		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
-		log.debug("Golem {} was sealed in at {}; brought home", golem.getId(), at);
-		noteRescue(golem, at, plinth, "sealed in");
+		log.debug("Golem {} was {} at {}; brought home", golem.getId(),
+			pocket ? "shut in a pocket" : "cut off", at);
+		noteRescue(golem, at, plinth, pocket ? "pocket" : "cut off");
 		golem.relocate(plinth);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
@@ -2466,8 +2525,8 @@ public class GolemsDontDiePlugin extends Plugin
 			obstacleData.save();
 		}
 
-		// A few golems a tick, asked whether the ground they are on goes anywhere.
-		sweepForSealedIn();
+		// A few golems a tick, asked whether the ground they are on joins up with home.
+		sweepForCutOff();
 
 		// Every tick, so a golem keeps up with the map as it is panned. Closed, this is one widget
 		// lookup and nothing else.
