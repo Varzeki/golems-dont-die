@@ -25,12 +25,12 @@ class GolemStore
 
 	/**
 	 * Ten numbers plus the nickname. The rest are optional: whether the golem is in an instance,
-	 * when it may next sail, its seed, and the seven of its history.
+	 * when it may next sail, its seed, and the six of its history.
 	 */
 	private static final int FIELD_COUNT = 11;
 
 	/** How many optional fields may follow the eleven. */
-	private static final int OPTIONAL_FIELDS = 10;
+	private static final int OPTIONAL_FIELDS = 9;
 
 	/** Where the history starts among the optional fields. */
 	private static final int HISTORY_AT = FIELD_COUNT + 3;
@@ -68,7 +68,6 @@ class GolemStore
 		int walked;
 		int furthestX;
 		int furthestY;
-		int floors;
 	}
 
 	/** Encodes a live roster for the config store. */
@@ -108,8 +107,7 @@ class GolemStore
 				.append(FIELD_SEPARATOR).append(history.getVoyages())
 				.append(FIELD_SEPARATOR).append(history.getWalked())
 				.append(FIELD_SEPARATOR).append(history.getFurthestX())
-				.append(FIELD_SEPARATOR).append(history.getFurthestY())
-				.append(FIELD_SEPARATOR).append(history.getFloors());
+				.append(FIELD_SEPARATOR).append(history.getFurthestY());
 		}
 		return out.toString();
 	}
@@ -154,7 +152,7 @@ class GolemStore
 				saved.inInstance = fields.length > FIELD_COUNT && "1".equals(fields[FIELD_COUNT].trim());
 				saved.shoreLeaveUntil = fields.length > FIELD_COUNT + 1 ? Long.parseLong(fields[FIELD_COUNT + 1].trim()) : 0;
 				saved.seed = fields.length > FIELD_COUNT + 2 ? Long.parseLong(fields[FIELD_COUNT + 2].trim()) : 0;
-				if (fields.length >= HISTORY_AT + 7)
+				if (fields.length >= HISTORY_AT + 6)
 				{
 					saved.firstSeen = Long.parseLong(fields[HISTORY_AT].trim());
 					saved.transports = Integer.parseInt(fields[HISTORY_AT + 1].trim());
@@ -162,7 +160,6 @@ class GolemStore
 					saved.walked = Integer.parseInt(fields[HISTORY_AT + 3].trim());
 					saved.furthestX = Integer.parseInt(fields[HISTORY_AT + 4].trim());
 					saved.furthestY = Integer.parseInt(fields[HISTORY_AT + 5].trim());
-					saved.floors = Integer.parseInt(fields[HISTORY_AT + 6].trim());
 				}
 				result.add(saved);
 			}
@@ -207,7 +204,7 @@ class GolemStore
 		if (saved.firstSeen != 0)
 		{
 			golem.getHistory().restore(saved.firstSeen, saved.transports, saved.voyages, saved.walked,
-				saved.furthestX, saved.furthestY, saved.floors, home);
+				saved.furthestX, saved.furthestY, home);
 		}
 		golem.setInInstance(saved.inInstance);
 		golem.setShoreLeaveUntil(saved.shoreLeaveUntil);

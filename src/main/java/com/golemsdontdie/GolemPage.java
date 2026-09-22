@@ -234,7 +234,7 @@ class GolemPage
 
 		if (history.getFirstSeen() > 0)
 		{
-			line(record, "Known since " + DAY.format(new java.util.Date(history.getFirstSeen())));
+			line(record, "Crafted on " + DAY.format(new java.util.Date(history.getFirstSeen())));
 		}
 		line(record, "Walked about " + NUMBERS.format(history.getWalked()) + " tiles");
 		line(record, history.getTransports() == 1 ? "Used one shortcut"
@@ -248,15 +248,6 @@ class GolemPage
 		{
 			String where = furthest == null ? "" : " — " + furthest;
 			line(record, "Been " + NUMBERS.format(history.getFurthest()) + " tiles from home" + where);
-		}
-		if (history.hasBeenUnderground())
-		{
-			line(record, "Been underground");
-		}
-		if (history.getHighestFloor() > 0)
-		{
-			line(record, "Been up " + (history.getHighestFloor() == 1 ? "one floor"
-				: history.getHighestFloor() + " floors"));
 		}
 		record.revalidate();
 		record.repaint();

@@ -45,8 +45,9 @@ class GolemPortrait
 	 * The poses a golem may be caught in, one frame of each: standing mostly, since a portrait is
 	 * a golem stood for its portrait, and now and then mid-stride, arms out, or one hand raised.
 	 *
-	 * <p>Picked from what the golem already plays in the world. Two more were tried and left out:
-	 * squeezing through a gap leans the whole model at the viewer, and a climb turns its head away.
+	 * <p>Picked from what the golem already plays in the world. Others were tried and left out:
+	 * squeezing through a gap leans the whole model at the viewer, a climb turns its head away, and
+	 * the beam-walking poses hold both arms straight out, which a picture cut at the waist loses.
 	 * The listing is the weighting — a pose named twice comes up twice as often.
 	 */
 	private static final int[] POSES = {
@@ -57,8 +58,6 @@ class GolemPortrait
 		GolemContent.GOLEM_WALK_ANIMATION,
 		GolemContent.GOLEM_WALK_ANIMATION,
 		GolemContent.ANIM_LADDER_GRAB,
-		GolemContent.ANIM_BALANCE_WALK,
-		GolemContent.ANIM_TIGHTROPE,
 		GolemContent.ANIM_JUMP_STEPPINGSTONE,
 	};
 
@@ -72,8 +71,14 @@ class GolemPortrait
 	private static final float NEAREST = 1f;
 	private static final float FURTHEST = 0.86f;
 
-	/** Room left around the figure, in pixels, so nothing touches the frame. */
+	/** Room left around the golem, in pixels, so nothing touches the frame. */
 	private static final int MARGIN = 10;
+
+	/**
+	 * How much of the golem the picture holds, from the top down: head, shoulders and chest, cut
+	 * somewhere around the waist, as a portrait is.
+	 */
+	private static final float SHOWN = 0.52f;
 
 	/** Gamma the client's own colour palette is built with, and so this one. */
 	private static final double BRIGHTNESS = 0.8;
@@ -142,9 +147,9 @@ class GolemPortrait
 	}
 
 	/**
-	 * @param standing the same golem unposed, which sets the size it is drawn at: sized by the pose
-	 *                 instead, a golem with its arms out came out smaller than its neighbour and a
-	 *                 golem leaning at the viewer filled the frame.
+	 * @param standing the same golem unposed, which sets both the size it is drawn at and where the
+	 *                 picture is cut. Framed on the pose instead, a golem with a hand raised came
+	 *                 out smaller and lower than the one beside it.
 	 */
 	private static BufferedImage draw(Model model, Model standing, double turn, double lean, float zoom)
 	{
@@ -182,15 +187,12 @@ class GolemPortrait
 			bottom = Math.max(bottom, y[v]);
 		}
 
-		// Fitted to the frame, the same scale both ways so nothing is stretched.
-		float wide = Math.max(1f, rightmost - leftmost);
-		float tall = Math.max(1f, bottom - top);
-		// The pose may shrink the figure a little where it needs the room, but never enlarge it.
-		float resting = zoom * fit(standing);
-		float scale = Math.max(resting * CROWDED,
-			Math.min(resting, zoom * Math.min((WIDTH - 2f * MARGIN) / wide, (HEIGHT - 2f * MARGIN) / tall)));
-		float offsetX = WIDTH / 2f - (leftmost + rightmost) / 2f * scale;
-		float offsetY = HEIGHT / 2f - (top + bottom) / 2f * scale;
+		// Framed on the golem standing: its top half, at the size that fills the frame. Whatever
+		// the pose puts outside that — a raised hand, the legs below the cut — falls off the edge.
+		float[] framing = framing(standing);
+		float scale = zoom * framing[0];
+		float offsetX = WIDTH / 2f;
+		float offsetY = HEIGHT / 2f - framing[1] * scale;
 
 		BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = image.createGraphics();
@@ -257,36 +259,46 @@ class GolemPortrait
 		return image;
 	}
 
-	/** The smallest a pose that needs the room may be drawn, against the same golem standing. */
-	private static final float CROWDED = 0.8f;
-
-	/** The scale a golem is drawn at standing, which is the size every pose is framed against. */
-	private static float fit(Model standing)
+	/**
+	 * How the picture is framed on a golem standing: the scale to draw it at, and the height in the
+	 * model to put in the middle of the frame.
+	 *
+	 * <p>Only the top {@link #SHOWN} of it is considered, which is what makes this a portrait and
+	 * not a figure. Width is measured at any angle rather than as the model happens to face, so
+	 * turning a golem does not change its size.
+	 */
+	private static float[] framing(Model standing)
 	{
 		float[] modelX = standing.getVerticesX();
 		float[] modelY = standing.getVerticesY();
 		float[] modelZ = standing.getVerticesZ();
-		float wide = 1f;
-		float tall = 1f;
-		if (modelX != null && modelY != null && modelZ != null)
+		if (modelX == null || modelY == null || modelZ == null)
 		{
-			float leftmost = Float.MAX_VALUE;
-			float rightmost = -Float.MAX_VALUE;
-			float top = Float.MAX_VALUE;
-			float bottom = -Float.MAX_VALUE;
-			for (int v = 0; v < standing.getVerticesCount(); v++)
-			{
-				// Across at any angle, so that turning a golem does not change its size.
-				float across = (float) Math.hypot(modelX[v], modelZ[v]);
-				leftmost = Math.min(leftmost, -across);
-				rightmost = Math.max(rightmost, across);
-				top = Math.min(top, modelY[v]);
-				bottom = Math.max(bottom, modelY[v]);
-			}
-			wide = Math.max(1f, rightmost - leftmost);
-			tall = Math.max(1f, bottom - top);
+			return new float[]{1f, 0f};
 		}
-		return Math.min((WIDTH - 2f * MARGIN) / wide, (HEIGHT - 2f * MARGIN) / tall);
+		int count = standing.getVerticesCount();
+		float top = Float.MAX_VALUE;
+		float bottom = -Float.MAX_VALUE;
+		for (int v = 0; v < count; v++)
+		{
+			top = Math.min(top, modelY[v]);
+			bottom = Math.max(bottom, modelY[v]);
+		}
+		float cut = top + (bottom - top) * SHOWN;
+
+		float across = 1f;
+		for (int v = 0; v < count; v++)
+		{
+			if (modelY[v] <= cut)
+			{
+				across = Math.max(across, (float) Math.hypot(modelX[v], modelZ[v]));
+			}
+		}
+		float tall = Math.max(1f, cut - top);
+		return new float[]{
+			Math.min((WIDTH - 2f * MARGIN) / (2f * across), (HEIGHT - 2f * MARGIN) / tall),
+			(top + cut) / 2f,
+		};
 	}
 
 	/** Behind the golem: dark above, and the ground it stands on catching a little light. */

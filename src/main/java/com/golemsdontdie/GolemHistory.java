@@ -17,12 +17,6 @@ class GolemHistory
 	/** Tiles between two samples beyond which the golem cannot have walked there. */
 	private static final int WALKED_AT_MOST = 24;
 
-	/** Coordinates this far north are underground. */
-	private static final int UNDERGROUND = 4160;
-
-	/** The bit in {@link #floors} that means the golem has been below ground. */
-	private static final int UNDER = 1 << 2;
-
 	/** When the golem was first known, in epoch milliseconds; 0 if it was made before this was kept. */
 	@Getter
 	private long firstSeen;
@@ -46,10 +40,6 @@ class GolemHistory
 	@Getter
 	private int furthest;
 
-	/** The highest floor reached, in the low two bits, and {@link #UNDER} if it has been below. */
-	@Getter
-	private int floors;
-
 	/** Where the golem was at the last sample; 0 before the first. */
 	private int lastX;
 	private int lastY;
@@ -61,7 +51,7 @@ class GolemHistory
 
 	/** Puts back what was saved. The furthest distance is worked out again from home. */
 	void restore(long firstSeen, int transports, int voyages, int walked, int furthestX, int furthestY,
-		int floors, WorldPoint home)
+		WorldPoint home)
 	{
 		this.firstSeen = firstSeen;
 		this.transports = transports;
@@ -69,7 +59,6 @@ class GolemHistory
 		this.walked = walked;
 		this.furthestX = furthestX;
 		this.furthestY = furthestY;
-		this.floors = floors;
 		this.furthest = furthestX == 0 && furthestY == 0 ? 0 : away(furthestX, furthestY, home);
 	}
 
@@ -87,7 +76,7 @@ class GolemHistory
 	 * Notes where the golem is now. Called for every golem on the census pass, so it is a handful
 	 * of comparisons and nothing else.
 	 */
-	void sample(int x, int y, int plane, WorldPoint home)
+	void sample(int x, int y, WorldPoint home)
 	{
 		if (lastX != 0)
 		{
@@ -100,15 +89,6 @@ class GolemHistory
 		lastX = x;
 		lastY = y;
 
-		if (plane > (floors & 3))
-		{
-			floors = (floors & ~3) | plane;
-		}
-		if (y >= UNDERGROUND)
-		{
-			floors |= UNDER;
-		}
-
 		int away = away(x, y, home);
 		if (away > furthest)
 		{
@@ -116,17 +96,6 @@ class GolemHistory
 			furthestX = x;
 			furthestY = y;
 		}
-	}
-
-	/** The highest floor the golem has been up to, 0 for ground level. */
-	int getHighestFloor()
-	{
-		return floors & 3;
-	}
-
-	boolean hasBeenUnderground()
-	{
-		return (floors & UNDER) != 0;
 	}
 
 	private static int away(int x, int y, WorldPoint home)

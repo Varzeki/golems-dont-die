@@ -2174,7 +2174,7 @@ public class GolemsDontDiePlugin extends Plugin
 			for (Golem golem : golems)
 			{
 				WorldPoint at = golem.currentTile();
-				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome());
+				golem.getHistory().sample(at.getX(), at.getY(), golem.getHome());
 			}
 		}
 

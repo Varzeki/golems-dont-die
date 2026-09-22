@@ -68,7 +68,7 @@ public class PageProbe
 
 		// A record to look at, since nothing here plays the game.
 		golem.getHistory().restore(System.currentTimeMillis() - 86400000L * 96, 1483, 37, 214_500,
-			2412, 3812, 2 | 4, new WorldPoint(2596, 2256, 0));
+			2412, 3812, new WorldPoint(2596, 2256, 0));
 
 		java.awt.image.BufferedImage picture = standIn();
 		GolemPage page = new GolemPage(g -> System.out.println("find " + g.getNickname()));

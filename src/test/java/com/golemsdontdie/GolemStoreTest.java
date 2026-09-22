@@ -81,8 +81,8 @@ public class GolemStoreTest
 		golem.getHistory().tookTransport();
 		golem.getHistory().sailed();
 		// Two samples: the first only says where it is, the second is the ground between them.
-		golem.getHistory().sample(2596, 2256, 0, PLINTH);
-		golem.getHistory().sample(2600, 2256, 2, PLINTH);
+		golem.getHistory().sample(2596, 2256, PLINTH);
+		golem.getHistory().sample(2600, 2256, PLINTH);
 
 		GolemStore.SavedGolem saved = store.deserialise(store.serialise(
 			java.util.Collections.singletonList(golem))).get(0);
@@ -91,7 +91,6 @@ public class GolemStoreTest
 		assertEquals(1, saved.voyages);
 		assertEquals(4, saved.walked);
 		assertEquals(2600, saved.furthestX);
-		assertEquals(2, saved.floors & 3);
 		assertEquals(golem.getHistory().getFirstSeen(), saved.firstSeen);
 	}
 }
