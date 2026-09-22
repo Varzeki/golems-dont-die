@@ -123,7 +123,7 @@ class GolemMapPoints
 	@Inject
 	private Whereabouts whereabouts;
 
-	/** Read only to tell sea from land, for the fold above. */
+	/** Read only to tell sea from land, when a dungeon is folded onto the surface map. */
 	@Inject
 	private WorldMesh mesh;
 

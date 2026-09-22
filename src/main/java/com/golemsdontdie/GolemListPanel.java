@@ -542,6 +542,10 @@ class GolemListPanel extends PluginPanel
 			try
 			{
 				row.name.setText(name);
+				// A field longer than the box scrolls to wherever the caret is, and setText leaves
+				// it at the end: a golem called something long showed the last of its name with the
+				// first of it off the left edge. Wound back so a name reads from its beginning.
+				row.name.setCaretPosition(0);
 			}
 			finally
 			{
@@ -598,6 +602,10 @@ class GolemListPanel extends PluginPanel
 		JTextField name = new PlaceholderField(golem.getNickname(),
 			suggested == null ? "Unnamed Golem" : suggested);
 		name.setMinimumSize(SQUEEZED);
+		// A field holding more than it can show scrolls to the caret, and a fresh one leaves that
+		// at the end: a golem with a long name showed the last of it with the first off the left
+		// edge. The row is built with the name already in it, so this is where it is wound back.
+		name.setCaretPosition(0);
 		Row[] self = new Row[1];
 		name.setToolTipText("Name this golem");
 		name.getDocument().addDocumentListener(new DocumentListener()
