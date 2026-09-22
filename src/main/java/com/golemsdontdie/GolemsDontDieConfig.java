@@ -121,6 +121,19 @@ public interface GolemsDontDieConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+		keyName = "showSidebar",
+		name = "Enable sidebar",
+		description = "Shows the Golems tab. With it off, missing golems can still be revived by "
+			+ "shift right-clicking a golem plinth on Wyrmscraig.",
+		section = golemsSection,
+		position = 6
+	)
+	default boolean showSidebar()
+	{
+		return true;
+	}
+
 	@ConfigSection(
 		name = "Celebrations",
 		description = "Golems stop what they are doing and dance when something goes well",

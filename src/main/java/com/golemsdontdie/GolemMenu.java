@@ -103,6 +103,21 @@ class GolemMenu
 		}
 	}
 
+	/**
+	 * Adds the plinth's revive entry, above Cancel as the golems' own entries are.
+	 *
+	 * <p>Shown on a golem plinth with shift held, and only while golems are missing: the count is
+	 * in the option so a player knows what they are asking for before they ask.
+	 */
+	void addReviveEntry(int missing, String target, Runnable revive)
+	{
+		client.getMenu().createMenuEntry(1)
+			.setOption("Revive missing golems (" + missing + ")")
+			.setTarget(target == null ? "" : target)
+			.setType(MenuAction.RUNELITE)
+			.onClick(e -> revive.run());
+	}
+
 	/** Opens the chatbox prompt for a golem's name. Left empty, the golem is "Golem" again. */
 	private void askForName(Golem golem)
 	{

@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.KeyCode;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
 import net.runelite.api.NPC;
@@ -29,6 +31,7 @@ import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.StatChanged;
@@ -569,7 +572,7 @@ public class GolemsDontDiePlugin extends Plugin
 			.priority(7)
 			.panel(panel)
 			.build();
-		clientToolbar.addNavigation(navButton);
+		showSidebar(config.showSidebar());
 		overlayManager.add(minimapOverlay);
 		overlayManager.add(obstacleHighlightOverlay);
 		overlayManager.add(nameplateOverlay);
@@ -647,7 +650,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (navButton != null)
 		{
-			clientToolbar.removeNavigation(navButton);
+			showSidebar(false);
 			navButton = null;
 		}
 		if (page != null)
@@ -2193,6 +2196,59 @@ public class GolemsDontDiePlugin extends Plugin
 	 * clip it plays, and how long it takes, is server-side and in no cache, so the only way to
 	 * know is to use one and watch. Remove this and its two siblings before release.
 	 */
+	/**
+	 * Puts the Golems tab in the sidebar, or takes it away.
+	 *
+	 * <p>The panel itself is built either way and keeps its state: the tab is a way in, not the
+	 * roster. Off, the plinth's own menu is how missing golems are revived; see GolemMenu.
+	 */
+	private void showSidebar(boolean shown)
+	{
+		if (navButton == null)
+		{
+			return;
+		}
+		if (shown && !sidebarShown)
+		{
+			clientToolbar.addNavigation(navButton);
+		}
+		else if (!shown && sidebarShown)
+		{
+			clientToolbar.removeNavigation(navButton);
+		}
+		sidebarShown = shown;
+	}
+
+	/** Whether the tab is in the sidebar, so it is neither added twice nor removed twice. */
+	private boolean sidebarShown;
+
+	/**
+	 * Offers to revive missing golems from the plinth they were carved on, for a player with the
+	 * sidebar off — and for anyone standing at the plinth, which is where it would occur to them.
+	 */
+	@Subscribe
+	public void onMenuOpened(MenuOpened event)
+	{
+		if (!running || !client.isKeyPressed(KeyCode.KC_SHIFT))
+		{
+			return;
+		}
+		int missing = tally.getTotal() - countLiving();
+		if (missing <= 0)
+		{
+			return;
+		}
+		for (MenuEntry entry : event.getMenuEntries())
+		{
+			if (GolemContent.isPlinth(entry.getIdentifier()))
+			{
+				// Named as the plinth the player is pointing at, which is one of six carvings.
+				menu.addReviveEntry(missing, entry.getTarget(), this::reviveMissing);
+				return;
+			}
+		}
+	}
+
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
@@ -2421,6 +2477,11 @@ public class GolemsDontDiePlugin extends Plugin
 		if (!GolemsDontDieConfig.GROUP.equals(event.getGroup()))
 		{
 			return;
+		}
+
+		if ("showSidebar".equals(event.getKey()))
+		{
+			showSidebar(config.showSidebar());
 		}
 
 		if ("maxGolems".equals(event.getKey()) || "limitGolems".equals(event.getKey()))

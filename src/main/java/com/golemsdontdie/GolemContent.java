@@ -86,6 +86,30 @@ final class GolemContent
 	static final int PLINTH_Y = 2256;
 
 	/**
+	 * The two plinths a golem is carved on, and the six states each one shows: Empty plinth,
+	 * Golem base, three Unfinished golems and an Unpowered golem.
+	 *
+	 * <p>The scene holds the two stations, 62351 and 62352, and the client swaps in whichever
+	 * state the carving varbit says — which is why a menu has to know all eight. Found by asking
+	 * the cache which objects the carving halves of {@link #GOLEM_COUNT_VARP} drive; see
+	 * {@code dev-tools/AnimationCheck} for the same kind of question asked of animations.
+	 */
+	private static final int[] PLINTHS = {62351, 62352, 62353, 62354, 62355, 62356, 62357, 62358};
+
+	/** Whether an object is one of the carving plinths, whatever state it is showing. */
+	static boolean isPlinth(int objectId)
+	{
+		for (int plinth : PLINTHS)
+		{
+			if (plinth == objectId)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * The regions the bundled island map covers: (39..41, 34..36) around the site.
 	 *
 	 * <p>From the Shortest Path world collision map (cache-generated, with XTEA keys this machine
