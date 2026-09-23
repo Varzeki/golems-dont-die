@@ -73,7 +73,22 @@ public class PageProbe
 		java.awt.image.BufferedImage picture = standIn();
 		GolemNames names = new GolemNames();
 		names.load();
-		GolemPage page = new GolemPage(g -> System.out.println("find " + g.getNickname()), names);
+		PlaceNames places = new PlaceNames();
+		places.load();
+
+		// A few journeys to read back, walked through the census the way the plugin does: the
+		// journal is written by arriving somewhere, so arriving is what the probe has to do.
+		int[][] been = {
+			{2596, 2256, 0}, {2660, 2256, 0}, {2816, 3264, 0}, {2848, 3424, 0},
+			{2884, 9798, 0}, {2884, 9860, 0}, {3222, 3218, 0}, {3290, 3290, 0},
+			{2440, 3096, 0}, {2528, 3096, 0},
+		};
+		for (int[] at : been)
+		{
+			golem.getHistory().sample(at[0], at[1], at[2], new WorldPoint(2596, 2256, 0));
+		}
+
+		GolemPage page = new GolemPage(g -> System.out.println("find " + g.getNickname()), names, places);
 		SwingUtilities.invokeAndWait(() ->
 		{
 			page.show(golem, null);
@@ -82,6 +97,21 @@ public class PageProbe
 			// The real picture is drawn from the golem's model, which needs a running client; this
 			// is a stand-in of the same size, to see the frame it hangs in.
 			page.showPicture(golem, picture);
+			// -Dtab=journal to look at the other one. Reached by reflection rather than by an
+			// opener on the page itself: nothing in the client needs one.
+			if ("journal".equals(System.getProperty("tab")))
+			{
+				try
+				{
+					java.lang.reflect.Field field = GolemPage.class.getDeclaredField("tabs");
+					field.setAccessible(true);
+					((javax.swing.JTabbedPane) field.get(page)).setSelectedIndex(1);
+				}
+				catch (ReflectiveOperationException e)
+				{
+					System.out.println("no tabs: " + e);
+				}
+			}
 		});
 		// Painted after the window is up, so the look and feel has done its work.
 		Thread.sleep(500);

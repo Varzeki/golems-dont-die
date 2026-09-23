@@ -81,8 +81,8 @@ public class GolemStoreTest
 		golem.getHistory().tookTransport();
 		golem.getHistory().sailed();
 		// Two samples: the first only says where it is, the second is the ground between them.
-		golem.getHistory().sample(2596, 2256, PLINTH);
-		golem.getHistory().sample(2600, 2256, PLINTH);
+		golem.getHistory().sample(2596, 2256, 0, PLINTH);
+		golem.getHistory().sample(2600, 2256, 0, PLINTH);
 
 		GolemStore.SavedGolem saved = store.deserialise(store.serialise(
 			java.util.Collections.singletonList(golem))).get(0);

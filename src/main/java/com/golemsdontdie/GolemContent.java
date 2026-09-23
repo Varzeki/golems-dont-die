@@ -284,6 +284,25 @@ final class GolemContent
 	static final int ANIM_EMOTE_WAVE = 863;
 
 	/**
+	 * The emote tab's own animations, which a golem may copy off the player.
+	 *
+	 * <p>Two runs of ids, and every one of them checked with {@code dev-tools/AnimationCheck}:
+	 * all are framemap 0, the human rig the golem is built on, so they play against it untouched.
+	 * Anything outside these runs is left alone — a combat or skilling clip on the wrong framemap
+	 * folds a golem through itself rather than looking merely wrong.
+	 */
+	private static final int EMOTES_FROM = 855;
+	private static final int EMOTES_TO = 868;
+	private static final int LATER_EMOTES_FROM = 2105;
+	private static final int LATER_EMOTES_TO = 2113;
+
+	static boolean isEmote(int animation)
+	{
+		return animation >= EMOTES_FROM && animation <= EMOTES_TO
+			|| animation >= LATER_EMOTES_FROM && animation <= LATER_EMOTES_TO;
+	}
+
+	/**
 	 * The fireworks that go off over a levelling player, drawn over a dancing golem instead.
 	 *
 	 * <p>Spot animation 199, which the client plays on an actor: golems are not actors, so its

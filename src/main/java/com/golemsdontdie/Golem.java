@@ -618,7 +618,7 @@ class Golem
 			if (itinerary != null && itinerary.isFinished(context.getTick()) && itinerary.transport() != null)
 			{
 				noteInstance(itinerary.transport());
-				history.tookTransport();
+				history.tookTransport(itinerary.transport());
 			}
 			WorldPoint resolved = itinerary != null
 				? itinerary.positionAt(context.getTick())
@@ -687,6 +687,7 @@ class Golem
 				// on the sea with nowhere to walk, so it is put ashore.
 			if (wasVoyage)
 			{
+				history.cameAshore();
 				transportMemory.beginShoreLeaveOnArrival(tick, tick, random);
 				RoamPlanner planner = context.getPlanner();
 				if (planner != null)
@@ -731,7 +732,7 @@ class Golem
 		if (itinerary != null && itinerary.transport() != null)
 		{
 			noteInstance(itinerary.transport());
-			history.tookTransport();
+			history.tookTransport(itinerary.transport());
 		}
 		WorldPoint at = itinerary == null ? currentTile() : itinerary.destination();
 		this.fineX = at.getX() * TILE + TILE / 2;
@@ -1520,7 +1521,7 @@ class Golem
 			lastHopTick = context.getTick();
 		}
 		transportMemory.used(transport, context.getTick(), cooldownFor(transport, context));
-		history.tookTransport();
+		history.tookTransport(transport);
 		// On landing, not now: a golem climbing into the pew is still in the cathedral.
 		landingInstance = transport.entersInstance() ? 1 : transport.leavesInstance() ? 0 : -1;
 
@@ -2136,10 +2137,36 @@ class Golem
 	 */
 	void greet(int untilTick, int dx, int dy)
 	{
+		attend(untilTick, dx, dy, GolemContent.ANIM_EMOTE_WAVE);
+	}
+
+	/** Stops and looks at something, playing nothing: a golem that finds the player interesting. */
+	void watch(int untilTick, int dx, int dy)
+	{
+		attend(untilTick, dx, dy, -1);
+	}
+
+	/** Stops, looks, and copies what it saw. The animation is the player's own. */
+	void mimic(int untilTick, int dx, int dy, int animation)
+	{
+		attend(untilTick, dx, dy, animation);
+	}
+
+	/**
+	 * Turns to face something and holds there, playing a clip or nothing at all.
+	 *
+	 * @param animation what to play while it does, or -1 to stand and look
+	 */
+	private void attend(int untilTick, int dx, int dy, int animation)
+	{
 		greetUntil = untilTick;
+		greetAnimation = animation;
 		// headingFor, because an orientation worked out by hand faced the golem the other way.
 		targetOrientation = headingFor(dx, dy);
 	}
+
+	/** What the golem plays while it is attending to something; -1 to stand and look. */
+	private int greetAnimation = GolemContent.ANIM_EMOTE_WAVE;
 
 	boolean isGreeting(int tick)
 	{
@@ -2197,11 +2224,12 @@ class Golem
 		{
 			return walking ? gaitWalk : gaitIdle;
 		}
-		// A wave at the player, which stops for nothing except the things above: a golem halfway
-		// up a ladder has its hands full.
-		if (!walking && greetUntil > 0 && tickNow < greetUntil)
+		// Attending to the player — a wave, a copied emote, or simply looking — which stops for
+		// nothing except the things above: a golem halfway up a ladder has its hands full. A
+		// golem that is only watching plays nothing and falls through to standing still.
+		if (!walking && greetUntil > 0 && tickNow < greetUntil && greetAnimation != -1)
 		{
-			return GolemContent.ANIM_EMOTE_WAVE;
+			return greetAnimation;
 		}
 		// Last of all, and never over anything else: a golem climbing, crossing or at the helm has
 		// a pose already, and one halfway through a recorded motion is having its frames set by

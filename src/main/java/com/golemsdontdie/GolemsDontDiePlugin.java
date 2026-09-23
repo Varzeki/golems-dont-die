@@ -564,7 +564,7 @@ public class GolemsDontDiePlugin extends Plugin
 				}
 			});
 		// Swing throughout, and it only reads the golem it is given: see GolemPage.
-		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), names);
+		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), names, placeNames);
 		menu.setOnInfo(golem ->
 		{
 			GolemPage open = page;
@@ -1400,6 +1400,10 @@ public class GolemsDontDiePlugin extends Plugin
 		// and every few ticks rather than every one: the clip is about three ticks long.
 		boolean social = tick != lastSocialTick;
 		lastSocialTick = tick;
+		if (social)
+		{
+			noteEmote();
+		}
 		boolean celebrating = celebration.isDancing(tick);
 		int since = celebration.startedAt(tick);
 		boolean fireworksDue = celebrating && tick != lastFireworkTick && since % FIREWORK_EVERY == 0;
@@ -2115,6 +2119,32 @@ public class GolemsDontDiePlugin extends Plugin
 	private static final float PARTY_CHANCE = 0.02f;
 	private static final int PARTY_TICKS = 17;
 
+	/**
+	 * How many golems may be on screen before one stops finding the player worth looking at.
+	 *
+	 * <p>A golem alone in the world with a player in front of it has every reason to stare. One
+	 * of thirty at the plinth has seen you before, and thirty golems turning to watch at once is
+	 * a guard of honour rather than curiosity.
+	 */
+	private static final int WATCHING_CROWD = 5;
+
+	/** How near the player a golem watches from, the chance it does, and how long it looks. */
+	private static final int WATCH_TILES = 12;
+	private static final float WATCH_CHANCE = 0.01f;
+	private static final int WATCH_TICKS = 8;
+
+	/** The same for copying an emote, which is rarer to come by and likelier to be taken up. */
+	private static final int MIMIC_TILES = 8;
+	private static final float MIMIC_CHANCE = 0.5f;
+	private static final int MIMIC_TICKS = 7;
+
+	/**
+	 * The emote the player has just begun, or -1. Read once a tick and held until it changes, so
+	 * a four-second dance is one thing to copy rather than seven.
+	 */
+	private int playerEmote = -1;
+	private int lastPlayerAnimation = -1;
+
 	/** How near the player a friendly golem waves, the chance it does, and how long a wave takes. */
 	private static final int GREET_TILES = 6;
 	private static final float GREET_CHANCE = 0.05f;
@@ -2207,6 +2237,20 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
+	 * Watches what the player is doing, so golems can copy it.
+	 *
+	 * <p>Only the emote tab's own clips, and only the moment one begins: an emote held for four
+	 * seconds is one thing to copy, and a combat or skilling animation is not an emote at all.
+	 */
+	private void noteEmote()
+	{
+		Player me = client.getLocalPlayer();
+		int animation = me == null ? -1 : me.getAnimation();
+		playerEmote = animation != lastPlayerAnimation && GolemContent.isEmote(animation) ? animation : -1;
+		lastPlayerAnimation = animation;
+	}
+
+	/**
 	 * What a golem does because of what it is like: the life of the party dances when there is a
 	 * crowd to dance in, and a friendly golem waves at the player.
 	 *
@@ -2218,6 +2262,26 @@ public class GolemsDontDiePlugin extends Plugin
 		if (golem.isDancing() || golem.isGreeting(tick) || golem.isDying())
 		{
 			return;
+		}
+
+		// Curiosity, which is about the player being a rarity rather than about the golem: one
+		// golem in an empty field stares, one of thirty at the plinth has seen you before.
+		if (playerAt != null && drawnGolems.size() <= WATCHING_CROWD)
+		{
+			WorldPoint at = golem.currentTile();
+			int away = at.getPlane() == playerAt.getPlane() ? at.distanceTo2D(playerAt) : Integer.MAX_VALUE;
+			int dx = playerAt.getX() - at.getX();
+			int dy = playerAt.getY() - at.getY();
+			if (playerEmote != -1 && away <= MIMIC_TILES && moods.nextFloat() < MIMIC_CHANCE)
+			{
+				golem.mimic(tick + MIMIC_TICKS, dx, dy, playerEmote);
+				return;
+			}
+			if (away <= WATCH_TILES && moods.nextFloat() < WATCH_CHANCE)
+			{
+				golem.watch(tick + WATCH_TICKS, dx, dy);
+				return;
+			}
 		}
 
 		if (playerAt != null && GolemTrait.FRIENDLY.in(golem.getTraits())
@@ -2621,7 +2685,7 @@ public class GolemsDontDiePlugin extends Plugin
 			for (Golem golem : golems)
 			{
 				WorldPoint at = golem.currentTile();
-				golem.getHistory().sample(at.getX(), at.getY(), golem.getHome());
+				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome());
 			}
 		}
 
