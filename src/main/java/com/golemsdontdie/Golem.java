@@ -471,7 +471,7 @@ class Golem
 	 * up around it. The crossing it had planned is given up — the crew's is planned when the crew
 	 * is, and a golem let go without one plans afresh — so the tally gives that one back too.
 	 */
-	void waitAshore(int tick, int ticks)
+	void waitAshore(int tick, int ticks, WorldPoint quayside)
 	{
 		if (itinerary != null && itinerary.isVoyage())
 		{
@@ -479,7 +479,18 @@ class Golem
 		}
 		path.clear();
 		walking = false;
-		itinerary = RoamPlanner.stayPut(currentTile(), tick, ticks);
+		relocate(quayside);
+		itinerary = RoamPlanner.stayPut(quayside, tick, ticks);
+	}
+
+	/**
+	 * Turns the golem to a heading at once, without turning through it: a golem on a boat is
+	 * carried round with the boat rather than steering itself.
+	 */
+	void faceAs(int heading)
+	{
+		orientation = heading & 2047;
+		targetOrientation = orientation;
 	}
 
 	/** Takes the crossing its crew has planned. Counted, as any other voyage is. */

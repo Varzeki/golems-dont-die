@@ -42,7 +42,7 @@ class FakeRaft extends RuneLiteObjectController
 	private int groundZ = Integer.MIN_VALUE;
 
 	FakeRaft(Client client, Model model, GolemModelFactory shared, int fineX, int fineY,
-		int orientation)
+		int orientation, int radius)
 	{
 		this.client = client;
 		this.model = model;
@@ -55,8 +55,9 @@ class FakeRaft extends RuneLiteObjectController
 		this.animation = new AnimationController(client, -1);
 
 		// A boat covers several tiles; ground under its footprint must draw first or the hull
-		// z-fights with the water.
-		setRadius(3 * 64);
+		// z-fights with the water. How many tiles is the boat's own business — see
+		// GolemBoat.drawRadius.
+		setRadius(radius);
 		setDrawFrontTilesFirst(true);
 		syncTransform();
 	}

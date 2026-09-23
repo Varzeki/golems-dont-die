@@ -113,6 +113,16 @@ enum GolemBoat
 		return new int[]{slot[0], helmOffset - slot[1]};
 	}
 
+	/**
+	 * How far the boat reaches from its middle, in model units, which is what the client culls and
+	 * sorts it by. Taken from the hull rather than assumed: a sloop is three times the raft's
+	 * length, and at the raft's radius most of it would be clipped away.
+	 */
+	int drawRadius()
+	{
+		return Math.max(Math.max(-hullMinX, hullMaxX), Math.max(-hullMinZ, hullMaxZ));
+	}
+
 	/** The smallest boat that carries this many golems; the raft for one. */
 	static GolemBoat forCrew(int golems)
 	{

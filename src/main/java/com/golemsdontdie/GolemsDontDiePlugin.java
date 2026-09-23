@@ -2009,7 +2009,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			raft = new FakeRaft(client, hull, modelFactory,
-				golem.getFineX(), golem.getFineY(), golem.getOrientation());
+				golem.getFineX(), golem.getFineY(), golem.getOrientation(), kind.drawRadius());
 			client.registerRuneLiteObject(raft);
 			rafts.put(golem, raft);
 		}

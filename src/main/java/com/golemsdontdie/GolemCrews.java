@@ -35,9 +35,6 @@ class GolemCrews
 	@Inject
 	private Voyage voyage;
 
-	@Inject
-	private SailingDocks docks;
-
 	/** Crews being made up, by the dock they are waiting at. */
 	private final Map<Integer, Muster> mustering = new HashMap<>();
 
@@ -86,6 +83,10 @@ class GolemCrews
 			{
 				land(golem);
 			}
+			else if (atSea && golem.isCrewed())
+			{
+				steer(golem);
+			}
 		}
 		sail(tick, context);
 		if (sailing.size() > golems.size())
@@ -123,18 +124,23 @@ class GolemCrews
 
 		WorldPoint at = golem.currentTile();
 		SailingDocks.Dock dock = voyage == null ? null : voyage.dockAt(at, QUAYSIDE);
-		if (dock == null)
+		if (dock == null || dock.getShore() == null)
 		{
 			return;
 		}
 
 		Muster muster = mustering.computeIfAbsent(dock.getRowId(), id -> new Muster(dock, tick));
-		if (muster.waiting.contains(golem))
+		// Already on the list and sailing again: its wait ran out, it planned afresh and cast off
+		// while the crew was still making up. Held again rather than left under way on a list it
+		// could be signed off, which would have carried it back to the dock it had left.
+		if (!muster.waiting.contains(golem))
 		{
-			return;
+			muster.waiting.add(golem);
 		}
-		muster.waiting.add(golem);
-		golem.waitAshore(tick, MUSTER_TICKS);
+		// Put back on the quayside rather than left where it stands. Crossings begin between game
+		// ticks and this runs on one, so by now the golem is a tile or two out on the water, and
+		// standing it there would leave it on the sea until the watchdog fetched it back.
+		golem.waitAshore(tick, MUSTER_TICKS, dock.getShore());
 		// The crossing it gave up booked shore leave for its whole length; without this the golem
 		// could not sail again for as long as the voyage it is not taking would have lasted.
 		golem.getTransportMemory().clearShoreLeave();
@@ -218,6 +224,25 @@ class GolemCrews
 		}
 		log.debug("{} golems crewed a {} from {}", made.size(), boat, muster.dock.getName());
 		return true;
+	}
+
+	/**
+	 * Keeps a crew facing as one.
+	 *
+	 * <p>A berth is measured from the boat and turned to wherever the boat is pointing, and the
+	 * only heading a golem has is its own. Left to themselves they each turn from whatever way
+	 * they happened to face at the dock, at their own rate, so for the first seconds of a crossing
+	 * the crew would be strewn around the boat rather than standing on it. The helm's heading is
+	 * every member's; which way each one looks from there is {@link Golem#drawOrientation}.
+	 */
+	private void steer(Golem golem)
+	{
+		GolemCrew crew = crews.get(golem);
+		Golem helm = crew == null ? null : crew.helm();
+		if (helm != null && helm != golem)
+		{
+			golem.faceAs(helm.getOrientation());
+		}
 	}
 
 	/** Puts a golem ashore, and its crew with it once the last of them has landed. */

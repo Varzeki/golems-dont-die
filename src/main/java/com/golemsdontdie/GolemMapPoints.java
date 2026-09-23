@@ -192,6 +192,9 @@ class GolemMapPoints
 		{
 			return;
 		}
+		// Kept before the list is narrowed: the measurement below is checked against the golems
+		// around the player, and while one golem is being looked for it is the only one left.
+		List<Golem> roster = golems;
 		if (only != null)
 		{
 			golems = java.util.Collections.singletonList(only);
@@ -245,7 +248,7 @@ class GolemMapPoints
 		}
 		if (!measured && sinceOpen <= MEASURE_FRAMES)
 		{
-			measure(centre, golems);
+			measure(centre, roster);
 		}
 
 		gather(golems, named, cellTiles, centre.getX() - halfWidth, centre.getX() + halfWidth,
