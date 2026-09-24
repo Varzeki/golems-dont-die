@@ -1,12 +1,5 @@
 package com.golemsdontdie;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
@@ -31,20 +24,11 @@ import net.runelite.api.events.MenuOptionClicked;
  * animation but not the person's, and of three open server reimplementations none is current
  * enough to trust. So it watches: every obstacle used becomes an {@link ObstacleSighting} for
  * {@link ObstacleKnowledge}, and two consistent sightings unlock it for golems permanently.
- *
- * <p>It always keeps a raw journal too, down to the player's position at 20ms resolution
- * during a traversal, because the correlation below must decide in the moment what belongs to
- * what whereas a journal can be re-read. Always on is affordable because the expensive rows
- * are tied to the rare event: per-tick rows are about 360KB an hour, the 20ms rows only
- * mid-traversal.
  */
 @Slf4j
 @Singleton
 class ObstacleObserver
 {
-	/** Bumped whenever a journal column changes, so an old file is never misparsed. */
-	private static final int SCHEMA = 1;
-
 	/**
 	 * Ticks after a click within which an animation is taken to belong to it. Generous because an
 	 * earlier three-tick window expired during the walk to the obstacle, easily ten seconds.
@@ -59,18 +43,6 @@ class ObstacleObserver
 	 * two a tick and a staircase several thousand, so the test is nowhere near the margin.
 	 */
 	private static final int TELEPORT_TILES = 3;
-
-	/** Client ticks of fine-grained journal recording after the last animation ends. */
-	private static final int TAIL_CYCLES = 100;
-
-	/**
-	 * Client ticks of position kept in hand before a traversal is recognised: the wind-up happens
-	 * before the animation event and cannot be recovered, so it is held continuously.
-	 */
-	private static final int LOOKBACK_CYCLES = 60;
-
-	/** Journals kept on disk. Older ones are deleted when a new session starts. */
-	private static final int JOURNALS_KEPT = 10;
 
 	@Inject
 	private Client client;
@@ -91,54 +63,6 @@ class ObstacleObserver
 	/** Whether to report the plugin's verdict on each obstacle clicked. */
 	@Setter
 	private boolean explaining;
-
-	/**
-	 * Whether to record what the golems are doing too: very loud, a row per visible golem per tick,
-	 * but both halves land in one file on one clock and can be held against each other.
-	 */
-	@Setter
-	private boolean loggingGolems;
-
-	boolean isLoggingGolems()
-	{
-		return loggingGolems && out != null;
-	}
-
-	/** One golem, as it is this tick. */
-	void writeGolem(String id, String state)
-	{
-		if (out == null)
-		{
-			return;
-		}
-		out.println(client.getGameCycle() + "	" + client.getTickCount() + "	GOLEM"
-			+ "	-1	-1	-1	-1	-1	-1	" + id + " " + state);
-	}
-
-	/**
-	 * One golem as it was drawn on one client frame, while it is mid-obstacle: at 600ms a door
-	 * crossed in one cycle and in three look identical. Written during transitions only.
-	 */
-	void writeGolemFrame(String id, String state)
-	{
-		if (out == null)
-		{
-			return;
-		}
-		out.println(client.getGameCycle() + "	" + client.getTickCount() + "	GOLEMFRAME"
-			+ "	-1	-1	-1	-1	-1	-1	" + id + " " + state);
-	}
-
-	/** Something a golem decided, and why. */
-	void writeGolemEvent(String id, String what)
-	{
-		if (out == null)
-		{
-			return;
-		}
-		out.println(client.getGameCycle() + "	" + client.getTickCount() + "	GOLEMACT"
-			+ "	-1	-1	-1	-1	-1	-1	" + id + " " + what);
-	}
 
 	/** Called when a sighting completes, so the plugin can persist and announce it. */
 	@Setter
@@ -220,99 +144,16 @@ class ObstacleObserver
 	private String silentName = "";
 	private String silentMenu = "";
 
-	// ------------------------------------------------------------------- journal
-
-	private PrintWriter out;
-	private File file;
-	private int fineRemaining;
-
-	/** The rolling lookback: cycle, localX, localY per entry, oldest overwritten. */
-	private final int[][] lookback = new int[LOOKBACK_CYCLES][3];
-	private int lookbackAt;
-	private int lookbackHeld;
-	private int lastPose = -2;
-	private int lastPlane = -2;
-
 	// ------------------------------------------------------------------ lifecycle
 
 	void startUp()
 	{
 		resetSession();
-		if (!DevOptions.JOURNAL)
-		{
-			return;
-		}
-		try
-		{
-			String stamp = LocalDateTime.now()
-				.format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-			file = new File(net.runelite.client.RuneLite.RUNELITE_DIR,
-				"golem-obstacles-" + stamp + ".tsv");
-			out = new PrintWriter(new BufferedWriter(new FileWriter(file)));
-
-			out.println("#schema\t" + SCHEMA);
-			out.println("#started\t" + LocalDateTime.now());
-			out.println("#cycle\ttick\ttype\tx\ty\tplane\tanim\tpose\torient\tdetail");
-			out.flush();
-
-			log.debug("Obstacle journal: {}", file.getAbsolutePath());
-			pruneOldJournals();
-		}
-		catch (IOException e)
-		{
-			// Disabled rather than throwing every tick for the rest of the session.
-			out = null;
-			log.error("Could not open the obstacle journal; journalling is off", e);
-		}
-	}
-
-	/**
-	 * Deletes all but the most recent journals: only files this class wrote, matched on its prefix
-	 * and suffix, in RuneLite's own folder. Their timestamps sort, so the newest are the last.
-	 */
-	private void pruneOldJournals()
-	{
-		try
-		{
-			File[] existing = net.runelite.client.RuneLite.RUNELITE_DIR
-				.listFiles((d, n) -> n.startsWith("golem-obstacles-") && n.endsWith(".tsv"));
-			if (existing == null || existing.length <= JOURNALS_KEPT)
-			{
-				return;
-			}
-
-			java.util.Arrays.sort(existing, java.util.Comparator.comparing(File::getName));
-			for (int i = 0; i < existing.length - JOURNALS_KEPT; i++)
-			{
-				if (!existing[i].delete())
-				{
-					log.debug("Could not delete old journal {}", existing[i]);
-				}
-			}
-		}
-		catch (RuntimeException e)
-		{
-			// Tidying is not worth failing a session over.
-			log.debug("Could not prune old journals", e);
-		}
 	}
 
 	void shutDown()
 	{
 		resetSession();
-		if (out != null)
-		{
-			write("SESSION", "end");
-			out.flush();
-			out.close();
-			out = null;
-			log.debug("Obstacle journal closed: {}", file);
-		}
-	}
-
-	String journalPath()
-	{
-		return file == null ? null : file.getAbsolutePath();
 	}
 
 	// --------------------------------------------------------------------- capture
@@ -326,15 +167,6 @@ class ObstacleObserver
 			return;
 		}
 
-		if (out != null)
-		{
-			write("CLICK", "id=" + event.getId()
-				+ " opcode=" + event.getMenuAction()
-				+ " param0=" + event.getParam0()
-				+ " param1=" + event.getParam1()
-				+ " option=\"" + option + "\""
-				+ " target=\"" + stripTags(event.getMenuTarget()) + "\"");
-		}
 
 		if (!isObjectAction(event.getMenuAction()))
 		{
@@ -362,10 +194,6 @@ class ObstacleObserver
 			queuedMenu = (option + " " + stripTags(event.getMenuTarget())).trim();
 			queuedName = objectName(queuedObject);
 			queuedTick = client.getTickCount();
-			if (out != null)
-			{
-				describeObject(queuedObject);
-			}
 			return;
 		}
 
@@ -395,10 +223,6 @@ class ObstacleObserver
 		clips.clear();
 		startedAt = null;
 
-		if (out != null)
-		{
-			describeObject(clickedObject);
-		}
 
 		if (explaining)
 		{
@@ -464,10 +288,6 @@ class ObstacleObserver
 		int playing = local.getAnimation();
 		int tick = client.getTickCount();
 
-		if (out != null)
-		{
-			write("ANIM", "anim=" + playing);
-		}
 
 		if (playing == -1 && startedAt != null)
 		{
@@ -553,11 +373,6 @@ class ObstacleObserver
 			animEndTile = null;
 		}
 
-		flushLookback();
-
-		// Cycle-level recording starts here rather than at the click, which is what lets the journal
-		// be left on forever: keyed to the click it followed every walk across every town.
-		fineRemaining = TAIL_CYCLES;
 
 		clips.add(playing);
 		animTimeline.add(new int[]{client.getGameCycle(), playing});
@@ -570,8 +385,6 @@ class ObstacleObserver
 	 */
 	void onGameTick()
 	{
-		journalTick();
-
 		Player local = client.getLocalPlayer();
 		if (local == null)
 		{
@@ -644,10 +457,6 @@ class ObstacleObserver
 		// moves, and learned, that teaches golems to cross by swimming. So hurt means failed.
 		if (hurt)
 		{
-			if (out != null)
-			{
-				write("SIGHTING", "discarded: hurt during " + clickedName);
-			}
 			hurt = false;
 			chainTile = null;
 			reset();
@@ -737,10 +546,6 @@ class ObstacleObserver
 			startedAtTemplate != null && !startedAtTemplate.equals(startedAt),
 			landingTemplate != null && !landingTemplate.equals(landing));
 
-		if (out != null)
-		{
-			write("SIGHTING", sighting.toString());
-		}
 
 		reset();
 
@@ -790,10 +595,6 @@ class ObstacleObserver
 				fromTemplate != null && !fromTemplate.equals(from),
 				toTemplate != null && !toTemplate.equals(to));
 
-			if (out != null)
-			{
-				write("SIGHTING", "silent " + sighting);
-			}
 			reset();
 
 			if (onSighting != null)
@@ -1221,10 +1022,6 @@ class ObstacleObserver
 			return false;
 		}
 
-		if (out != null)
-		{
-			write("POSED", "pose=" + pose + " for " + clickedName);
-		}
 		clearSilent();
 		posing = pose;
 		beginClip(pose, null, null, local, tick);
@@ -1278,67 +1075,19 @@ class ObstacleObserver
 		}
 	}
 
-	// ------------------------------------------------------------------- journal
-
-	/** Writes the per-tick position row, and notes pose and plane changes. */
-	private void journalTick()
-	{
-		if (out == null)
-		{
-			return;
-		}
-
-		Player local = client.getLocalPlayer();
-		if (local == null)
-		{
-			return;
-		}
-
-		net.runelite.api.WorldView view = client.getTopLevelWorldView();
-		boolean instanced = view != null && view.isInstance();
-		WorldPoint template = instanced ? templateOf(local.getWorldLocation()) : null;
-		write("TICK", "instance=" + instanced + (template == null ? ""
-			: " template=" + template.getX() + "," + template.getY() + "," + template.getPlane()));
-
-		int pose = local.getPoseAnimation();
-		if (pose != lastPose)
-		{
-			write("POSE", "pose=" + pose + " idle=" + local.getIdlePoseAnimation());
-			lastPose = pose;
-		}
-
-		WorldPoint at = local.getWorldLocation();
-		if (at != null && at.getPlane() != lastPlane)
-		{
-			write("PLANE", "from=" + lastPlane + " to=" + at.getPlane());
-			lastPlane = at.getPlane();
-		}
-
-		out.flush();
-	}
+	// ------------------------------------------------------------------- motion
 
 	/**
-	 * Writes the player's exact position while a traversal is in progress. A game tick is 600ms and
+	 * Samples the player's exact position while a traversal is in progress. A game tick is 600ms and
 	 * movement is interpolated thirty times inside it, so tick resolution cannot tell a walk from a
-	 * glide from a teleport. These rows are local coordinates: 128ths of a tile, the golems' unit.
+	 * glide from a teleport. Local coordinates: 128ths of a tile, the golems' unit.
 	 */
 	void onClientTick()
 	{
-		// Not only while the journal is open: the samples below are the motion curves golems learn
-		// from, and a curve is what splits a line of stepping stones into its hops.
+		// The samples below are the motion curves golems learn from, and a curve is what splits a
+		// line of stepping stones into its hops.
 		Player local = client.getLocalPlayer();
 		LocalPoint fine = local == null ? null : local.getLocalLocation();
-
-		if (fine != null)
-		{
-			// Always held, recording or not: the only copy of what happened just before a
-			// traversal was noticed.
-			lookback[lookbackAt][0] = client.getGameCycle();
-			lookback[lookbackAt][1] = fine.getX();
-			lookback[lookbackAt][2] = fine.getY();
-			lookbackAt = (lookbackAt + 1) % LOOKBACK_CYCLES;
-			lookbackHeld = Math.min(lookbackHeld + 1, LOOKBACK_CYCLES);
-		}
 
 		// The motion itself, sample by sample: what a golem performs, the window below being a summary
 		// for obstacles no curve was captured for. Sampled from the click onward, not the animation,
@@ -1387,107 +1136,6 @@ class ObstacleObserver
 		}
 		previousFine = fine;
 
-		if (fineRemaining <= 0 || out == null)
-		{
-			return;
-		}
-		fineRemaining--;
-
-		// The keyframe too: movement and animation are two clocks, and whether a golem's hop plays
-		// at the right moment can only be judged against the frame the player's own hop was on.
-		write("FINE", fine == null ? "local=none"
-			: "localX=" + fine.getX() + " localY=" + fine.getY()
-				+ " frame=" + (local == null ? -1 : local.getAnimationFrame()));
-	}
-
-	/** Writes the held positions, oldest first, as the run-up to a traversal. */
-	private void flushLookback()
-	{
-		if (out == null || lookbackHeld == 0)
-		{
-			return;
-		}
-
-		int start = (lookbackAt - lookbackHeld + LOOKBACK_CYCLES) % LOOKBACK_CYCLES;
-		for (int i = 0; i < lookbackHeld; i++)
-		{
-			int[] entry = lookback[(start + i) % LOOKBACK_CYCLES];
-			out.println(entry[0] + "	-1	PRE	-1	-1	-1	-1	-1	-1	localX="
-				+ entry[1] + " localY=" + entry[2]);
-		}
-		lookbackHeld = 0;
-	}
-
-	/** One journal row: when, what, where, and the detail for this kind of event. */
-	private void write(String type, String detail)
-	{
-		if (out == null)
-		{
-			return;
-		}
-
-		Player local = client.getLocalPlayer();
-		WorldPoint at = local == null ? null : local.getWorldLocation();
-
-		out.println(client.getGameCycle()
-			+ "\t" + client.getTickCount()
-			+ "\t" + type
-			+ "\t" + (at == null ? -1 : at.getX())
-			+ "\t" + (at == null ? -1 : at.getY())
-			+ "\t" + (at == null ? -1 : at.getPlane())
-			+ "\t" + (local == null ? -1 : local.getAnimation())
-			+ "\t" + (local == null ? -1 : local.getPoseAnimation())
-			+ "\t" + (local == null ? -1 : local.getOrientation())
-			+ "\t" + detail);
-	}
-
-	/** Writes what the cache knows about an object, once per click. */
-	private void describeObject(int id)
-	{
-		try
-		{
-			ObjectComposition def = client.getObjectDefinition(id);
-			if (def == null)
-			{
-				return;
-			}
-
-			StringBuilder actions = new StringBuilder();
-			String[] ops = def.getActions();
-			if (ops != null)
-			{
-				for (String op : ops)
-				{
-					if (op != null && !op.isEmpty())
-					{
-						actions.append(actions.length() == 0 ? "" : ",").append(op);
-					}
-				}
-			}
-
-			// An impostor is the object the varbits actually resolve this one to, and where
-			// there is one its id is the id the game is really using.
-			int impostor = -1;
-			try
-			{
-				ObjectComposition real = def.getImpostor();
-				if (real != null)
-				{
-					impostor = real.getId();
-				}
-			}
-			catch (RuntimeException e)
-			{
-				// No impostor ids on this definition. Normal for most objects.
-			}
-
-			write("OBJ", "id=" + id + " name=\"" + def.getName() + "\""
-				+ " actions=\"" + actions + "\" impostor=" + impostor);
-		}
-		catch (RuntimeException e)
-		{
-			write("OBJ", "id=" + id + " lookup-failed");
-		}
 	}
 
 	private String objectName(int id)

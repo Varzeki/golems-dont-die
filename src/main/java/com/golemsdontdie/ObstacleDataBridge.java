@@ -3,9 +3,12 @@ package com.golemsdontdie;
 import com.golemsdontdie.telemetry.GolemCrossing;
 import com.golemsdontdie.telemetry.ObstacleDataFile;
 import com.golemsdontdie.telemetry.PlayerCrossing;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import net.runelite.client.RuneLite;
+import net.runelite.client.util.Filepath;
 
 /**
  * The one place the plugin hands anything to the obstacle data file.
@@ -22,9 +25,39 @@ class ObstacleDataBridge
 
 	private ObstacleDataFile file;
 
-	void startUp()
+	/**
+	 * @param folder the plugin's own folder, or null if RuneLite could not give it one: then nothing
+	 *               is kept, and play goes on without it
+	 */
+	void startUp(Filepath folder)
 	{
-		file = new ObstacleDataFile(RuneLite.RUNELITE_DIR, GolemsDontDiePlugin.VERSION);
+		if (folder == null)
+		{
+			file = null;
+			return;
+		}
+		Filepath path = folder.join(ObstacleDataFile.FILE_NAME);
+		file = new ObstacleDataFile(new ObstacleDataFile.Store()
+		{
+			@Override
+			public boolean exists()
+			{
+				return path.exists();
+			}
+
+			@Override
+			public Reader reader() throws IOException
+			{
+				return path.openBufferedReader();
+			}
+
+			@Override
+			public Writer writer() throws IOException
+			{
+				folder.createDirectories();
+				return path.openWriter();
+			}
+		}, GolemsDontDiePlugin.VERSION);
 		file.load();
 	}
 

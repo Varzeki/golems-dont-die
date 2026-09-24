@@ -1,17 +1,16 @@
 package com.golemsdontdie.telemetry;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * The obstacle data file: {@value #FILE_NAME} in the RuneLite folder.
+ * The obstacle data file: {@value #FILE_NAME} in the plugin's own folder.
  *
  * <p>Tab-separated text, readable in any spreadsheet. Lines starting {@code #} describe the file;
  * {@code P} lines are crossings by the player, {@code G} lines crossings by golems. Column names are
@@ -55,7 +54,20 @@ public final class ObstacleDataFile
 	private static final int G_WORST_START = column(GOLEM_COLUMNS, "worstStart");
 	private static final int G_OVER_STONE = column(GOLEM_COLUMNS, "overStone");
 
-	private final File file;
+	/**
+	 * Where the file is kept. In play, the plugin's own folder, through RuneLite's file utility:
+	 * a plugin may not reach into the RuneLite folder itself. In a test, a temporary file.
+	 */
+	public interface Store
+	{
+		boolean exists();
+
+		Reader reader() throws IOException;
+
+		Writer writer() throws IOException;
+	}
+
+	private final Store store;
 	private final String pluginVersion;
 
 	/** Lines by crossing, least recently seen first. The first column (P or G) is not stored. */
@@ -64,9 +76,9 @@ public final class ObstacleDataFile
 
 	private boolean changed;
 
-	public ObstacleDataFile(File directory, String pluginVersion)
+	public ObstacleDataFile(Store store, String pluginVersion)
 	{
-		this.file = new File(directory, FILE_NAME);
+		this.store = store;
 		this.pluginVersion = pluginVersion;
 	}
 
@@ -78,11 +90,19 @@ public final class ObstacleDataFile
 		player.clear();
 		golem.clear();
 		changed = false;
-		if (!file.exists())
+		try
 		{
+			if (!store.exists())
+			{
+				return;
+			}
+		}
+		catch (RuntimeException e)
+		{
+			log.warn("Could not look for the obstacle data file", e);
 			return;
 		}
-		try (BufferedReader in = new BufferedReader(new FileReader(file)))
+		try (BufferedReader in = new BufferedReader(store.reader()))
 		{
 			boolean sameSchema = false;
 			String line;
@@ -121,7 +141,7 @@ public final class ObstacleDataFile
 			return;
 		}
 		changed = false;
-		try (PrintWriter out = new PrintWriter(new FileWriter(file)))
+		try (PrintWriter out = new PrintWriter(store.writer()))
 		{
 			out.println("# Golems Don't Die obstacle data. Kept on this computer; nothing in it is sent anywhere.");
 			out.println("# P lines: crossings of obstacles by the player. G lines: crossings by golems.");

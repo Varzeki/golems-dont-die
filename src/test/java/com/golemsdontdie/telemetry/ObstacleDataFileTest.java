@@ -14,6 +14,32 @@ public class ObstacleDataFileTest
 {
 	private File directory;
 
+	/** The file in the test's own temporary folder, standing in for the plugin's. */
+	private ObstacleDataFile.Store store()
+	{
+		File file = new File(directory, ObstacleDataFile.FILE_NAME);
+		return new ObstacleDataFile.Store()
+		{
+			@Override
+			public boolean exists()
+			{
+				return file.exists();
+			}
+
+			@Override
+			public java.io.Reader reader() throws java.io.IOException
+			{
+				return new java.io.FileReader(file);
+			}
+
+			@Override
+			public java.io.Writer writer() throws java.io.IOException
+			{
+				return new java.io.FileWriter(file);
+			}
+		};
+	}
+
 	@Before
 	public void makeFolder() throws Exception
 	{
@@ -24,7 +50,7 @@ public class ObstacleDataFileTest
 	@Test
 	public void keepsOneLinePerPlayerCrossingAndCountsRepeats() throws Exception
 	{
-		ObstacleDataFile data = new ObstacleDataFile(directory, "test");
+		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
 		data.load();
 		data.add(stile(3300, 3300, 3300, 3302));
 		data.add(stile(3300, 3300, 3300, 3302));
@@ -37,7 +63,7 @@ public class ObstacleDataFileTest
 		Assert.assertEquals("seen twice", "2", value("P", line, "seen"));
 		Assert.assertEquals("the path, as cycle:along:side", "0:0:0,2:64:0,4:256:0", value("P", line, "path"));
 
-		ObstacleDataFile reloaded = new ObstacleDataFile(directory, "test");
+		ObstacleDataFile reloaded = new ObstacleDataFile(store(), "test");
 		reloaded.load();
 		Assert.assertEquals("both lines survive a restart", 2, reloaded.playerLines());
 		reloaded.add(stile(3300, 3300, 3300, 3302));
@@ -48,7 +74,7 @@ public class ObstacleDataFileTest
 	@Test
 	public void measuresHowFarAGolemStrayedFromItsRoute() throws Exception
 	{
-		ObstacleDataFile data = new ObstacleDataFile(directory, "test");
+		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
 		data.load();
 
 		// A route two tiles north. From the middle of the start tile the golem drifts half a tile to
@@ -85,7 +111,7 @@ public class ObstacleDataFileTest
 	{
 		Files.write(new File(directory, ObstacleDataFile.FILE_NAME).toPath(),
 			"#schema\t1\nP\t1\t2\t3\n".getBytes("UTF-8"));
-		ObstacleDataFile data = new ObstacleDataFile(directory, "test");
+		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
 		data.load();
 		Assert.assertEquals(0, data.playerLines());
 	}

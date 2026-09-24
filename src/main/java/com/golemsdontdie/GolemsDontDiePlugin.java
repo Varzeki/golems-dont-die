@@ -76,6 +76,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Golems Don't Die",
+	internalName = "golems-dont-die",
 	description = "Golems should live forever.",
 	tags = {"golem", "crafting", "wyrmscraig", "skilling", "cosmetic", "npc", "sailing", "exploration", "shortcuts"}
 )
@@ -447,14 +448,12 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Writes what every golem near the player is doing, for reading against the journal.
-	 * Confined to the scene: a row per tick for four hundred and fifty golems would be megabytes
-	 * a minute. The same file holds the player's position at 20ms and every animation they
-	 * start, so the two can be compared on one clock.
+	 * Logs what every golem near the player is doing, at debug level, for chasing a bug. Confined
+	 * to the scene: a line per tick for four hundred and fifty golems would be megabytes a minute.
 	 */
 	private void logGolemState()
 	{
-		if (!obstacleObserver.isLoggingGolems())
+		if (!DevOptions.LOG_GOLEM_STATE)
 		{
 			return;
 		}
@@ -466,7 +465,7 @@ public class GolemsDontDiePlugin extends Plugin
 				continue;
 			}
 			FakeGolem drawn = golem.getRenderer();
-			obstacleObserver.writeGolem(String.valueOf(golem.getId()), golem.debugState()
+			log.debug("Golem {} {}", golem.getId(), golem.debugState()
 				+ (drawn == null ? " undrawn" : " drawnAgo=" + (client.getGameCycle() - drawn.getLastDrawnCycle())));
 			checkStep(golem);
 			checkStanding(golem);
@@ -477,7 +476,6 @@ public class GolemsDontDiePlugin extends Plugin
 	private void applyObstacleSettings()
 	{
 		obstacleObserver.setExplaining(DevOptions.HIGHLIGHT_OBSTACLES);
-		obstacleObserver.setLoggingGolems(DevOptions.LOG_GOLEM_STATE);
 	}
 
 	@Provides
@@ -509,7 +507,17 @@ public class GolemsDontDiePlugin extends Plugin
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
 		obstacleObserver.startUp();
-		obstacleData.startUp();
+		// In the plugin's own folder, which RuneLite hands out; a plugin writes nowhere else.
+		net.runelite.client.util.Filepath folder = null;
+		try
+		{
+			folder = getPluginDirectory();
+		}
+		catch (java.io.IOException | RuntimeException e)
+		{
+			log.warn("No folder for the obstacle data; it will not be kept this session", e);
+		}
+		obstacleData.startUp(folder);
 		mapPoints.startUp();
 		// Drawn in the world it stands in, which it is registered with: moving aboard or ashore
 		// is a new drawn object, made on the next frame.
@@ -546,9 +554,9 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext.setObstacles(obstacleIndex);
 		roamContext.setJournal((golem, what) ->
 		{
-			if (obstacleObserver.isLoggingGolems())
+			if (DevOptions.LOG_GOLEM_STATE)
 			{
-				obstacleObserver.writeGolemEvent(String.valueOf(golem.getId()), what);
+				log.debug("Golem {} {}", golem.getId(), what);
 			}
 		});
 		roamContext.setPlanner(roamPlanner);
@@ -1868,7 +1876,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		obstacleObserver.writeGolemEvent(String.valueOf(golem.getId()), "crossed blocked edge from "
+		log.debug("Golem {} {}", golem.getId(), "crossed blocked edge from "
 			+ before.getX() + "," + before.getY() + "," + before.getPlane() + " to "
 			+ now.getX() + "," + now.getY() + "," + now.getPlane()
 			+ " flags=" + Integer.toHexString(flags[sx][sy]) + "," + Integer.toHexString(flags[sx + dx][sy + dy]));
@@ -1905,7 +1913,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		obstacleObserver.writeGolemEvent(String.valueOf(golem.getId()), "standing on blocked tile "
+		log.debug("Golem {} {}", golem.getId(), "standing on blocked tile "
 			+ at.getX() + "," + at.getY() + "," + at.getPlane() + " flags=" + Integer.toHexString(flags)
 			+ (golem.debugState().contains(" itinerary") ? " route" : ""));
 	}
@@ -2169,9 +2177,9 @@ public class GolemsDontDiePlugin extends Plugin
 
 	private void noteRescue(Golem golem, WorldPoint from, WorldPoint to, String reason)
 	{
-		if (obstacleObserver.isLoggingGolems())
+		if (DevOptions.LOG_GOLEM_STATE)
 		{
-			obstacleObserver.writeGolemEvent(String.valueOf(golem.getId()), "rescued " + reason
+			log.debug("Golem {} {}", golem.getId(), "rescued " + reason
 				+ " from " + from.getX() + "," + from.getY() + "," + from.getPlane()
 				+ " to " + to.getX() + "," + to.getY() + "," + to.getPlane()
 				+ " tier=" + golem.getTier());
@@ -2722,14 +2730,8 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			FakeGolem renderer = new FakeGolem(client, golem, model, modelFactory);
-			String traceId = String.valueOf(golem.getId());
-			renderer.setTrace(line ->
-			{
-				if (obstacleObserver.isLoggingGolems())
-				{
-					obstacleObserver.writeGolemFrame(traceId, line);
-				}
-			}, obstacleObserver::isLoggingGolems);
+			long traceId = golem.getId();
+			renderer.setTrace(line -> log.debug("Golem {} frame {}", traceId, line), () -> DevOptions.LOG_GOLEM_STATE);
 			golem.setRenderer(renderer);
 			client.registerRuneLiteObject(renderer);
 		}
