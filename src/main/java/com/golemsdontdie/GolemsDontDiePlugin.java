@@ -1899,7 +1899,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * {@code runelite-plugin.properties} and {@code build.gradle}, which the Plugin Hub reads;
 	 * this one is what the plugin writes into the data it keeps.
 	 */
-	static final String VERSION = "2.0";
+	static final String VERSION = "3.0";
 
 	/** Set once an update has been announced, or on a new install with nothing to say. */
 	private static final String ANNOUNCED_KEY = "announcedSailing";
