@@ -389,8 +389,18 @@ class GolemListPanel extends PluginPanel
 	/** Whether the keyboard is in one of this panel's text fields: a name, or the search. */
 	private boolean typing()
 	{
-		java.awt.Component owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-		return owner instanceof JTextField && SwingUtilities.isDescendingFrom(owner, this);
+		if (search.isFocusOwner())
+		{
+			return true;
+		}
+		for (Row row : shown.values())
+		{
+			if (row.name.isFocusOwner())
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	void refresh(List<Golem> golems, int missing, boolean names)
