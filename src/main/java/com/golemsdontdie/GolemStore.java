@@ -25,15 +25,20 @@ class GolemStore
 
 	/**
 	 * Ten numbers plus the nickname. The rest are optional: whether the golem is in an instance,
-	 * when it may next sail, its seed, and the six of its history.
+	 * when it may next sail, its seed, the six of its history, and its traits.
+	 *
+	 * <p>The format only ever grows at the end, and a reader takes what it knows and ignores the
+	 * rest. So a save written by a later version still loads here, less whatever was added since;
+	 * refusing it, as 2.0 does anything past thirteen fields, costs a player every golem they have
+	 * the first time two versions meet.
 	 */
 	private static final int FIELD_COUNT = 11;
 
-	/** How many optional fields may follow the eleven. */
-	private static final int OPTIONAL_FIELDS = 9;
-
 	/** Where the history starts among the optional fields. */
 	private static final int HISTORY_AT = FIELD_COUNT + 3;
+
+	/** Where the traits are, after the six of the history. */
+	private static final int TRAITS_AT = HISTORY_AT + 6;
 
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
@@ -60,6 +65,13 @@ class GolemStore
 
 		/** The golem's own number, or 0 for a save written before it was kept. See revive. */
 		long seed;
+
+		/**
+		 * Its traits as dealt, or 0 for a save written before they were kept. Kept because they are
+		 * drawn from the trait list as it stands, and the list will not stand still: re-dealt from
+		 * the seed after the list changed, every golem would come back with somebody else's.
+		 */
+		int traits;
 
 		/** Its history, in the order GolemHistory.restore takes them; all zero if there was none. */
 		long firstSeen;
@@ -107,7 +119,8 @@ class GolemStore
 				.append(FIELD_SEPARATOR).append(history.getVoyages())
 				.append(FIELD_SEPARATOR).append(history.getWalked())
 				.append(FIELD_SEPARATOR).append(history.getFurthestX())
-				.append(FIELD_SEPARATOR).append(history.getFurthestY());
+				.append(FIELD_SEPARATOR).append(history.getFurthestY())
+				.append(FIELD_SEPARATOR).append(golem.getTraits());
 		}
 		return out.toString();
 	}
@@ -129,7 +142,9 @@ class GolemStore
 			}
 			// -1 keeps a trailing empty nickname as a field rather than dropping it.
 			String[] fields = entry.split(FIELD_SEPARATOR, -1);
-			if (fields.length < FIELD_COUNT || fields.length > FIELD_COUNT + OPTIONAL_FIELDS)
+			// A floor and no ceiling: fields past the ones this version knows are a later
+			// version's, and are ignored rather than taken as damage.
+			if (fields.length < FIELD_COUNT)
 			{
 				log.debug("Dropping malformed saved golem '{}'", entry);
 				continue;
@@ -161,6 +176,7 @@ class GolemStore
 					saved.furthestX = Integer.parseInt(fields[HISTORY_AT + 4].trim());
 					saved.furthestY = Integer.parseInt(fields[HISTORY_AT + 5].trim());
 				}
+				saved.traits = fields.length > TRAITS_AT ? Integer.parseInt(fields[TRAITS_AT].trim()) : 0;
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -200,6 +216,12 @@ class GolemStore
 		long seed = saved.seed != 0 ? saved.seed
 			: ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
 		Golem golem = Golem.onTile(snapshot, home, seed, at);
+		// Every golem is dealt at least one trait, so none at all means none were saved: the golem
+		// keeps the hand its seed deals today, which from now on is saved with it.
+		if (saved.traits != 0)
+		{
+			golem.restoreTraits(saved.traits);
+		}
 		golem.setNickname(saved.nickname);
 		if (saved.firstSeen != 0)
 		{

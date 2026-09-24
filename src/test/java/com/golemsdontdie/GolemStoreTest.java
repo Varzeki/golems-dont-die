@@ -57,18 +57,53 @@ public class GolemStoreTest
 		}
 	}
 
-	/** And a record with more fields than the format has is not half-read. */
+	/**
+	 * A save from a later version, with fields this one has never heard of, still loads: the
+	 * format only grows at the end, and what is not understood is left rather than taken as damage.
+	 */
 	@Test
-	public void aGarbledRecordIsDropped()
+	public void aLaterSaveStillLoads()
 	{
 		GolemStore store = new GolemStore();
-		StringBuilder toolong = new StringBuilder("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble");
+		StringBuilder later = new StringBuilder(store.serialise(
+			java.util.Collections.singletonList(golem(77L, "Flint"))));
 		for (int extra = 0; extra < 11; extra++)
 		{
-			toolong.append(",1");
+			later.append(",1");
 		}
-		assertEquals(0, store.deserialise(toolong.toString()).size());
-		assertEquals(0, store.deserialise("1234,2596,2256").size());
+		List<GolemStore.SavedGolem> read = store.deserialise(later.toString());
+		assertEquals(1, read.size());
+		assertEquals(77L, read.get(0).seed);
+		assertEquals("Flint", read.get(0).nickname);
+	}
+
+	/** A record too short to be a golem is dropped rather than half-read. */
+	@Test
+	public void aTruncatedRecordIsDropped()
+	{
+		assertEquals(0, new GolemStore().deserialise("1234,2596,2256").size());
+	}
+
+	/**
+	 * Traits come back as they were dealt, not as the seed would deal them today: the list they are
+	 * drawn from will change, and a golem's page must not change with it.
+	 */
+	@Test
+	public void traitsSurviveTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem golem = golem(5L, "Slate");
+		int dealt = golem.getTraits();
+		golem.restoreTraits(GolemTrait.LOYAL.mask() | GolemTrait.FOND_OF_GOATS.mask());
+
+		GolemStore.SavedGolem saved = store.deserialise(store.serialise(
+			java.util.Collections.singletonList(golem))).get(0);
+
+		assertEquals(GolemTrait.LOYAL.mask() | GolemTrait.FOND_OF_GOATS.mask(), saved.traits);
+		// And a save from before traits were kept says so, leaving the seed's hand in place.
+		String older = "1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble,0,0,5";
+		assertEquals(0, store.deserialise(older).get(0).traits);
+		assertEquals(dealt, GolemTrait.of(5L));
 	}
 
 	/** A golem's history goes with it, and comes back as it was. */

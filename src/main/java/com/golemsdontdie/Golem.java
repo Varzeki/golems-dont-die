@@ -419,7 +419,7 @@ class Golem
 
 	/** What this golem is like, drawn from its seed and kept for life. See GolemTrait. */
 	@Getter
-	private final int traits;
+	private int traits;
 
 	/** What it has done since it was made. See GolemHistory. */
 	@Getter
@@ -504,6 +504,13 @@ class Golem
 	TransportMemory getTransportMemory()
 	{
 		return transportMemory;
+	}
+
+	/** Puts back the traits a golem was saved with, which win over the ones its seed deals now. */
+	void restoreTraits(int saved)
+	{
+		traits = saved;
+		transportMemory.setTraits(saved);
 	}
 
 	/**
