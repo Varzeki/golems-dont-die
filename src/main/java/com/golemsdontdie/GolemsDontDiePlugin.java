@@ -2630,7 +2630,9 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		else
 		{
-			mapPoints.refresh(livingGolems(), onMap == GolemsDontDieConfig.MapGolems.NAMED,
+			// The roster itself, not a copy of the living: this runs every tick whether or not the
+			// map is open, and the map skips the dying golems itself once it knows it is.
+			mapPoints.refresh(golems, onMap == GolemsDontDieConfig.MapGolems.NAMED,
 				roamContext.getTick(), finding);
 		}
 

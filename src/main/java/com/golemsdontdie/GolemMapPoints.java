@@ -156,6 +156,11 @@ class GolemMapPoints
 	/** Takes every golem off the map. */
 	void clear()
 	{
+		// Called every tick the map is shut, and nearly always there is nothing to take off.
+		if (wasShut && shown.isEmpty())
+		{
+			return;
+		}
 		// Nothing on the map, so the next refresh that finds one open is a fresh one to measure.
 		wasShut = true;
 		for (CellPoint point : shown)
@@ -171,7 +176,9 @@ class GolemMapPoints
 	/**
 	 * Brings the map up to date with where the golems are.
 	 *
-	 * @param named true to show only golems with names
+	 * @param golems the whole roster, crumbling golems and all: they are passed over here, so the
+	 *               caller need not copy the roster every tick to leave them out
+	 * @param named  true to show only golems with names
 	 */
 	void refresh(List<Golem> golems, boolean named, int tick)
 	{
@@ -304,6 +311,10 @@ class GolemMapPoints
 		int landed = 0;
 		for (Golem golem : golems)
 		{
+			if (golem.isDying())
+			{
+				continue;
+			}
 			int x = golem.getFineX() / Golem.TILE;
 			int y = golem.getFineY() / Golem.TILE;
 			if (Math.abs(x - at.getX()) > SAMPLE_TILES || Math.abs(y - at.getY()) > SAMPLE_TILES
@@ -337,7 +348,7 @@ class GolemMapPoints
 
 		for (Golem golem : golems)
 		{
-			if (named && !isNamed(golem))
+			if (golem.isDying() || named && !isNamed(golem))
 			{
 				continue;
 			}
