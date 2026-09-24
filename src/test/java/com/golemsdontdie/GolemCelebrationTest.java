@@ -24,6 +24,12 @@ public class GolemCelebrationTest
 		{
 			return true;
 		}
+
+		@Override
+		public boolean danceOnClue()
+		{
+			return true;
+		}
 	}
 
 	private GolemCelebration celebration;
@@ -133,5 +139,85 @@ public class GolemCelebrationTest
 		assertFalse(celebration.isDancing(1));
 		celebration.statChanged(Skill.MINING, 42, 1);
 		assertFalse("and the level it already had is news to nobody", celebration.isDancing(1));
+	}
+
+	/** The game's own lines for the other occasions, colour tags and all. */
+	@Test
+	public void theOtherOccasionsAreRecognised()
+	{
+		String[] lines = {
+			"Congratulations, you've completed a hard combat task: <col=06600c>Whack-a-Mole</col>.",
+			"You have a funny feeling like you're being followed.",
+			"Fight duration: <col=ff0000>1:23.40</col> (new personal best)",
+			"You have completed <col=ef1020>12</col> medium Treasure Trails.",
+		};
+		int tick = 100;
+		for (String line : lines)
+		{
+			tick += 100;
+			celebration.chatMessage(line, tick);
+			assertTrue(line, celebration.isDancing(tick));
+		}
+	}
+
+	/** And an ordinary line is not an occasion. */
+	@Test
+	public void anOrdinaryLineIsNot()
+	{
+		celebration.chatMessage("You manage to mine some copper.", 100);
+		celebration.chatMessage("Your Zulrah kill count is: <col=ff0000>12</col>.", 100);
+		assertFalse(celebration.isDancing(100));
+	}
+
+	/** The pop-ups come whether or not the chat lines are on. */
+	@Test
+	public void aPopUpIsEnough()
+	{
+		celebration.popup("Collection log", 100);
+		assertTrue(celebration.isDancing(100));
+		celebration.popup("Combat Task Completed!", 300);
+		assertTrue(celebration.isDancing(300));
+		celebration.popup("Something else", 500);
+		assertFalse(celebration.isDancing(500));
+	}
+
+	@Test
+	public void aQuestIsWorthDancingAbout()
+	{
+		celebration.questCompleted(100);
+		assertTrue(celebration.isDancing(100));
+	}
+
+	/**
+	 * A diary tier already finished at login is not finished again: the first reads are where the
+	 * player already stood, and only a tier that goes from not done to done afterwards counts.
+	 */
+	@Test
+	public void aDiaryCountsOnlyWhenItIsFinished()
+	{
+		int[] atLogin = new int[GolemCelebration.DIARY_TIERS.length];
+		atLogin[0] = 1;
+		celebration.diaries(atLogin, 10);
+		celebration.diaries(atLogin, 15);
+		celebration.diaries(atLogin, 20);
+		assertFalse("already done at login", celebration.isDancing(20));
+
+		int[] later = atLogin.clone();
+		later[5] = 1;
+		celebration.diaries(later, 25);
+		assertTrue(celebration.isDancing(25));
+	}
+
+	/** A tier that is set during the settling reads is the login arriving, not a finish. */
+	@Test
+	public void aDiaryArrivingWithLoginIsNot()
+	{
+		int[] empty = new int[GolemCelebration.DIARY_TIERS.length];
+		int[] synced = empty.clone();
+		synced[3] = 1;
+		celebration.diaries(empty, 10);
+		celebration.diaries(synced, 15);
+		celebration.diaries(synced, 20);
+		assertFalse(celebration.isDancing(20));
 	}
 }

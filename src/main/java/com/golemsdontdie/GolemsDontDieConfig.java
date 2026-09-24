@@ -170,8 +170,7 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "danceOnCollectionLog",
 		name = "Collection log",
-		description = "Golems dance when you fill a collection log slot. Needs the game's collection "
-			+ "log chat message turned on.",
+		description = "Golems dance when you fill a collection log slot.",
 		section = celebrationsSection,
 		position = 1
 	)
@@ -188,6 +187,79 @@ public interface GolemsDontDieConfig extends Config
 		position = 2
 	)
 	default boolean danceOnGolemCrafted()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnQuest",
+		name = "Quest complete",
+		description = "Golems dance when you finish a quest or miniquest.",
+		section = celebrationsSection,
+		position = 3
+	)
+	default boolean danceOnQuest()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnDiary",
+		name = "Achievement diary",
+		description = "Golems dance when you finish a tier of an achievement diary.",
+		section = celebrationsSection,
+		position = 4
+	)
+	default boolean danceOnDiary()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnCombatTask",
+		name = "Combat achievement",
+		description = "Golems dance when you complete a combat task.",
+		section = celebrationsSection,
+		position = 5
+	)
+	default boolean danceOnCombatTask()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnPet",
+		name = "Pet",
+		description = "Golems dance when a pet finds you.",
+		section = celebrationsSection,
+		position = 6
+	)
+	default boolean danceOnPet()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnPersonalBest",
+		name = "Personal best",
+		description = "Golems dance when you beat your best time at a boss, a raid or a course.",
+		section = celebrationsSection,
+		position = 7
+	)
+	default boolean danceOnPersonalBest()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "danceOnClue",
+		name = "Clue scroll",
+		description = "Golems dance when you finish a clue scroll. Off by default: for a player doing "
+			+ "clues back to back it would be every few minutes.",
+		section = celebrationsSection,
+		position = 8
+	)
+	default boolean danceOnClue()
 	{
 		return false;
 	}

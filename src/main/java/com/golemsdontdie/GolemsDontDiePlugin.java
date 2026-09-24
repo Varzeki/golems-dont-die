@@ -33,8 +33,10 @@ import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.callback.RenderCallback;
@@ -795,6 +797,63 @@ public class GolemsDontDiePlugin extends Plugin
 			rosterChanged = true;
 		}
 		celebration.chatMessage(event.getMessage(), client.getTickCount());
+	}
+
+	/** How often the achievement diary flags are read, in ticks. See GolemCelebration.diaries. */
+	private static final int DIARY_TICKS = 5;
+
+	private int ticksSinceDiaries;
+
+	/**
+	 * Reads every diary tier's "complete" flag, now and then. Read rather than listened for: a
+	 * tier nobody has finished sends nothing at login, so its first change is the finish itself.
+	 */
+	private void readDiaries()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN || ++ticksSinceDiaries < DIARY_TICKS)
+		{
+			return;
+		}
+		ticksSinceDiaries = 0;
+		int[] done = new int[GolemCelebration.DIARY_TIERS.length];
+		for (int i = 0; i < done.length; i++)
+		{
+			done[i] = client.getVarbitValue(GolemCelebration.DIARY_TIERS[i]);
+		}
+		celebration.diaries(done, client.getTickCount());
+	}
+
+	/** The quest reward scroll: a quest or miniquest has just been finished. */
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event)
+	{
+		if (event.getGroupId() == net.runelite.api.gameval.InterfaceID.QUESTSCROLL)
+		{
+			celebration.questCompleted(client.getTickCount());
+		}
+	}
+
+	/** Set between a pop-up notification starting and its text being filled in. */
+	private boolean popupStarting;
+
+	/**
+	 * The game's pop-up notifications, which say "Collection log" and "Combat Task Completed!"
+	 * whether or not the player has the matching chat lines turned on. Read as the Screenshot
+	 * plugin reads them: the title is set once the pop-up's second script runs.
+	 */
+	@Subscribe
+	public void onScriptPreFired(ScriptPreFired event)
+	{
+		if (event.getScriptId() == net.runelite.api.ScriptID.NOTIFICATION_START)
+		{
+			popupStarting = true;
+		}
+		else if (event.getScriptId() == net.runelite.api.ScriptID.NOTIFICATION_DELAY && popupStarting)
+		{
+			popupStarting = false;
+			celebration.popup(client.getVarcStrValue(net.runelite.api.gameval.VarClientID.NOTIFICATION_TITLE),
+				client.getTickCount());
+		}
 	}
 
 	/** A level going up is one of the things the golems dance about. See GolemCelebration. */
@@ -2568,6 +2627,7 @@ public class GolemsDontDiePlugin extends Plugin
 	{
 		tickStartCycle = client.getGameCycle();
 		announceUpdate();
+		readDiaries();
 		obstacleObserver.onGameTick();
 		logGolemState();
 		// Refreshed continuously rather than read once at spawn: a golem steps off its
