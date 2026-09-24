@@ -11,15 +11,12 @@ final class DevOptions
 	/** Outline shortcuts nearby by how well golems know them. See ObstacleHighlightOverlay. */
 	static final boolean HIGHLIGHT_OBSTACLES = false;
 
-	/** Record every visible golem's state each tick into the obstacle journal. */
-	static final boolean LOG_GOLEM_STATE = false;
-
 	/**
-	 * Write the tick-by-tick obstacle journal to the RuneLite folder. Off in a release; only
-	 * useful beside a bug. {@link ObstacleDataBridge} keeps what ordinary play is worth
-	 * keeping, and is always on.
+	 * Log every visible golem's state each tick, and what it decides, at debug level. Very loud;
+	 * only useful beside a bug. Nothing is written to a file: {@link ObstacleDataBridge} keeps what
+	 * ordinary play is worth keeping, in the plugin's own folder.
 	 */
-	static final boolean JOURNAL = false;
+	static final boolean LOG_GOLEM_STATE = false;
 
 	private DevOptions()
 	{
