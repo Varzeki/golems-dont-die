@@ -13,7 +13,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -38,7 +37,15 @@ class GolemPage
 	private static final Font TITLE = FontManager.getRunescapeBoldFont().deriveFont(20f);
 	private static final Font BODY = FontManager.getRunescapeFont().deriveFont(16f);
 
-	private final JFrame frame = new JFrame("Golem Info");
+	/**
+	 * The page's window, made the first time it is opened. A dialog owned by the client's own window,
+	 * so it stays above the client without being put above everything else on the screen, and goes
+	 * where the client goes.
+	 */
+	private javax.swing.JDialog frame;
+
+	/** What the window shows, built once. */
+	private final JPanel body = new JPanel(new BorderLayout());
 	private final JLabel title = new JLabel();
 	private final JLabel place = new JLabel();
 	private final JPanel traits = new JPanel();
@@ -183,7 +190,7 @@ class GolemPage
 		close.setFocusPainted(false);
 		close.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		close.setForeground(Color.WHITE);
-		close.addActionListener(e -> frame.setVisible(false));
+		close.addActionListener(e -> hide());
 
 		JPanel buttons = new JPanel(new BorderLayout(6, 0));
 		buttons.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -191,52 +198,81 @@ class GolemPage
 		buttons.add(find, BorderLayout.CENTER);
 		buttons.add(close, BorderLayout.EAST);
 
-		JPanel body = new JPanel(new BorderLayout());
 		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		body.add(heading, BorderLayout.NORTH);
 		body.add(tabs, BorderLayout.CENTER);
 		body.add(buttons, BorderLayout.SOUTH);
+
+	}
+
+	/**
+	 * Makes the page's window, owned by the client's: the window the sidebar is in, or failing that
+	 * the client's own frame.
+	 */
+	private javax.swing.JDialog window(Component beside)
+	{
+		Window owner = beside == null ? null : SwingUtilities.getWindowAncestor(beside);
+		if (owner == null)
+		{
+			for (java.awt.Frame open : java.awt.Frame.getFrames())
+			{
+				if (open.isVisible())
+				{
+					owner = open;
+					break;
+				}
+			}
+		}
+		javax.swing.JDialog window = new javax.swing.JDialog(owner, "Golem Info");
 
 		// The client's own chrome, the way the client asks for it: undecorated, and the root pane
 		// told to draw a frame. Asking the look and feel first whether it supports decorations
 		// said no and left the page in the desktop's chrome.
 		try
 		{
-			frame.setUndecorated(true);
-			frame.getRootPane().setWindowDecorationStyle(javax.swing.JRootPane.FRAME);
+			window.setUndecorated(true);
+			window.getRootPane().setWindowDecorationStyle(javax.swing.JRootPane.FRAME);
 		}
 		catch (RuntimeException e)
 		{
 			// A look and feel that will not draw a frame leaves us with the desktop's, which is
 			// not what we wanted but is a window a player can still move and close.
-			frame.dispose();
-			frame.setUndecorated(false);
+			window.dispose();
+			window.setUndecorated(false);
 		}
 		java.awt.image.BufferedImage icon = net.runelite.client.util.ImageUtil.loadImageResource(
 			GolemPage.class, "/golem-icon.png");
 		if (icon != null)
 		{
-			frame.setIconImage(icon);
+			window.setIconImage(icon);
 		}
 
-		// Over the client rather than behind it: a page is opened to be read beside the game.
-		frame.setAlwaysOnTop(true);
-		frame.setContentPane(body);
-		frame.setMinimumSize(new Dimension(320, 260));
-		frame.setSize(new Dimension(380, 420));
+		window.setContentPane(body);
+		window.setMinimumSize(new Dimension(320, 260));
+		window.setSize(new Dimension(380, 420));
 		// Closing the window keeps the golem: a page is a thing a player glances at and dismisses.
-		frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-		frame.addWindowListener(new WindowAdapter()
+		window.setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
+		window.addWindowListener(new WindowAdapter()
 		{
 			@Override
 			public void windowClosing(WindowEvent e)
 			{
-				frame.setVisible(false);
+				hide();
 			}
 		});
+		return window;
 	}
 
-	/** Opens the page on a golem, or brings it forward if it is already on that one. */
+	/** Puts the page away, keeping it for next time. */
+	private void hide()
+	{
+		if (frame != null)
+		{
+			frame.setVisible(false);
+		}
+	}
+
+	/** Opens the page on a golem, or turns it to that golem if it is already open. */
 	void show(Golem golem, Component beside)
 	{
 		showing = golem;
@@ -257,19 +293,21 @@ class GolemPage
 		// From the top: the page a player left scrolled halfway is not where the next one starts.
 		SwingUtilities.invokeLater(() -> scroll.getViewport().setViewPosition(new java.awt.Point(0, 0)));
 
+		if (frame == null)
+		{
+			frame = window(beside);
+		}
 		if (!frame.isVisible())
 		{
-			Window near = beside == null ? null : SwingUtilities.getWindowAncestor(beside);
-			frame.setLocationRelativeTo(near);
+			frame.setLocationRelativeTo(frame.getOwner());
 		}
 		frame.setVisible(true);
-		frame.toFront();
 	}
 
 	/** Whether the page is open, so the plugin only works out a whereabouts line when it is. */
 	boolean isOpen()
 	{
-		return frame.isVisible();
+		return frame != null && frame.isVisible();
 	}
 
 	Golem getShowing()
@@ -301,8 +339,12 @@ class GolemPage
 	void close()
 	{
 		showing = null;
-		frame.setVisible(false);
-		frame.dispose();
+		if (frame != null)
+		{
+			frame.setVisible(false);
+			frame.dispose();
+			frame = null;
+		}
 	}
 
 	/** What the golem has done, in the plainest words the numbers allow. */
