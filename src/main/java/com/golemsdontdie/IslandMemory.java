@@ -330,11 +330,6 @@ class IslandMemory
 	}
 
 	/**
-	 * Copies passability for every island region currently loaded out of the scene. Bounded to
-	 * regions near the anchor, so walking across the rest of Gielinor does not accumulate a
-	 * world map in the player's config.
-	 */
-	/**
 	 * Asks for one more harvest pass. Called when the scene is rebuilt, because nothing about
 	 * the scene changes between ticks: harvesting every tick re-scanned in full, sixty times a
 	 * minute, every region clipped by the scene edge, which can never have all 4096 of its
@@ -347,6 +342,11 @@ class IslandMemory
 
 	private boolean pendingHarvest = true;
 
+	/**
+	 * Copies passability for every island region currently loaded out of the scene. Bounded to
+	 * regions near the anchor, so walking across the rest of Gielinor does not accumulate a
+	 * world map in the player's config.
+	 */
 	void harvestLoadedRegions()
 	{
 		if (!pendingHarvest)

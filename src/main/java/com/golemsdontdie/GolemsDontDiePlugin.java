@@ -1394,10 +1394,9 @@ public class GolemsDontDiePlugin extends Plugin
 		int tick = client.getTickCount();
 		boolean lookAtAll = farViewChanged(wv, playerAt, restrictAmbition);
 
-		// Something is being celebrated. Fireworks are rolled for once a tick rather than once a
-		// frame, which is fifty times as often and would fill the sky in a second.
-		// Fireworks are rolled once a tick rather than once a frame, which is fifty times as often,
-		// and every few ticks rather than every one: the clip is about three ticks long.
+		// What the golems are doing because of the player, once a tick rather than once a frame.
+		// Fireworks especially: fifty rolls a tick would fill the sky in a second, and even once
+		// a tick is too often for a clip about three ticks long, so they go every few.
 		boolean social = tick != lastSocialTick;
 		lastSocialTick = tick;
 		if (social)
@@ -2362,11 +2361,6 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Attaches or detaches a golem's drawn object as it crosses the scene boundary, which is
-	 * what lets one wander off the edge of what is loaded and come back: leaving the scene
-	 * costs it its renderer, not its existence.
-	 */
-	/**
 	 * Most golems drawn on one tile. The game draws only a few objects per tile, and with more
 	 * than that on one it chose a different few each frame and they flashed; the roster is
 	 * walked in a fixed order instead, so the first few keep their place and the rest wait.
@@ -2430,6 +2424,11 @@ public class GolemsDontDiePlugin extends Plugin
 		return GolemTier.FAR;
 	}
 
+	/**
+	 * Attaches or detaches a golem's drawn object as it crosses the scene boundary, which is
+	 * what lets one wander off the edge of what is loaded and come back: leaving the scene
+	 * costs it its renderer, not its existence.
+	 */
 	private void updateRenderer(Golem golem, WorldView wv, boolean inSceneTier, TileMap drawnPerTile)
 	{
 		boolean visible = inSceneTier
@@ -2492,11 +2491,6 @@ public class GolemsDontDiePlugin extends Plugin
 
 	// ---- per-tick upkeep ----
 
-	/**
-	 * Development only: records what a shortcut actually does when the player uses one. Which
-	 * clip it plays, and how long it takes, is server-side and in no cache, so the only way to
-	 * know is to use one and watch. Remove this and its two siblings before release.
-	 */
 	/**
 	 * Puts the Golems tab in the sidebar, or takes it away.
 	 *

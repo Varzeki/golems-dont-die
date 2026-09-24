@@ -637,10 +637,6 @@ class Golem
 	}
 
 	/**
-	 * Advances a golem nobody can see, almost always nothing at all: the only work is
-	 * replanning when a route runs out, once a minute or so per golem.
-	 */
-	/**
 	 * Moves the golem along its route, and tidies up when the route runs out. Position comes
 	 * from the route rather than being stepped toward it, so the mechanism is the same
 	 * watched or not; only the ending differs.
@@ -706,6 +702,9 @@ class Golem
 	}
 
 	/**
+	 * Advances a golem nobody can see, almost always nothing at all: the only work is
+	 * replanning when a route runs out, once a minute or so per golem.
+	 *
 	 * @param mayPlan false once this frame's planning is spent, so a golem whose route ran
 	 *                out stands where it arrived and plans on a later frame rather than a
 	 *                thousand of them searching in the same one.

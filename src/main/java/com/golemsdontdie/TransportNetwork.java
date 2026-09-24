@@ -216,11 +216,6 @@ class TransportNetwork
 	private static final int[] NO_REQUIREMENT = new int[0];
 
 	/**
-	 * The archetype this object is given wherever it appears, or -1. Keyed by object rather than
-	 * tile because the highlight overlay works from the obstacle index, which knows where
-	 * obstacles stand but not where they lead.
-	 */
-	/**
 	 * True if the shipped tables have a row for this object. Shipped rows only:
 	 * {@link #archetypeFor} counts learned rows too, so a tree that slipped through once passed
 	 * the obstacle test for good.
@@ -232,6 +227,11 @@ class TransportNetwork
 
 	private final java.util.Set<Integer> shippedObjects = new java.util.HashSet<>();
 
+	/**
+	 * The archetype this object is given wherever it appears, or -1. Keyed by object rather than
+	 * tile because the highlight overlay works from the obstacle index, which knows where
+	 * obstacles stand but not where they lead.
+	 */
 	int archetypeFor(int objectId)
 	{
 		Integer found = archetypeByObject.get(objectId);

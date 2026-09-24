@@ -265,10 +265,6 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * How sure we are about one obstacle standing at one place. Drives the highlight overlay only;
-	 * golem behaviour is decided by {@link #isUnlocked} and {@link #clipsFor}.
-	 */
-	/**
 	 * How sure we are about an obstacle known only by what and where it is. The overlay works from
 	 * the obstacle index, which knows nothing about where obstacles lead, so there may be no row
 	 * at all — itself the answer.
@@ -382,6 +378,10 @@ class ObstacleKnowledge
 		}
 	}
 
+	/**
+	 * How sure we are about one obstacle standing at one place. Drives the highlight overlay only;
+	 * golem behaviour is decided by {@link #isUnlocked} and {@link #clipsFor}.
+	 */
 	Status statusAt(GolemTransport transport)
 	{
 		if (!isUnlocked(transport))
@@ -989,10 +989,6 @@ class ObstacleKnowledge
 	// ------------------------------------------------------------- what to play
 
 	/**
-	 * The clips a golem should play for this transport, best source first: what the player was
-	 * seen doing beats what was shipped, which beats the archetype's guess.
-	 */
-	/**
 	 * True if the player has been watched using this obstacle, whatever the outcome. Tells "seen,
 	 * and it plays nothing" from "never seen", which an empty clip set cannot do on its own.
 	 */
@@ -1002,6 +998,10 @@ class ObstacleKnowledge
 		return known != null && known.unlocked();
 	}
 
+	/**
+	 * The clips a golem should play for this transport, best source first: what the player was
+	 * seen doing beats what was shipped, which beats the archetype's guess.
+	 */
 	int[] clipsFor(GolemTransport transport)
 	{
 		// Only once it has cleared the bar everything else clears: a single sighting can be a

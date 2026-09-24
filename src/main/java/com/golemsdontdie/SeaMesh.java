@@ -55,10 +55,6 @@ class SeaMesh
 	private final Map<Long, List<int[]>> routes = new HashMap<>();
 
 	/**
-	 * A cached route, or null if this pair has not been searched yet. Separate from {@link #route}
-	 * so the caller can take the cheap answer on a render frame and defer the expensive one.
-	 */
-	/**
 	 * Crossings between every pair of moorings, computed offline by
 	 * {@code dev-tools/probe/com/golemsdontdie/BuildSeaRoutes.java}. The live search could not be
 	 * relied on: sampling forty pairs of ports it found no route for twenty-one — the ocean being
@@ -111,6 +107,10 @@ class SeaMesh
 		}
 	}
 
+	/**
+	 * A cached route, or null if this pair has not been searched yet. Separate from {@link #route}
+	 * so the caller can take the cheap answer on a render frame and defer the expensive one.
+	 */
 	List<int[]> cachedRoute(WorldPoint from, WorldPoint to)
 	{
 		loadShipped();

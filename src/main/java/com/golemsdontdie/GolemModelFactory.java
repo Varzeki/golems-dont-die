@@ -89,11 +89,6 @@ class GolemModelFactory
 	}
 
 	/**
-	 * How long a clip runs for, in client cycles, or 0 if unknown: the sum of its frame lengths,
-	 * asked of the client so it stays right if Jagex retimes one. Paces a golem through a
-	 * shortcut; guessing had golems scaling a cliff in two thirds of a second.
-	 */
-	/**
 	 * True if this animation is built to repeat.
 	 *
 	 * <p>{@code frameStep} is how many frames the client winds back at a clip's end: positive
@@ -107,6 +102,11 @@ class GolemModelFactory
 		return animation != null && animation.getFrameStep() > 0;
 	}
 
+	/**
+	 * How long a clip runs for, in client cycles, or 0 if unknown: the sum of its frame lengths,
+	 * asked of the client so it stays right if Jagex retimes one. Paces a golem through a
+	 * shortcut; guessing had golems scaling a cliff in two thirds of a second.
+	 */
 	int animationCycles(int animationId)
 	{
 		Animation animation = animationFor(animationId);

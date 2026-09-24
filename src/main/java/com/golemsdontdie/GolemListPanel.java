@@ -120,7 +120,7 @@ class GolemListPanel extends PluginPanel
 	private final JPanel rows = new JPanel();
 	private final JLabel summary = new JLabel();
 
-	/** Narrows the list to golems whose name or whereabouts contains what is typed. */
+	/** Narrows the list to golems whose name contains what is typed. */
 	private final JTextField search = new PlaceholderField(null, "Search golems");
 
 	private final JButton previous = new JButton("<");
@@ -134,10 +134,7 @@ class GolemListPanel extends PluginPanel
 	/** The whole roster, as the client thread last gave it. */
 	private List<Golem> roster = java.util.Collections.emptyList();
 
-	/** Where each golem is, in step with the roster, for searching by place. */
-	private List<String> rosterPlaces = java.util.Collections.emptyList();
-
-	/** The golems matching the search, named first. */
+	/** The golems matching the search, in the roster's order. */
 	private List<Golem> matching = java.util.Collections.emptyList();
 
 	/** The golems on the page now, for whoever wants to know what is worth updating. */
@@ -328,36 +325,16 @@ class GolemListPanel extends PluginPanel
 	}
 
 	/**
-	* Redraws the list. Rebuilt only when the set of golems changes: this is called every game
-	* tick, and recreating a text field the player might be typing in would make renaming
-	* impossible.
-	*
-	* @param missing how many fewer golems are roaming than crafted; the revive button shows
-	*                only when this is positive
-	*/
+	 * As {@link #refresh(List, int, boolean)}, leaving the names on rows already shown alone.
+	 *
+	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
+	 *                only when this is positive
+	 */
 	void refresh(List<Golem> golems, int missing)
 	{
 		refresh(golems, missing, false);
 	}
 
-	/**
-	 * Brings the list up to date with the roster, changing only what changed: rebuilding the
-	 * whole list made three thousand rows of components every time a golem was made or
-	 * crumbled, and threw away a half-typed name.
-	 *
-	 * @param names also show names given in game, which leave the roster otherwise unchanged
-	 */
-	/**
-	 * Takes the roster as it now stands, in the order the client thread put it: nearest first.
-	 *
-	 * <p>Only a page of it is ever built. One row is half a dozen Swing components, and a player who
-	 * has crafted for months has thousands of golems — sixty thousand components in one scroll pane
-	 * is minutes of laying out and megabytes held for a list nobody can read anyway.
-	 *
-	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
-	 *                only when this is positive
-	 * @param names   also take names given in game, which leave the roster otherwise unchanged
-	 */
 	/**
 	 * Builds every row again, for when the name pack changes: the name a row shows for a golem
 	 * nobody has named is a prompt set when the row was made.
@@ -372,6 +349,17 @@ class GolemListPanel extends PluginPanel
 		});
 	}
 
+	/**
+	 * Takes the roster as it now stands, in the order the client thread put it: nearest first.
+	 *
+	 * <p>Only a page of it is ever built. One row is half a dozen Swing components, and a player who
+	 * has crafted for months has thousands of golems — sixty thousand components in one scroll pane
+	 * is minutes of laying out and megabytes held for a list nobody can read anyway.
+	 *
+	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
+	 *                only when this is positive
+	 * @param names   also take names given in game, which leave the roster otherwise unchanged
+	 */
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->
@@ -467,13 +455,10 @@ class GolemListPanel extends PluginPanel
 	}
 
 	/**
-	 * Says where each golem is, under its name.
-	 *
-	 * <p>Given as a list in step with the golems rather than read from them here: they belong to the
-	 * client thread, and this is Swing's.
-	 */
-	/**
 	 * Says where each golem on the page is and how far off, under its name.
+	 *
+	 * <p>Given as lists in step with the golems rather than read from them here: they belong to the
+	 * client thread, and this is Swing's.
 	 *
 	 * @param places   where each golem is, in words
 	 * @param distance how many tiles away each one is, or -1 where that cannot be said

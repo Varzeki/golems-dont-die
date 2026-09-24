@@ -172,7 +172,6 @@ class ObstacleIndex
 		return found;
 	}
 
-	/** The cache's traversal time for an object, in ticks, or 0: the same wherever it stands. */
 	/**
 	 * True if the cache lists this object as something you traverse: the first question asked of
 	 * anything the player is seen using, watching alone not telling an obstacle from a tree. The
@@ -185,6 +184,7 @@ class ObstacleIndex
 
 	private final java.util.Set<Integer> known = new java.util.HashSet<>();
 
+	/** The cache's traversal time for an object, in ticks, or 0: the same wherever it stands. */
 	int ticksFor(int objectId)
 	{
 		Integer found = ticksByObject.get(objectId);
