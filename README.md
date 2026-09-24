@@ -39,6 +39,8 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
 | Auto name golems | Off | Gives golems you have not named one anyway — a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
 | Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |
+| Path to a golem being found | On | While you are finding a golem, the [Shortest Path](https://github.com/Skretzo/shortest-path) plugin draws the way to it. Does nothing without Shortest Path installed. |
+| Golems join your ship | On | Golems standing near your boat when you step aboard come too. Not while golem ambition is restricted. |
 
 **Celebrations**
 
@@ -47,14 +49,22 @@ Golems in view stop what they are doing, dance for about ten seconds and set off
 | Setting | Default | |
 |---|---|---|
 | Level up | On | Golems dance when you gain a level. |
-| Collection log | On | Golems dance when you fill a collection log slot. Needs the game's collection log chat message turned on. |
+| Collection log | On | Golems dance when you fill a collection log slot. |
 | Golem crafted | Off | Golems dance each time you craft another golem. |
+| Quest complete | On | Golems dance when you finish a quest or miniquest. |
+| Achievement diary | On | Golems dance when you finish a tier of an achievement diary. |
+| Combat achievement | On | Golems dance when you complete a combat task. |
+| Pet | On | Golems dance when a pet finds you. |
+| Personal best | On | Golems dance when you beat your best time at a boss, a raid or a course. |
+| Clue scroll | Off | Golems dance when you finish a clue scroll. |
 
 
 ## Finding a golem
 
-The sidebar lists your golems nearest first, fifty to a page, with a search box for names. Under
+The sidebar lists your golems nearest first, fifteen to a page, with a search box for names. Under
 each name is where that golem is — "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
+
+Star a golem to keep it at the top of the list, wherever it is.
 
 Right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar. The
 option carries the number missing, and is only there while any are.
@@ -66,9 +76,18 @@ leaves them all plain golems again.
 
 **Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
 eight tiles of it or stop looking. While you are looking, that golem is the only one on the world
-map, and its face sticks to the edge of the map when you pan away from it.
+map, its face sticks to the edge of the map when you pan away from it, and an infobox says how far
+off it is — right-click it to stop. With Shortest Path installed, the way there is drawn too.
 
 On the map, a named golem wears its name. Hover any face to see where it is.
+
+
+## Your ship
+
+Golems standing near your boat when you step aboard come with you — starred golems first, then
+named ones — and stand at the rail looking out while you sail. They step off where you do. Leave
+the boat any other way, by teleport or by logging out, and they go back to the quay they boarded
+from.
 
 
 ## Building
