@@ -27,3 +27,6 @@ dev-tools/branding/fonts/
 
 # A record of bugs found and fixed while building this, kept locally rather than published.
 BUGS.md
+
+# Local design notes and planning; not published.
+notes/
