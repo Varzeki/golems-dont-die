@@ -310,7 +310,7 @@ class GolemPage
 
 		if (history.getFirstSeen() > 0)
 		{
-			line(record, "Crafted on " + DAY.format(new java.util.Date(history.getFirstSeen())));
+			line(record, "Alive since " + DAY.format(new java.util.Date(history.getFirstSeen())));
 		}
 		line(record, "Walked about " + NUMBERS.format(history.getWalked()) + " tiles");
 		line(record, history.getTransports() == 1 ? "Used one shortcut"
