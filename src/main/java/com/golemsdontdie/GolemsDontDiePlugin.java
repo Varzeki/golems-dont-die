@@ -50,6 +50,8 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
+import net.runelite.client.eventbus.EventBus;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.util.ImageUtil;
 
 /**
@@ -191,6 +193,10 @@ public class GolemsDontDiePlugin extends Plugin
 
 	@Inject
 	private InfoBoxManager infoBoxManager;
+
+	/** For asking the Shortest Path plugin for a route, if it is installed. See pathTo. */
+	@Inject
+	private EventBus eventBus;
 
 	/** The infobox saying how far off the golem being looked for is; null while none is. */
 	private GolemFindBox findBox;
@@ -665,6 +671,7 @@ public class GolemsDontDiePlugin extends Plugin
 				finding = null;
 				client.clearHintArrow();
 				showFindBox(false);
+				clearPath();
 			});
 			propFactory.clear();
 			raftFactory.clear();
@@ -930,6 +937,62 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private static final int SAME_MAP_TILES = 3200;
 
+	/**
+	 * The Shortest Path plugin's own name for itself, and its two messages: draw a route to a
+	 * target, and take it away again. See its ShortestPathPlugin.onPluginMessage.
+	 */
+	private static final String SHORTEST_PATH = "shortestpath";
+	private static final String SHORTEST_PATH_ROUTE = "path";
+	private static final String SHORTEST_PATH_CLEAR = "clear";
+
+	/**
+	 * How far a golem must have moved, and how long since the last route, before it is routed to
+	 * again. A route is a pathfinding search in the other plugin, and a golem walking is a target
+	 * moving every tick; asked every tick it would search without end for a route it had not
+	 * finished drawing.
+	 */
+	private static final int REROUTE_TILES = 12;
+	private static final int REROUTE_TICKS = 10;
+
+	/** Where Shortest Path was last asked to go, or null if this plugin has not asked. */
+	private WorldPoint routedTo;
+	private int routedAt;
+
+	/**
+	 * Asks Shortest Path for the way to a golem. Nobody listens if it is not installed, so this is
+	 * free when it is not; when it is, the route follows the golem at a walking pace.
+	 */
+	private void pathTo(WorldPoint at)
+	{
+		if (!config.findPath())
+		{
+			clearPath();
+			return;
+		}
+		int tick = client.getTickCount();
+		boolean moved = routedTo == null || routedTo.getPlane() != at.getPlane()
+			|| routedTo.distanceTo2D(at) >= REROUTE_TILES;
+		if (!moved || routedTo != null && tick - routedAt < REROUTE_TICKS && tick >= routedAt)
+		{
+			return;
+		}
+		routedTo = at;
+		routedAt = tick;
+		Map<String, Object> data = new HashMap<>();
+		data.put("target", at);
+		eventBus.post(new PluginMessage(SHORTEST_PATH, SHORTEST_PATH_ROUTE, data));
+	}
+
+	/** Takes away a route this plugin asked for. One the player set themselves is not ours. */
+	private void clearPath()
+	{
+		if (routedTo != null)
+		{
+			routedTo = null;
+			eventBus.post(new PluginMessage(SHORTEST_PATH, SHORTEST_PATH_CLEAR));
+		}
+	}
+
 	/** Puts the find infobox up, or takes it down. */
 	private void showFindBox(boolean shown)
 	{
@@ -972,6 +1035,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (finding == null)
 		{
 			client.clearHintArrow();
+			clearPath();
 		}
 		showFindBox(finding != null);
 		if (panel != null)
@@ -1013,6 +1077,7 @@ public class GolemsDontDiePlugin extends Plugin
 			findGolem(null);
 			return;
 		}
+		pathTo(at);
 
 		// The game's own arrow points at a tile and moves when the tick says so, which beside a
 		// walking golem reads as an arrow trailing it. So it is used only where the plugin cannot

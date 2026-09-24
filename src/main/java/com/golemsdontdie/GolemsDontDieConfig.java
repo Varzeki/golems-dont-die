@@ -148,6 +148,19 @@ public interface GolemsDontDieConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "findPath",
+		name = "Path to a golem being found",
+		description = "While you are finding a golem, the Shortest Path plugin draws the way to it. "
+			+ "Needs Shortest Path installed; without it this does nothing.",
+		section = golemsSection,
+		position = 8
+	)
+	default boolean findPath()
+	{
+		return true;
+	}
+
 	@ConfigSection(
 		name = "Celebrations",
 		description = "Golems stop what they are doing and dance when something goes well",
