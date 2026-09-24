@@ -62,19 +62,20 @@ class GolemNameplateOverlay extends Overlay
 		{
 			String name = names.of(golem);
 			FakeGolem drawn = golem.getRenderer();
-			if (name == null || name.trim().isEmpty() || drawn == null || golem.getDrawPlane() != wv.getPlane())
+			if (name == null || name.trim().isEmpty() || drawn == null
+				|| !golem.isAboard() && golem.getDrawPlane() != wv.getPlane())
 			{
 				continue;
 			}
 
-			int localX = golem.getDrawFineX() - wv.getBaseX() * Golem.TILE;
-			int localY = golem.getDrawFineY() - wv.getBaseY() * Golem.TILE;
-			if (!Golem.isInScene(wv, localX, localY))
+			// Where it is drawn, which for a golem aboard the player's ship is on the ship's deck.
+			LocalPoint drawnAt = golem.drawnPoint(client);
+			if (drawnAt == null)
 			{
 				continue;
 			}
 
-			Point at = Perspective.getCanvasTextLocation(client, graphics, new LocalPoint(localX, localY, wv), name,
+			Point at = Perspective.getCanvasTextLocation(client, graphics, drawnAt, name,
 				drawn.getModelHeight() + NAME_GAP + golem.jumpArc() + golem.deckLift());
 			if (at != null)
 			{
@@ -105,20 +106,19 @@ class GolemNameplateOverlay extends Overlay
 	{
 		Golem golem = plugin.getFinding();
 		FakeGolem drawn = golem == null ? null : golem.getRenderer();
-		if (drawn == null || golem.getDrawPlane() != wv.getPlane())
+		if (drawn == null || !golem.isAboard() && golem.getDrawPlane() != wv.getPlane())
 		{
 			return;
 		}
-		int localX = golem.getDrawFineX() - wv.getBaseX() * Golem.TILE;
-		int localY = golem.getDrawFineY() - wv.getBaseY() * Golem.TILE;
-		if (!Golem.isInScene(wv, localX, localY))
+		LocalPoint drawnAt = golem.drawnPoint(client);
+		if (drawnAt == null)
 		{
 			return;
 		}
 
 		int bob = (int) (Math.sin(System.currentTimeMillis() / 220.0) * ARROW_BOB);
-		Point at = Perspective.localToCanvas(client, new LocalPoint(localX, localY, wv),
-			wv.getPlane(), drawn.getModelHeight() + ARROW_GAP + golem.jumpArc() + golem.deckLift());
+		Point at = Perspective.localToCanvas(client, drawnAt,
+			golem.drawnLevel(), drawn.getModelHeight() + ARROW_GAP + golem.jumpArc() + golem.deckLift());
 		if (at == null)
 		{
 			return;

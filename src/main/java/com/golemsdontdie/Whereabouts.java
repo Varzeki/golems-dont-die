@@ -29,6 +29,10 @@ class Whereabouts
 		{
 			return "";
 		}
+		if (golem.isAboard())
+		{
+			return "Aboard your ship";
+		}
 		if (golem.isSailing(tick))
 		{
 			// Where it will land, which is the useful half of a crossing: the sea itself has no name

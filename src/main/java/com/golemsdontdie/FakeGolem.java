@@ -158,7 +158,8 @@ class FakeGolem extends RuneLiteObjectController
 	 */
 	java.awt.Shape clickbox()
 	{
-		WorldView wv = client.getTopLevelWorldView();
+		// The world it is drawn in: aboard the player's ship, the ship's own.
+		WorldView wv = golem.isAboard() ? client.getWorldView(golem.getAboardView()) : client.getTopLevelWorldView();
 		if (wv == null || baseModel == null)
 		{
 			return null;
@@ -178,6 +179,11 @@ class FakeGolem extends RuneLiteObjectController
 	/** Copies the simulation's position and heading onto the drawn object. */
 	private void syncTransform()
 	{
+		if (golem.isAboard())
+		{
+			syncAboard();
+			return;
+		}
 		WorldView wv = client.getTopLevelWorldView();
 		if (wv == null)
 		{
@@ -206,6 +212,25 @@ class FakeGolem extends RuneLiteObjectController
 			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getDrawPlane())
 				- golem.jumpArc() - golem.deckLift());
 		}
+	}
+
+	/**
+	 * Aboard the player's ship: on the deck, in the ship's own world, which the client moves and
+	 * turns with the boat. Height is the deck's, which that world knows.
+	 */
+	private void syncAboard()
+	{
+		LocalPoint deck = golem.drawnPoint(client);
+		if (deck == null)
+		{
+			return;
+		}
+		setX(deck.getX());
+		setY(deck.getY());
+		setWorldView(deck.getWorldView());
+		setLevel(golem.drawnLevel());
+		setOrientation(golem.drawOrientation());
+		setZ(Perspective.getTileHeight(client, deck, golem.drawnLevel()));
 	}
 
 	/**

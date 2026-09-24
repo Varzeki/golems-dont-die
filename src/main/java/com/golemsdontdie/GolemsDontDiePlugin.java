@@ -148,6 +148,10 @@ public class GolemsDontDiePlugin extends Plugin
 	@Inject
 	private GolemCrews crews;
 
+	/** Golems that come aboard the player's own ship. See GolemShipmates. */
+	@Inject
+	private GolemShipmates shipmates;
+
 	/**
 	 * Watches the player use obstacles and teaches the plugin what each does. Golems may only
 	 * use obstacles whose animation is known; this grows that set.
@@ -507,6 +511,9 @@ public class GolemsDontDiePlugin extends Plugin
 		obstacleObserver.startUp();
 		obstacleData.startUp();
 		mapPoints.startUp();
+		// Drawn in the world it stands in, which it is registered with: moving aboard or ashore
+		// is a new drawn object, made on the next frame.
+		shipmates.setOnMoved(this::detachRenderer);
 
 		// Saved map first, shipped baseline underneath: what the player has walked beats a
 		// static export of the same ground.
@@ -660,6 +667,8 @@ public class GolemsDontDiePlugin extends Plugin
 				saveLearnedObstacles();
 			});
 
+			// Ashore first, at the quays they boarded from, so none is saved at sea.
+			safely("bringing golems ashore", () -> shipmates.abandon(client.getTickCount()));
 			// Or shutdown is indistinguishable from deleting every golem the player has.
 			safely("saving golems", this::saveGolems);
 			safely("saving the island map", this::saveIslandMemory);
@@ -1597,6 +1606,16 @@ public class GolemsDontDiePlugin extends Plugin
 
 		for (Golem golem : golems)
 		{
+			// Aboard the player's ship: nowhere to walk and nothing to plan. It goes where the ship
+			// goes, is drawn on its deck, and dances there if there is something to dance about.
+			if (golem.isAboard())
+			{
+				shipmates.carry(golem);
+				golem.setTickNow(tick);
+				golem.setDancing(celebrating);
+				updateRenderer(golem, wv, true, drawnPerTile);
+				continue;
+			}
 			if (!lookAtAll && golem.getTier() == GolemTier.FAR && golem.getRenderer() == null
 				&& !golem.farCheckDue(tick))
 			{
@@ -2022,7 +2041,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 	private void sendHomeIfCutOff(Golem golem)
 	{
-		if (golem.isDying() || golem.inTransition()
+		if (golem.isDying() || golem.inTransition() || golem.isAboard()
 			|| golem.isSailing(roamContext.getTick()) || golem.isInInstance())
 		{
 			return;
@@ -2532,7 +2551,7 @@ public class GolemsDontDiePlugin extends Plugin
 	private static boolean freeToWave(Golem golem, int tick)
 	{
 		return !golem.isDying() && !golem.isDancing() && !golem.isGreeting(tick) && !golem.isPartying(tick)
-			&& !golem.inTransition() && !golem.isSailing(tick);
+			&& !golem.inTransition() && !golem.isSailing(tick) && !golem.isAboard();
 	}
 
 	/** How many other golems are within a few tiles of this one, counted up to what is asked. */
@@ -2668,8 +2687,10 @@ public class GolemsDontDiePlugin extends Plugin
 			&& wv != null
 			&& wv.getPlane() == golem.getDrawPlane()
 			&& inScene(wv, golem)
-			&& drawnPerTile.addTo(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
-				golem.getFineY() / Golem.TILE, golem.getPlane()), 1) <= MAX_DRAWN_PER_TILE;
+			// Aboard, a whole crew stands on a boat three tiles long, each in a place of its own
+			// on the deck: the cap is for golems heaped on one tile of land.
+			&& (golem.isAboard() || drawnPerTile.addTo(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
+				golem.getFineY() / Golem.TILE, golem.getPlane()), 1) <= MAX_DRAWN_PER_TILE);
 
 		if (!visible)
 		{
@@ -2850,6 +2871,9 @@ public class GolemsDontDiePlugin extends Plugin
 		// Who is waiting at a quayside, who has just cast off, and who has landed.
 		crews.update(golems, roamContext.getTick(), roamContext);
 
+		// Whether the player has just stepped aboard their ship, or off it, with golems following.
+		shipmates.update(golems, client.getTickCount(), roamPlanner::snapToMesh);
+
 		// A few golems a tick, asked whether the ground they are on joins up with home.
 		sweepForCutOff();
 
@@ -2914,6 +2938,12 @@ public class GolemsDontDiePlugin extends Plugin
 			// it has covered since the last one. See GolemHistory.
 			for (Golem golem : golems)
 			{
+				// At sea on the player's ship it has not walked anywhere: the voyage is written down
+				// when it steps ashore, as sailed.
+				if (golem.isAboard())
+				{
+					continue;
+				}
 				WorldPoint at = golem.currentTile();
 				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome());
 			}
@@ -2991,7 +3021,9 @@ public class GolemsDontDiePlugin extends Plugin
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
 		{
 			// Golems are permanent, so nothing is released here — only the renderers,
-			// which belong to a scene that is going away.
+			// which belong to a scene that is going away. Any aboard the player's ship go back
+			// to their quays first: the ship does not come with the player.
+			shipmates.abandon(client.getTickCount());
 			saveGolems();
 			saveIslandMemory();
 			// Quest progress is the account's, and the next login may be another account.

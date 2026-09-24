@@ -86,6 +86,7 @@ public class DevCommands extends Plugin
 			case "gcutoff":
 			case "gparty":
 			case "gboat":
+			case "gdeck":
 			case "ghelp":
 				clientThread.invoke(() -> run(command, args));
 				break;
@@ -447,8 +448,51 @@ public class DevCommands extends Plugin
 			case "ghelp":
 				say("::golems  ::gdance [s]  ::gguitar  ::glevel  ::gcollog  ::gcrafted");
 				say("::gbring [n]  ::gtraits  ::gpage  ::gfind  ::gremove [n]  ::gmap  ::gwhere [name]");
-				say("::gpath x y  ::gcutoff  ::gparty  ::gboat [raft|skiff|sloop]");
+				say("::gpath x y  ::gcutoff  ::gparty  ::gboat [raft|skiff|sloop]  ::gdeck");
 				break;
+
+			case "gdeck":
+			{
+				// Standing on your own ship: the deck as the golems would board it. R is a rail place,
+				// in the order golems take them; D deck; # blocked; . no tile at all; P the player.
+				Player me = client.getLocalPlayer();
+				net.runelite.api.WorldView deck = me == null ? null : me.getWorldView();
+				if (deck == null || deck.isTopLevel())
+				{
+					say("Not aboard a ship.");
+					break;
+				}
+				net.runelite.api.WorldEntity entity = client.getTopLevelWorldView().worldEntities().byIndex(deck.getId());
+				say("View " + deck.getId() + ", " + deck.getSizeX() + "x" + deck.getSizeY() + ", plane " + deck.getPlane()
+					+ ", owner " + (entity == null ? "?" : entity.getOwnerType()) + " (2 is yours)");
+				java.util.List<int[]> rails = GolemShipmates.rails(deck, deck.getPlane(), me.getLocalLocation());
+				int[][] flags = deck.getCollisionMaps()[deck.getPlane()].getFlags();
+				net.runelite.api.Tile[][] floor = deck.getScene().getTiles()[deck.getPlane()];
+				int px = me.getLocalLocation().getSceneX();
+				int py = me.getLocalLocation().getSceneY();
+				for (int y = Math.min(deck.getSizeY(), flags[0].length) - 1; y >= 0; y--)
+				{
+					StringBuilder row = new StringBuilder();
+					for (int x = 0; x < Math.min(deck.getSizeX(), flags.length); x++)
+					{
+						int order = -1;
+						for (int i = 0; i < rails.size(); i++)
+						{
+							if (rails.get(i)[0] / 128 == x && rails.get(i)[1] / 128 == y)
+							{
+								order = i;
+							}
+						}
+						row.append(x == px && y == py ? 'P'
+							: order >= 0 ? (char) ('1' + Math.min(order, 8))
+							: floor[x][y] == null ? '.'
+							: (flags[x][y] & GolemShipmates.NOT_DECK) != 0 ? '#' : 'D');
+					}
+					say(row.toString());
+				}
+				say(rails.size() + " rail places; golems take them in the numbered order");
+				break;
+			}
 
 			case "golems":
 			{

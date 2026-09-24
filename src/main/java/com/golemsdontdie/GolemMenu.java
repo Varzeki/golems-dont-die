@@ -198,8 +198,11 @@ class GolemMenu
 				continue;
 			}
 
-			Point ground = Perspective.localToCanvas(client,
-				new LocalPoint(renderer.getX(), renderer.getY(), wv), golem.getPlane());
+			// In the world the golem is drawn in, which aboard the player's ship is the ship's.
+			LocalPoint drawnAt = golem.isAboard() ? golem.drawnPoint(client)
+				: new LocalPoint(renderer.getX(), renderer.getY(), wv);
+			Point ground = drawnAt == null ? null
+				: Perspective.localToCanvas(client, drawnAt, golem.isAboard() ? golem.drawnLevel() : golem.getPlane());
 			if (ground == null
 				|| Math.abs(ground.getX() - mouse.getX()) > CANDIDATE_RADIUS
 				|| Math.abs(ground.getY() - mouse.getY()) > CANDIDATE_RADIUS)

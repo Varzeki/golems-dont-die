@@ -5,7 +5,9 @@ import java.util.Deque;
 import java.util.Random;
 import lombok.Getter;
 import lombok.Setter;
+import net.runelite.api.Client;
 import net.runelite.api.WorldView;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 
 /**
@@ -196,6 +198,12 @@ class Golem
 	 */
 	WorldPoint saveTile()
 	{
+		// Aboard the player's ship it is at sea, and the quay it boarded from is where it goes if
+		// the voyage ends without it stepping off.
+		if (isAboard() && aboardFrom != null)
+		{
+			return aboardFrom;
+		}
 		return itinerary != null && itinerary.isVoyage() ? itinerary.destination() : currentTile();
 	}
 
@@ -1880,12 +1888,112 @@ class Golem
 	 */
 	int drawOrientation()
 	{
+		if (isAboard())
+		{
+			// Out over the rail, in the ship's own frame: the client turns the ship.
+			return deckFacing;
+		}
 		if (!crewed || deckAcross == 0)
 		{
 			return orientation;
 		}
 		// Right of a golem facing south is west, which is 512 further round.
 		return orientation + (deckAcross > 0 ? 512 : -512) & 2047;
+	}
+
+	// ------------------------------------------------------------------ aboard the player's ship
+
+	/** The world view of the player's ship this golem stands on, or -1 ashore. See GolemShipmates. */
+	@Getter
+	private int aboardView = -1;
+
+	/** Where on the deck, in the ship's own local units, the floor it is on, and the way it faces. */
+	@Getter
+	private int deckX;
+	@Getter
+	private int deckY;
+	private int deckPlane;
+	private int deckFacing;
+
+	/** The quay it stepped aboard from, which it goes back to if the voyage ends without it. */
+	@Getter
+	private WorldPoint aboardFrom;
+
+	boolean isAboard()
+	{
+		return aboardView >= 0;
+	}
+
+	/**
+	 * Steps onto the player's ship, at a place on its deck. Whatever the golem was about is dropped:
+	 * it goes where the ship goes now.
+	 */
+	void boardShip(int view, int x, int y, int plane, int facing)
+	{
+		aboardFrom = currentTile();
+		// Everything a walk or a route leaves behind, cleared the way a rescue clears it.
+		relocate(aboardFrom);
+		aboardView = view;
+		deckX = x;
+		deckY = y;
+		deckPlane = plane;
+		deckFacing = facing;
+	}
+
+	/** Keeps the golem's own position at the ship's place in the main world, in fine units. */
+	void followShip(int fineX, int fineY, int plane)
+	{
+		this.fineX = fineX;
+		this.fineY = fineY;
+		this.plane = plane;
+	}
+
+	/** Steps off the ship onto the given tile, and remembers having sailed there. */
+	void leaveShip(WorldPoint at, int tick)
+	{
+		WorldPoint ashore = at == null ? currentTile() : at;
+		// Sailed, if it came ashore somewhere else. Stepping straight back off at the quay it
+		// boarded from, or being sent back there, is not a voyage for the journal.
+		boolean sailed = aboardFrom == null || regionOf(ashore) != regionOf(aboardFrom);
+		aboardView = -1;
+		relocate(ashore);
+		if (sailed)
+		{
+			history.cameAshore();
+		}
+		noteUnstuck(tick);
+	}
+
+	private static int regionOf(WorldPoint at)
+	{
+		return (at.getX() >> 6) << 8 | at.getY() >> 6;
+	}
+
+	/**
+	 * Where this golem is drawn, in whichever world it is drawn in: the ship's own if it is aboard,
+	 * the scene otherwise. Null if that world is not loaded, or the golem is outside the scene.
+	 */
+	LocalPoint drawnPoint(Client client)
+	{
+		if (isAboard())
+		{
+			WorldView ship = client.getWorldView(aboardView);
+			return ship == null ? null : new LocalPoint(deckX, deckY, ship);
+		}
+		WorldView wv = client.getTopLevelWorldView();
+		if (wv == null)
+		{
+			return null;
+		}
+		int localX = getDrawFineX() - wv.getBaseX() * TILE;
+		int localY = getDrawFineY() - wv.getBaseY() * TILE;
+		return isInScene(wv, localX, localY) ? new LocalPoint(localX, localY, wv) : null;
+	}
+
+	/** The floor this golem is drawn on, in the world it is drawn in. */
+	int drawnLevel()
+	{
+		return isAboard() ? deckPlane : getDrawPlane();
 	}
 
 	void setDrawOffset(int x, int y, int plane)

@@ -71,6 +71,11 @@ class GolemCrews
 	{
 		for (Golem golem : golems)
 		{
+			// Aboard the player's ship, it is the player's crew and not one of these.
+			if (golem.isAboard())
+			{
+				continue;
+			}
 			boolean atSea = golem.isSailing(tick);
 			Boolean was = sailing.put(golem, atSea);
 			if (atSea && !Boolean.TRUE.equals(was) && !golem.isCrewed())
@@ -154,7 +159,7 @@ class GolemCrews
 		{
 			Muster muster = it.next().getValue();
 			// Anyone who wandered off, died or was carried away is no longer waiting.
-			muster.waiting.removeIf(golem -> golem.isDying()
+			muster.waiting.removeIf(golem -> golem.isDying() || golem.isAboard()
 				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE);
 
 			if (muster.waiting.size() >= GolemCrew.LEAST)

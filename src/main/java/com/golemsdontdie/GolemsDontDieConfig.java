@@ -161,6 +161,19 @@ public interface GolemsDontDieConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "golemsJoinShip",
+		name = "Golems join your ship",
+		description = "Golems standing near your boat when you step aboard come too: they stand at "
+			+ "the rail while you sail and step off where you do. Not while golem ambition is restricted.",
+		section = golemsSection,
+		position = 9
+	)
+	default boolean golemsJoinShip()
+	{
+		return true;
+	}
+
 	@ConfigSection(
 		name = "Celebrations",
 		description = "Golems stop what they are doing and dance when something goes well",
