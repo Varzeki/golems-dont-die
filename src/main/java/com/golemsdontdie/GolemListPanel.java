@@ -364,6 +364,35 @@ class GolemListPanel extends PluginPanel
 	 *                only when this is positive
 	 * @param names   also take names given in game, which leave the roster otherwise unchanged
 	 */
+	/**
+	 * Puts the list back in order, unless the player is typing in it.
+	 *
+	 * <p>Reordering moves rows, and a text field taken out of the list and put back loses the keyboard:
+	 * a name half typed carried on into the game. So while a name or the search box has the caret the
+	 * order waits, and the next reorder after the player stops typing puts it right.
+	 */
+	void reorder(List<Golem> golems, int missing)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (typing())
+			{
+				return;
+			}
+			roster = golems;
+			updateRevive(missing);
+			updateSummary(golems.size());
+			relist();
+		});
+	}
+
+	/** Whether the keyboard is in one of this panel's text fields: a name, or the search. */
+	private boolean typing()
+	{
+		java.awt.Component owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+		return owner instanceof JTextField && SwingUtilities.isDescendingFrom(owner, this);
+	}
+
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->

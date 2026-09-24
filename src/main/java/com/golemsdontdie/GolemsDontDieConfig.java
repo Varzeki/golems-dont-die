@@ -124,9 +124,10 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "autoName",
 		name = "Auto name golems",
-		description = "Gives golems you have not named one anyway, in the sidebar and on a golem's "
-			+ "page: a name from Gielinor and a surname off the rocks. A golem always gets the same "
-			+ "name, and one you type yourself is kept whatever this is set to.",
+		description = "Gives golems you have not named one anyway, wherever a golem's name is shown: "
+			+ "a name from Gielinor and a surname off the rocks. A golem always gets the same name, and "
+			+ "one you type yourself is kept whatever this is set to. Only names you give are written on "
+			+ "the world map.",
 		section = golemsSection,
 		position = 6
 	)

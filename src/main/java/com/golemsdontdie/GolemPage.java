@@ -240,6 +240,9 @@ class GolemPage
 	void show(Golem golem, Component beside)
 	{
 		showing = golem;
+		// Named once the client thread has had a look, a frame from now; until then, nothing, and
+		// certainly not the last golem's.
+		furthest = null;
 		String suggested = names == null ? null : names.suggested(golem);
 		title.setText(golem.getNickname() != null ? golem.getNickname()
 			: suggested != null ? suggested : "Unnamed golem");
@@ -343,13 +346,18 @@ class GolemPage
 	private String furthest;
 
 	/** Told after the page is up, because naming a place is the client thread's business. */
-	void setFurthest(String place)
+	/**
+	 * @param of the golem the place was worked out for: ignored if the page has moved on to another,
+	 *           the way {@link #showPicture} ignores a late picture
+	 */
+	void setFurthest(Golem of, String place)
 	{
-		furthest = place;
-		if (showing != null)
+		if (of == null || of != showing)
 		{
-			listRecord(showing);
+			return;
 		}
+		furthest = place;
+		listRecord(showing);
 	}
 
 	private static final java.text.NumberFormat NUMBERS = java.text.NumberFormat.getIntegerInstance();

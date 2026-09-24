@@ -69,8 +69,9 @@ Star a golem to keep it at the top of the list, wherever it is.
 Right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar. The
 option carries the number missing, and is only there while any are.
 
-With **Auto name golems** on, the ones you have not named are called something anyway — dimmed in
-the list, and on the golem's own page, so a name you typed still reads as yours. Nothing is written
+With **Auto name golems** on, the ones you have not named are called something anyway — above
+their heads, on their page and in the map's tooltips, and dimmed in the list so a name you typed
+still reads as yours. Only names you give are written on the world map itself. Nothing is written
 down: a golem keeps its name because the name comes from the golem, and turning the setting off
 leaves them all plain golems again.
 

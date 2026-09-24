@@ -198,7 +198,22 @@ final class RoamContext
 	/** How long a measured area is trusted, in ticks, before doors may have changed it. */
 	private static final int AREA_REFRESH_TICKS = 500;
 
-	private final java.util.Map<Long, int[]> areas = new java.util.HashMap<>();
+	private final java.util.Map<Long, int[]> areas = new java.util.LinkedHashMap<Long, int[]>(1024, 0.75f, true)
+	{
+		/**
+		 * Kept to the tiles asked about lately. Every tile a golem plans from is asked about, and over
+		 * a long session with a big roster that was a map of most of the world, held for ever for
+		 * answers that go stale in a minute anyway.
+		 */
+		@Override
+		protected boolean removeEldestEntry(java.util.Map.Entry<Long, int[]> eldest)
+		{
+			return size() > MOST_AREAS;
+		}
+	};
+
+	/** Tiles whose enclosed area is remembered at once; the least recently asked go first. */
+	private static final int MOST_AREAS = 16384;
 
 	/** Walkable tiles reachable from here, capped at {@link #OPEN_AREA}, cached for a while. */
 	int enclosedArea(int x, int y, int plane)

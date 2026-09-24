@@ -123,6 +123,10 @@ class GolemMapPoints
 	@Inject
 	private Whereabouts whereabouts;
 
+	/** What a golem is called, auto name and all, for the tooltip. See GolemNames. */
+	@Inject
+	private GolemNames names;
+
 	/** Read only to tell sea from land, when a dungeon is folded onto the surface map. */
 	@Inject
 	private WorldMesh mesh;
@@ -724,7 +728,8 @@ class GolemMapPoints
 			}
 			if (cell.count == 1)
 			{
-				return isNamed(cell.first) ? cell.first.getNickname() : "A golem";
+				String name = names.of(cell.first);
+				return name != null ? name : "A golem";
 			}
 			return cell.count + " golems";
 		}
@@ -743,9 +748,15 @@ class GolemMapPoints
 				return "Golems";
 			}
 			String place = whereabouts.of(cell.first, tick);
-			// A golem with a name already wears it on the map, so the tooltip only adds where it is.
-			// One without a name is just a golem: the place is the whole of what there is to say.
-			return cell.count == 1 && !isNamed(cell.first) ? place : title() + " — " + place;
+			// What it is called, then where: its own name, or the one auto naming gives it. Only a
+			// name the player gave is drawn on the map itself — auto named, every face on the map
+			// would carry a label — but the tooltip is for one golem, and says who it is.
+			if (cell.count == 1)
+			{
+				String name = names.of(cell.first);
+				return name == null ? place : name + " — " + place;
+			}
+			return title() + " — " + place;
 		}
 	}
 }

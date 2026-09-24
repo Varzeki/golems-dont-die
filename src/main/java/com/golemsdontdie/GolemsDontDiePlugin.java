@@ -734,7 +734,7 @@ public class GolemsDontDiePlugin extends Plugin
 			: placeNames.nameFor(history.getFurthestX(), history.getFurthestY(), 0);
 		javax.swing.SwingUtilities.invokeLater(() ->
 		{
-			open.setFurthest(far);
+			open.setFurthest(golem, far);
 			open.showPicture(golem, drawn);
 		});
 	}
@@ -1055,7 +1055,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (panel != null)
 		{
 			panel.setFinding(finding == null ? null
-				: isNamed(finding) ? finding.getNickname() : "that golem");
+				: names.of(finding) != null ? names.of(finding) : "that golem");
 		}
 		pointAtGolem();
 	}
@@ -2941,7 +2941,7 @@ public class GolemsDontDiePlugin extends Plugin
 			if (++placesSinceOrder >= ORDERS_EVERY)
 			{
 				placesSinceOrder = 0;
-				panel.refresh(nearestFirst(), tally.getTotal() - countLiving(), false);
+				panel.reorder(nearestFirst(), tally.getTotal() - countLiving());
 			}
 		}
 
