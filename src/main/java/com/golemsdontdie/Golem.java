@@ -2154,6 +2154,25 @@ class Golem
 		attend(untilTick, dx, dy, GolemContent.ANIM_EMOTE_WAVE);
 	}
 
+	/** The tick this golem last waved at another golem, or -1 if it never has. */
+	private int wavedAtGolem = -1;
+
+	/**
+	 * Whether it has been long enough since this golem last waved at another. Also true if the
+	 * tick has gone backwards, which is the counter starting again after a world hop.
+	 */
+	boolean mayWaveAtGolem(int tick, int cooldown)
+	{
+		return wavedAtGolem < 0 || tick < wavedAtGolem || tick - wavedAtGolem >= cooldown;
+	}
+
+	/** Waves at another golem where it stands, and remembers having done so. */
+	void waveAtGolem(int untilTick, int dx, int dy, int tick)
+	{
+		greet(untilTick, dx, dy);
+		wavedAtGolem = tick;
+	}
+
 	/** Stops and looks at something, playing nothing: a golem that finds the player interesting. */
 	void watch(int untilTick, int dx, int dy)
 	{

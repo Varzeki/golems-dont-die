@@ -1588,6 +1588,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (social)
 		{
 			noteEmote();
+			greetEachOther(tick);
 		}
 		boolean celebrating = celebration.isDancing(tick);
 		int since = celebration.startedAt(tick);
@@ -2486,6 +2487,52 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			golem.startParty(tick + PARTY_TICKS);
 		}
+	}
+
+	/** How near two golems alone together must be to wave at each other, in tiles. */
+	private static final int PAIR_TILES = 8;
+
+	/** How long before a golem waves at another golem again, in ticks: five minutes. */
+	private static final int PAIR_COOLDOWN_TICKS = 500;
+
+	/**
+	 * Two golems with nobody else about wave at each other, once.
+	 *
+	 * <p>Only when they are the only two golems in view: in a crowd a golem has others all round
+	 * it and greeting each would be all it did, while two meeting on an empty road is exactly when
+	 * people raise a hand. Once, and then not again for five minutes, so a pair walking the same
+	 * way is not waving the whole length of it.
+	 */
+	private void greetEachOther(int tick)
+	{
+		if (drawnGolems.size() != 2)
+		{
+			return;
+		}
+		Golem one = drawnGolems.get(0);
+		Golem other = drawnGolems.get(1);
+		if (!freeToWave(one, tick) || !freeToWave(other, tick) || one.getPlane() != other.getPlane()
+			|| !one.mayWaveAtGolem(tick, PAIR_COOLDOWN_TICKS) || !other.mayWaveAtGolem(tick, PAIR_COOLDOWN_TICKS))
+		{
+			return;
+		}
+		WorldPoint a = one.currentTile();
+		WorldPoint b = other.currentTile();
+		int apart = a.distanceTo2D(b);
+		// Not two golems standing in one another either: there is no turning to face that.
+		if (apart < 1 || apart > PAIR_TILES)
+		{
+			return;
+		}
+		one.waveAtGolem(tick + GREET_TICKS, b.getX() - a.getX(), b.getY() - a.getY(), tick);
+		other.waveAtGolem(tick + GREET_TICKS, a.getX() - b.getX(), a.getY() - b.getY(), tick);
+	}
+
+	/** Whether a golem is doing nothing that a wave would interrupt. */
+	private static boolean freeToWave(Golem golem, int tick)
+	{
+		return !golem.isDying() && !golem.isDancing() && !golem.isGreeting(tick) && !golem.isPartying(tick)
+			&& !golem.inTransition() && !golem.isSailing(tick);
 	}
 
 	/** How many other golems are within a few tiles of this one, counted up to what is asked. */
