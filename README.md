@@ -35,7 +35,7 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Maximum golems | 25 | The cap, when Limit golems is on. |
 | Show golem names | On | Show golem names above their head. |
 | Name colour | Yellow (#FFE700) | The colour of the golem names. |
-| Golems on the world map | Named golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
+| Golems on the world map | Named and starred golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
 | Auto name golems | Off | Gives golems you have not named one anyway — a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
 | Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |

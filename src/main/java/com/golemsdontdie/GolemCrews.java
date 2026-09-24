@@ -121,7 +121,7 @@ class GolemCrews
 	private void hold(Golem golem, int tick)
 	{
 		Integer let = released.get(golem);
-		if (let != null && tick - let < MUSTER_TICKS)
+		if (let != null && tick >= let && tick - let < MUSTER_TICKS)
 		{
 			// Waited once already and found nobody; it goes now.
 			return;
@@ -162,15 +162,15 @@ class GolemCrews
 			muster.waiting.removeIf(golem -> golem.isDying() || golem.isAboard()
 				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE);
 
-			if (muster.waiting.size() >= GolemCrew.LEAST)
+			if (muster.waiting.size() >= GolemCrew.LEAST && cast(muster, tick, context))
 			{
-				if (cast(muster, tick, context))
-				{
-					it.remove();
-				}
+				it.remove();
 				continue;
 			}
-			if (tick - muster.since >= MUSTER_TICKS)
+			// However many are waiting: a crew no crossing can be planned for — no port that suits
+			// all of them — waited the same as one nobody joined, and then went its separate ways.
+			// Left to wait until one could be, it never could, and they stood at the quay for good.
+			if (tick - muster.since >= MUSTER_TICKS || tick < muster.since)
 			{
 				for (Golem golem : muster.waiting)
 				{
@@ -269,6 +269,24 @@ class GolemCrews
 	GolemCrew crewOf(Golem golem)
 	{
 		return crews.get(golem);
+	}
+
+	/**
+	 * Lets every crew still making up go, on a log out or a world hop: the golems waiting are put
+	 * back to planning for themselves rather than kept standing on a wait that was timed by the
+	 * session just left.
+	 */
+	void releaseMusters()
+	{
+		for (Muster muster : mustering.values())
+		{
+			for (Golem golem : muster.waiting)
+			{
+				golem.stopWaiting();
+			}
+		}
+		mustering.clear();
+		released.clear();
 	}
 
 	/** Forgets everything: the golems are being rebuilt. */

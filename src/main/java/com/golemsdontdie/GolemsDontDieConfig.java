@@ -79,7 +79,7 @@ public interface GolemsDontDieConfig extends Config
 	enum MapGolems
 	{
 		NONE("None"),
-		NAMED("Named golems"),
+		NAMED("Named and starred golems"),
 		ALL("All golems");
 
 		private final String label;

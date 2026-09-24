@@ -154,8 +154,11 @@ final class TransportMemory
 
 		float taste = is(GolemTrait.SURE_FOOTED) ? 1.6f : 1f;
 		int rise = transport.getFromPlane() - transport.getToPlane();
-		boolean down = rise > 0 || transport.getToY() >= UNDERGROUND && transport.getFromY() < UNDERGROUND;
-		boolean up = rise < 0 || transport.getFromY() >= UNDERGROUND && transport.getToY() < UNDERGROUND;
+		// Down is off the surface map, into a cave or somewhere below it; up is back onto it.
+		boolean down = rise > 0
+			|| WorldLayout.isSurface(transport.getFromY()) && !WorldLayout.isSurface(transport.getToY());
+		boolean up = rise < 0
+			|| !WorldLayout.isSurface(transport.getFromY()) && WorldLayout.isSurface(transport.getToY());
 		if (down && is(GolemTrait.SPELUNKER) || up && is(GolemTrait.CLIMBER))
 		{
 			taste *= 2.5f;
@@ -167,8 +170,6 @@ final class TransportMemory
 		return taste;
 	}
 
-	/** Coordinates this far north are underground. */
-	private static final int UNDERGROUND = 4160;
 
 	/**
 	 * How long a golem walks after using a shortcut before it looks for another. Three minutes.

@@ -689,7 +689,7 @@ public class GolemsDontDiePlugin extends Plugin
 			safely("taking the arrow off a golem", () ->
 			{
 				finding = null;
-				client.clearHintArrow();
+				clearOurArrow();
 				showFindBox(false);
 				clearPath();
 			});
@@ -952,12 +952,6 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Further apart than this north to south and two tiles are on different maps: a cave is laid
-	 * out six thousand tiles north of the ground it runs under.
-	 */
-	private static final int SAME_MAP_TILES = 3200;
-
-	/**
 	 * The Shortest Path plugin's own name for itself, and its two messages: draw a route to a
 	 * target, and take it away again. See its ShortestPathPlugin.onPluginMessage.
 	 */
@@ -1054,7 +1048,7 @@ public class GolemsDontDiePlugin extends Plugin
 		finding = golem == finding ? null : golem;
 		if (finding == null)
 		{
-			client.clearHintArrow();
+			clearOurArrow();
 			clearPath();
 		}
 		showFindBox(finding != null);
@@ -1086,7 +1080,7 @@ public class GolemsDontDiePlugin extends Plugin
 			// No distance across floors or between a cave and the ground above it: the tiles
 			// between them are not a walk, and a number would say they were.
 			boolean comparable = me != null && me.getPlane() == at.getPlane()
-				&& Math.abs(me.getY() - at.getY()) < SAME_MAP_TILES;
+				&& WorldLayout.sameLayer(me.getY(), at.getY());
 			String name = names.of(finding);
 			findBox.show(name == null ? "a golem" : name, whereabouts.of(finding, roamContext.getTick()),
 				comparable ? me.distanceTo2D(at) : -1);
@@ -1106,12 +1100,34 @@ public class GolemsDontDiePlugin extends Plugin
 		// on top of the other, and GolemNameplateOverlay's is the better of them.
 		if (finding.getRenderer() != null)
 		{
+			clearOurArrow();
+		}
+		else if (arrowAt != null || !client.hasHintArrow())
+		{
+			// Never over the game's own: a quest, a clue or a Slayer task pointing somewhere is
+			// worth more than this, and the infobox, the map and the route still say where the
+			// golem is.
+			client.setHintArrow(at);
+			arrowAt = at;
+		}
+	}
+
+	/** Where this plugin last put the game's hint arrow, or null if the arrow is not ours. */
+	private WorldPoint arrowAt;
+
+	/**
+	 * Takes the hint arrow away if it is still the one this plugin put up. One the game has put up
+	 * since — a quest step, a clue — is left where it is.
+	 */
+	private void clearOurArrow()
+	{
+		if (arrowAt != null && client.hasHintArrow()
+			&& client.getHintArrowType() == net.runelite.api.HintArrowType.COORDINATE
+			&& arrowAt.equals(client.getHintArrowPoint()))
+		{
 			client.clearHintArrow();
 		}
-		else
-		{
-			client.setHintArrow(at);
-		}
+		arrowAt = null;
 	}
 
 	/** Golems the game says have been crafted, as read this session, or -1 if unread. */
@@ -2938,9 +2954,10 @@ public class GolemsDontDiePlugin extends Plugin
 			// it has covered since the last one. See GolemHistory.
 			for (Golem golem : golems)
 			{
-				// At sea on the player's ship it has not walked anywhere: the voyage is written down
-				// when it steps ashore, as sailed.
-				if (golem.isAboard())
+				// At sea it has not walked anywhere, on the player's ship or a boat of its own: the
+				// voyage is written down when it comes ashore, as sailed. Sampled mid-crossing, the
+				// coast it passed was written down as walked to, and the landfall with it.
+				if (golem.isAboard() || golem.isSailing(roamContext.getTick()))
 				{
 					continue;
 				}
@@ -3035,9 +3052,15 @@ public class GolemsDontDiePlugin extends Plugin
 			hiddenNpcs.clear();
 			lastGameCycle = -1;
 
-			// The tick counter restarts on the other side, so a deadline carried across would sit
-			// far ahead of it, and the levels and the golem count are about to be sent again.
+			// The levels and the golem count are about to be sent again, and must not be taken for
+			// news. And whatever the golems were doing for the player's benefit — a wave, a dance, a
+			// crew making up at a quay — is over: those moments were timed against this session.
 			celebration.reset();
+			for (Golem golem : golems)
+			{
+				golem.forgetMoments();
+			}
+			crews.releaseMusters();
 
 			for (Golem golem : golems)
 			{

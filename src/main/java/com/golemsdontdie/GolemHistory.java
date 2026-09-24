@@ -133,8 +133,9 @@ class GolemHistory
 			return;
 		}
 
-		// Walked into the dark: that is exploring, and reads better than walking.
-		GolemTravel how = manner == GolemTravel.WALKED && y >= UNDERGROUND
+		// Walked off the surface — into a cave, or somewhere laid out apart from the map, such as
+		// God Wars or Zanaris: that is exploring, and reads better than walking.
+		GolemTravel how = manner == GolemTravel.WALKED && !WorldLayout.isSurface(y)
 			? GolemTravel.EXPLORED : manner;
 		manner = GolemTravel.WALKED;
 
@@ -196,6 +197,7 @@ class GolemHistory
 		lastX = x;
 		lastY = y;
 
+		// -1 for somewhere with no ground above it to measure from: not far, just unmeasurable.
 		int away = away(x, y, home);
 		if (away > furthest)
 		{
@@ -206,11 +208,12 @@ class GolemHistory
 	}
 
 	/**
-	 * How far a tile is from home.
+	 * How far a tile is from home, or -1 where that cannot be said.
 	 *
-	 * <p>Underground counts as the ground above it: a dungeon is drawn a hundred regions north of
-	 * what it runs under, and a golem in the cave under the island is not six thousand tiles from
-	 * home, it is under it.
+	 * <p>A cave counts as the ground above it: it is laid out a hundred regions north of what it runs
+	 * under, and a golem in the cave under the island is not six thousand tiles from home, it is
+	 * under it. Somewhere laid out apart from the map — God Wars, TzHaar — is under nowhere that can
+	 * be named, and a number measured to it would be a number about the layout, not the golem.
 	 */
 	private static int away(int x, int y, WorldPoint home)
 	{
@@ -218,10 +221,11 @@ class GolemHistory
 		{
 			return 0;
 		}
-		int above = y >= UNDERGROUND ? y - UNDERGROUND : y;
-		return Math.max(Math.abs(x - home.getX()), Math.abs(above - home.getY()));
+		int above = WorldLayout.groundAbove(y);
+		if (above < 0)
+		{
+			return -1;
+		}
+		return Math.max(Math.abs(x - home.getX()), Math.abs(above - WorldLayout.groundAbove(home.getY())));
 	}
-
-	/** How far below the surface the underground is laid out, in tiles. */
-	private static final int UNDERGROUND = 6400;
 }

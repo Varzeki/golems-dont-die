@@ -53,8 +53,8 @@ class GolemMapPoints
 	/** The face's size on screen, in pixels, which sets how far apart two faces must be. */
 	private static final int FACE_PIXELS = 15;
 
-	/** How far below the surface the underground is drawn, in tiles. */
-	private static final int UNDERGROUND = 6400;
+	/** How far north of the ground above it a cave is laid out, and drawn. See WorldLayout. */
+	private static final int UNDERGROUND = WorldLayout.CAVE_OFFSET;
 
 	/** Whether the map is looking at a dungeon rather than the ground above it. For the log. */
 	private boolean underground;
@@ -348,7 +348,8 @@ class GolemMapPoints
 
 		for (Golem golem : golems)
 		{
-			if (golem.isDying() || named && !isNamed(golem))
+			// "Named" means the golems a player has marked out: named or starred.
+			if (golem.isDying() || named && !isNamed(golem) && !golem.isFavourite())
 			{
 				continue;
 			}

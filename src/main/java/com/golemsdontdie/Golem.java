@@ -756,6 +756,12 @@ class Golem
 			noteInstance(itinerary.transport());
 			history.tookTransport(itinerary.transport());
 		}
+		else if (itinerary != null && itinerary.isVoyage())
+		{
+			// Out of view, a crossing ends here rather than at a landing anyone watched: the journal
+			// hears it came ashore all the same, or it would say the golem walked there.
+			history.cameAshore();
+		}
 		WorldPoint at = itinerary == null ? currentTile() : itinerary.destination();
 		this.fineX = at.getX() * TILE + TILE / 2;
 		this.fineY = at.getY() * TILE + TILE / 2;
@@ -2248,7 +2254,32 @@ class Golem
 
 	boolean isPartying(int tick)
 	{
-		return tick < partyUntil;
+		return tick < partyUntil && partyUntil - tick <= MOST_MOMENT_TICKS;
+	}
+
+	/**
+	 * Longest a wave, a look or a dance may still have to run, in ticks. Every one is a few seconds;
+	 * a deadline further off than this was set against a clock that has since gone backwards, and
+	 * believing it would hold the golem still for as long as the old clock had been running.
+	 */
+	private static final int MOST_MOMENT_TICKS = 30;
+
+	/**
+	 * Forgets anything the golem was in the middle of for the player's benefit — a wave, a look, a
+	 * dance of its own — on a log out or a world hop, where the moment is over whatever the clock
+	 * says.
+	 */
+	void forgetMoments()
+	{
+		greetUntil = 0;
+		partyUntil = 0;
+		wavedAtGolem = -1;
+	}
+
+	/** Gives up waiting at a quay for a crew, and plans for itself again. */
+	void stopWaiting()
+	{
+		relocate(currentTile());
 	}
 
 	/**
@@ -2311,7 +2342,7 @@ class Golem
 
 	boolean isGreeting(int tick)
 	{
-		return tick < greetUntil;
+		return tick < greetUntil && greetUntil - tick <= MOST_MOMENT_TICKS;
 	}
 
 	void nextDanceMove()
@@ -2368,14 +2399,14 @@ class Golem
 		// Attending to the player — a wave, a copied emote, or simply looking — which stops for
 		// nothing except the things above: a golem halfway up a ladder has its hands full. A
 		// golem that is only watching plays nothing and falls through to standing still.
-		if (!walking && greetUntil > 0 && tickNow < greetUntil && greetAnimation != -1)
+		if (!walking && isGreeting(tickNow) && greetAnimation != -1)
 		{
 			return greetAnimation;
 		}
 		// Last of all, and never over anything else: a golem climbing, crossing or at the helm has
 		// a pose already, and one halfway through a recorded motion is having its frames set by
 		// hand. Dancing is what a golem does when it is doing nothing.
-		if ((dancing || partyUntil > 0 && tickNow < partyUntil) && !walking)
+		if ((dancing || isPartying(tickNow)) && !walking)
 		{
 			if (danceMove == null)
 			{

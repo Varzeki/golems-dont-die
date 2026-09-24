@@ -227,7 +227,10 @@ class GolemClimate
 	 */
 	private static float nearness(byte[] grid, int x, int y, boolean underAsAbove)
 	{
-		int region = x >> 6 << 8 | (underAsAbove && y >= UNDERGROUND ? y - UNDERGROUND : y) >> 6;
+		// Only a cave has ground above it to count as; somewhere laid out apart from the map is
+		// taken as itself.
+		int above = WorldLayout.groundAbove(y);
+		int region = x >> 6 << 8 | (underAsAbove && above >= 0 ? above : y) >> 6;
 		if (region < 0 || region >= grid.length)
 		{
 			return FLOOR;
@@ -242,12 +245,6 @@ class GolemClimate
 		// its direction — it is what tells a golem which way the snow is.
 		return NEAR - (NEAR - FLOOR) * Math.min(1f, (away - 1) / (float) (REACH - 1));
 	}
-
-	/**
-	 * How far below the surface the underground is laid out, in tiles: a dungeon is drawn a hundred
-	 * regions north of what it runs under.
-	 */
-	private static final int UNDERGROUND = 6400;
 
 	/**
 	 * The mirror of {@link #nearness}, for the golem that wants none of it: being in the place is
