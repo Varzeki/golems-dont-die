@@ -128,4 +128,18 @@ public class GolemStoreTest
 		assertEquals(2600, saved.furthestX);
 		assertEquals(golem.getHistory().getFirstSeen(), saved.firstSeen);
 	}
+
+	/** A star stays on the golem it was given to, and a golem saved before stars has none. */
+	@Test
+	public void aStarSurvivesTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem starred = golem(8L, "Quartz");
+		starred.setFavourite(true);
+		List<GolemStore.SavedGolem> read = store.deserialise(store.serialise(
+			Arrays.asList(starred, golem(9L, null))));
+		assertEquals(true, read.get(0).favourite);
+		assertEquals(false, read.get(1).favourite);
+		assertEquals(false, store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0).favourite);
+	}
 }

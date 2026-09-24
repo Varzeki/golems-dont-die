@@ -40,6 +40,9 @@ class GolemStore
 	/** Where the traits are, after the six of the history. */
 	private static final int TRAITS_AT = HISTORY_AT + 6;
 
+	/** Whether the player starred the golem, after its traits. */
+	private static final int FAVOURITE_AT = TRAITS_AT + 1;
+
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
 
@@ -72,6 +75,9 @@ class GolemStore
 		 * the seed after the list changed, every golem would come back with somebody else's.
 		 */
 		int traits;
+
+		/** Starred by the player; see Golem#isFavourite. */
+		boolean favourite;
 
 		/** Its history, in the order GolemHistory.restore takes them; all zero if there was none. */
 		long firstSeen;
@@ -120,7 +126,8 @@ class GolemStore
 				.append(FIELD_SEPARATOR).append(history.getWalked())
 				.append(FIELD_SEPARATOR).append(history.getFurthestX())
 				.append(FIELD_SEPARATOR).append(history.getFurthestY())
-				.append(FIELD_SEPARATOR).append(golem.getTraits());
+				.append(FIELD_SEPARATOR).append(golem.getTraits())
+				.append(FIELD_SEPARATOR).append(golem.isFavourite() ? 1 : 0);
 		}
 		return out.toString();
 	}
@@ -177,6 +184,7 @@ class GolemStore
 					saved.furthestY = Integer.parseInt(fields[HISTORY_AT + 5].trim());
 				}
 				saved.traits = fields.length > TRAITS_AT ? Integer.parseInt(fields[TRAITS_AT].trim()) : 0;
+				saved.favourite = fields.length > FAVOURITE_AT && "1".equals(fields[FAVOURITE_AT].trim());
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -223,6 +231,7 @@ class GolemStore
 			golem.restoreTraits(saved.traits);
 		}
 		golem.setNickname(saved.nickname);
+		golem.setFavourite(saved.favourite);
 		if (saved.firstSeen != 0)
 		{
 			golem.getHistory().restore(saved.firstSeen, saved.transports, saved.voyages, saved.walked,

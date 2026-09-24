@@ -379,6 +379,14 @@ class Golem
 	private String nickname;
 
 	/**
+	 * Starred by the player, which keeps it at the top of the sidebar. Set on the client thread and
+	 * read by the sidebar's own, to draw the star.
+	 */
+	@Getter
+	@Setter
+	private volatile boolean favourite;
+
+	/**
 	 * True while the golem is inside an instance — through the pew, in the Mad Angel's room.
 	 * Golems are simulated in the instance's template, ordinary world coordinates, so
 	 * coordinates alone cannot say who is inside; without this, golems near the cathedral

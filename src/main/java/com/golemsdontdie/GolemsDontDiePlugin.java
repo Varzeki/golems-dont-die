@@ -309,10 +309,14 @@ public class GolemsDontDiePlugin extends Plugin
 	{
 		List<Golem> living = livingGolems();
 		WorldPoint me = PlayerPosition.of(client);
+		// Starred golems first, wherever they are: that is what starring one is for. Nearest first
+		// within each, so the favourites keep the same order as everyone else.
+		java.util.Comparator<Golem> order = java.util.Comparator.comparing(golem -> !golem.isFavourite());
 		if (me != null)
 		{
-			living.sort(java.util.Comparator.comparingInt(golem -> golem.currentTile().distanceTo2D(me)));
+			order = order.thenComparingInt(golem -> golem.currentTile().distanceTo2D(me));
 		}
+		living.sort(order);
 		return living;
 	}
 
@@ -566,6 +570,13 @@ public class GolemsDontDiePlugin extends Plugin
 			}),
 			() -> clientThread.invoke(this::reviveMissing),
 			golem -> clientThread.invoke(() -> findGolem(golem)),
+			golem -> clientThread.invoke(() ->
+			{
+				golem.setFavourite(!golem.isFavourite());
+				saveGolemsSoon();
+				// Straight to the top, or back among the rest, rather than at the next reorder.
+				rosterChanged = true;
+			}),
 			golem ->
 			{
 				// Gone if the plugin stopped between the click and this: see shutDown.

@@ -128,8 +128,8 @@ class GolemListPanel extends PluginPanel
 	private final JLabel pageLabel = new JLabel();
 	private final JPanel paging = new JPanel(new BorderLayout());
 
-	/** Says what the order is, under the pager: the list is nearest first and nothing said so. */
-	private final JLabel order = new JLabel("Closest first");
+	/** Says what the order is, under the pager: starred, then nearest, and nothing else said so. */
+	private final JLabel order = new JLabel("Starred first, then closest");
 
 	/** The whole roster, as the client thread last gave it. */
 	private List<Golem> roster = java.util.Collections.emptyList();
@@ -152,6 +152,9 @@ class GolemListPanel extends PluginPanel
 
 	/** Asks for a golem to be pointed at, or for the pointing to stop when given null. */
 	private final Consumer<Golem> onFind;
+
+	/** Stars a golem, or takes its star away. */
+	private final Consumer<Golem> onStar;
 
 	/** Asks for one golem's own page to be opened. */
 	private final Consumer<Golem> onOpen;
@@ -192,12 +195,13 @@ class GolemListPanel extends PluginPanel
 
 	GolemListPanel(GolemNames names, Consumer<Golem> onRemove,
 		java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive,
-		Consumer<Golem> onFind, Consumer<Golem> onOpen)
+		Consumer<Golem> onFind, Consumer<Golem> onStar, Consumer<Golem> onOpen)
 	{
 		super(false);
 		this.names = names;
 		this.onRemove = onRemove;
 		this.onFind = onFind;
+		this.onStar = onStar;
 		this.onOpen = onOpen;
 		this.onRename = onRename;
 		this.onRevive = onRevive;
@@ -653,11 +657,21 @@ class GolemListPanel extends PluginPanel
 		buttons.add(find, BorderLayout.CENTER);
 		buttons.add(remove, BorderLayout.EAST);
 
+		// In front of the name, where a star is looked for. Painted from the golem each time, so it
+		// is right however the golem was starred.
+		JButton star = new JButton(new Star(golem));
+		star.setToolTipText("Star this golem to keep it at the top of the list");
+		star.setFocusPainted(false);
+		star.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		star.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 2));
+		star.addActionListener(e -> onStar.accept(golem));
+
 		// The name shares the top of the row with the buttons; the place has the whole width of
 		// the row underneath, which is what it needs to say "Sailing to Port Khazard".
 		JPanel top = new JPanel(new BorderLayout(4, 0));
 		top.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		top.setMinimumSize(SQUEEZED);
+		top.add(star, BorderLayout.WEST);
 		top.add(name, BorderLayout.CENTER);
 		top.add(buttons, BorderLayout.EAST);
 
@@ -677,6 +691,71 @@ class GolemListPanel extends PluginPanel
 		self[0] = new Row(spaced, name);
 		self[0].place = place;
 		return self[0];
+	}
+
+	/** A star, filled in gold for a starred golem and drawn in outline for the rest. */
+	private static final class Star implements javax.swing.Icon
+	{
+		private static final int SIZE = 14;
+		private static final Color GOLD = new Color(0xFFB83F);
+
+		private final Golem golem;
+
+		private Star(Golem golem)
+		{
+			this.golem = golem;
+		}
+
+		@Override
+		public int getIconWidth()
+		{
+			return SIZE;
+		}
+
+		@Override
+		public int getIconHeight()
+		{
+			return SIZE;
+		}
+
+		@Override
+		public void paintIcon(java.awt.Component on, Graphics g, int x, int y)
+		{
+			Graphics2D drawing = (Graphics2D) g.create();
+			drawing.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			drawing.translate(x, y);
+			java.awt.geom.Path2D.Float shape = new java.awt.geom.Path2D.Float();
+			float middle = SIZE / 2f;
+			for (int point = 0; point < 10; point++)
+			{
+				// Five points out and five in, from straight up.
+				double angle = Math.PI * point / 5 - Math.PI / 2;
+				float reach = point % 2 == 0 ? middle - 0.5f : middle * 0.42f;
+				float px = middle + (float) Math.cos(angle) * reach;
+				float py = middle + 0.6f + (float) Math.sin(angle) * reach;
+				if (point == 0)
+				{
+					shape.moveTo(px, py);
+				}
+				else
+				{
+					shape.lineTo(px, py);
+				}
+			}
+			shape.closePath();
+			if (golem.isFavourite())
+			{
+				drawing.setColor(GOLD);
+				drawing.fill(shape);
+			}
+			else
+			{
+				drawing.setColor(ColorScheme.MEDIUM_GRAY_COLOR);
+				drawing.setStroke(new java.awt.BasicStroke(1.2f));
+				drawing.draw(shape);
+			}
+			drawing.dispose();
+		}
 	}
 
 	/**
