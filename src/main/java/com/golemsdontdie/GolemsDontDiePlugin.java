@@ -49,6 +49,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.util.ImageUtil;
 
 /**
@@ -187,6 +188,12 @@ public class GolemsDontDiePlugin extends Plugin
 
 	@Inject
 	private OverlayManager overlayManager;
+
+	@Inject
+	private InfoBoxManager infoBoxManager;
+
+	/** The infobox saying how far off the golem being looked for is; null while none is. */
+	private GolemFindBox findBox;
 
 	@Inject
 	private GolemMinimapOverlay minimapOverlay;
@@ -657,6 +664,7 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				finding = null;
 				client.clearHintArrow();
+				showFindBox(false);
 			});
 			propFactory.clear();
 			raftFactory.clear();
@@ -916,6 +924,38 @@ public class GolemsDontDiePlugin extends Plugin
 		return finding;
 	}
 
+	/**
+	 * Further apart than this north to south and two tiles are on different maps: a cave is laid
+	 * out six thousand tiles north of the ground it runs under.
+	 */
+	private static final int SAME_MAP_TILES = 3200;
+
+	/** Puts the find infobox up, or takes it down. */
+	private void showFindBox(boolean shown)
+	{
+		if (shown && findBox == null)
+		{
+			findBox = new GolemFindBox(ImageUtil.loadImageResource(GolemsDontDiePlugin.class, "/golem-icon.png"), this);
+			infoBoxManager.addInfoBox(findBox);
+		}
+		else if (!shown && findBox != null)
+		{
+			infoBoxManager.removeInfoBox(findBox);
+			findBox = null;
+		}
+	}
+
+	/** "Stop" on the find infobox's right-click menu. */
+	@Subscribe
+	public void onInfoBoxMenuClicked(net.runelite.client.events.InfoBoxMenuClicked event)
+	{
+		if (event.getInfoBox() == findBox && findBox != null
+			&& GolemFindBox.STOP.equals(event.getEntry().getOption()))
+		{
+			findGolem(null);
+		}
+	}
+
 	/** How near a golem being looked for counts as found, in tiles. */
 	private static final int FOUND_TILES = 8;
 
@@ -933,6 +973,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			client.clearHintArrow();
 		}
+		showFindBox(finding != null);
 		if (panel != null)
 		{
 			panel.setFinding(finding == null ? null
@@ -956,6 +997,16 @@ public class GolemsDontDiePlugin extends Plugin
 
 		WorldPoint at = finding.isSailing(roamContext.getTick()) ? finding.saveTile() : finding.currentTile();
 		WorldPoint me = PlayerPosition.of(client);
+		if (findBox != null)
+		{
+			// No distance across floors or between a cave and the ground above it: the tiles
+			// between them are not a walk, and a number would say they were.
+			boolean comparable = me != null && me.getPlane() == at.getPlane()
+				&& Math.abs(me.getY() - at.getY()) < SAME_MAP_TILES;
+			String name = names.of(finding);
+			findBox.show(name == null ? "a golem" : name, whereabouts.of(finding, roamContext.getTick()),
+				comparable ? me.distanceTo2D(at) : -1);
+		}
 		if (me != null && me.getPlane() == at.getPlane() && me.distanceTo2D(at) <= FOUND_TILES)
 		{
 			// Found. An arrow over a golem standing beside you is noise.
