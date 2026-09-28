@@ -37,17 +37,6 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Name colour | Yellow (#FFE700) | The colour of the golem names. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
 
-
-## Building
-
-```
-./gradlew jar
-```
-
-Requires a local RuneLite install in `~/.m2` (`./gradlew publishAllToMavenLocal` in the
-runelite repo), or `repo.runelite.net` for the published client artifact.
-
-
 ## Credits
 
 Collision map and transport data from [Shortest Path](https://github.com/Skretzo/shortest-path) by Skretzo. 
