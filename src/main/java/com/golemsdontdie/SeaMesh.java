@@ -59,8 +59,8 @@ class SeaMesh
 	 * so the caller can take the cheap answer on a render frame and defer the expensive one.
 	 */
 	/**
-	 * Crossings between every pair of moorings, computed offline by
-	 * {@code dev-tools/probe/com/golemsdontdie/BuildSeaRoutes.java}. The live search could not be
+	 * Crossings between every pair of moorings, computed offline and shipped. The live search could
+	 * not be
 	 * relied on: sampling forty pairs of ports it found no route for twenty-one — the ocean being
 	 * one body of water, every one was the budget running out, at a quarter to two fifths of a
 	 * second each on the client thread. It remains for a pair the table does not have.

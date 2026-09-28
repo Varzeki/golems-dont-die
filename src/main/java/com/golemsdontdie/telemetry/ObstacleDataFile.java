@@ -2,9 +2,6 @@ package com.golemsdontdie.telemetry;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.Reader;
-import java.io.Writer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -55,16 +52,17 @@ public final class ObstacleDataFile
 	private static final int G_OVER_STONE = column(GOLEM_COLUMNS, "overStone");
 
 	/**
-	 * Where the file is kept. In play, the plugin's own folder, through RuneLite's file utility:
-	 * a plugin may not reach into the RuneLite folder itself. In a test, a temporary file.
+	 * Where the file is kept. In play, the plugin's own folder, through RuneLite's file utility, which
+	 * is the only way a plugin touches the disk. In a test, a string in memory.
 	 */
 	public interface Store
 	{
 		boolean exists();
 
-		Reader reader() throws IOException;
+		BufferedReader reader() throws IOException;
 
-		Writer writer() throws IOException;
+		/** Replaces the whole file with this text. */
+		void write(String text) throws IOException;
 	}
 
 	private final Store store;
@@ -102,7 +100,7 @@ public final class ObstacleDataFile
 			log.warn("Could not look for the obstacle data file", e);
 			return;
 		}
-		try (BufferedReader in = new BufferedReader(store.reader()))
+		try (BufferedReader in = store.reader())
 		{
 			boolean sameSchema = false;
 			String line;
@@ -141,26 +139,28 @@ public final class ObstacleDataFile
 			return;
 		}
 		changed = false;
-		try (PrintWriter out = new PrintWriter(store.writer()))
+		StringBuilder out = new StringBuilder();
+		out.append("# Golems Don't Die obstacle data. Kept on this computer; nothing in it is sent anywhere.\n");
+		out.append("# P lines: crossings of obstacles by the player. G lines: crossings by golems.\n");
+		out.append("# Distances in 128ths of a tile, times in 20 ms client cycles unless named otherwise.\n");
+		out.append("# A path is cycle:along:side, measured from the start tile towards the end tile.\n");
+		out.append("#schema\t").append(SCHEMA).append('\n');
+		out.append("#plugin\t").append(pluginVersion).append('\n');
+		out.append(PLAYER_COLUMNS).append('\n');
+		for (String[] row : player.values())
 		{
-			out.println("# Golems Don't Die obstacle data. Kept on this computer; nothing in it is sent anywhere.");
-			out.println("# P lines: crossings of obstacles by the player. G lines: crossings by golems.");
-			out.println("# Distances in 128ths of a tile, times in 20 ms client cycles unless named otherwise.");
-			out.println("# A path is cycle:along:side, measured from the start tile towards the end tile.");
-			out.println("#schema\t" + SCHEMA);
-			out.println("#plugin\t" + pluginVersion);
-			out.println(PLAYER_COLUMNS);
-			for (String[] row : player.values())
-			{
-				out.println("P\t" + String.join("\t", row));
-			}
-			out.println(GOLEM_COLUMNS);
-			for (String[] row : golem.values())
-			{
-				out.println("G\t" + String.join("\t", row));
-			}
+			out.append("P\t").append(String.join("\t", row)).append('\n');
 		}
-		catch (IOException e)
+		out.append(GOLEM_COLUMNS).append('\n');
+		for (String[] row : golem.values())
+		{
+			out.append("G\t").append(String.join("\t", row)).append('\n');
+		}
+		try
+		{
+			store.write(out.toString());
+		}
+		catch (IOException | RuntimeException e)
 		{
 			log.warn("Could not write the obstacle data file", e);
 		}

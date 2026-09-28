@@ -330,7 +330,7 @@ class SailingDocks
 	 * Where a dock is, from the shipped table of docking buoys.
 	 *
 	 * <p>The dock table has no location in it — a dock's position is that of its <em>docking
-	 * buoy</em>, a scene object with a {@code Dock} action, harvested by {@code BuildDocks}. The
+	 * buoy</em>, a scene object with a {@code Dock} action, read offline from the cache. The
 	 * link is {@link DBTableID.SailingDock#COL_DOCK_ID}, the index into that list in object-id
 	 * order: Wyrmscraig's row reads dock id 59, the 60th buoy.
 	 */
@@ -356,7 +356,7 @@ class SailingDocks
 
 	/**
 	 * Reads the shipped table: a count, then six shorts a dock — the buoy's tile then the
-	 * gangplank's, each x, y and plane, as {@code BuildDocks} writes them. Reading
+	 * gangplank's, each x, y and plane, in the order they were written. Reading
 	 * {@code int, short, short, byte} put every dock at something like 0,3038 on plane 12.
 	 */
 	private void loadBuoys()

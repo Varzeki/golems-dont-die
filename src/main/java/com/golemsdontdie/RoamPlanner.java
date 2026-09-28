@@ -688,7 +688,7 @@ class RoamPlanner
 	 */
 	private static final float TRANSPORT_CHANCE = 0.5f;
 
-	/** How a plan came out, for the journal and the roaming simulation. */
+	/** How a plan came out, for the debug log. */
 	enum Outcome
 	{
 		VOYAGE,

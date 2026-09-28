@@ -1,9 +1,8 @@
 package com.golemsdontdie.telemetry;
 
-import java.io.File;
-import java.nio.file.Files;
+import java.io.BufferedReader;
+import java.io.StringReader;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -12,39 +11,31 @@ import org.junit.Test;
  */
 public class ObstacleDataFileTest
 {
-	private File directory;
+	/** The file's contents, or null before it is first written: the plugin's folder, in memory. */
+	private String contents;
 
-	/** The file in the test's own temporary folder, standing in for the plugin's. */
 	private ObstacleDataFile.Store store()
 	{
-		File file = new File(directory, ObstacleDataFile.FILE_NAME);
 		return new ObstacleDataFile.Store()
 		{
 			@Override
 			public boolean exists()
 			{
-				return file.exists();
+				return contents != null;
 			}
 
 			@Override
-			public java.io.Reader reader() throws java.io.IOException
+			public BufferedReader reader()
 			{
-				return new java.io.FileReader(file);
+				return new BufferedReader(new StringReader(contents));
 			}
 
 			@Override
-			public java.io.Writer writer() throws java.io.IOException
+			public void write(String text)
 			{
-				return new java.io.FileWriter(file);
+				contents = text;
 			}
 		};
-	}
-
-	@Before
-	public void makeFolder() throws Exception
-	{
-		directory = Files.createTempDirectory("golem-obstacle-data").toFile();
-		directory.deleteOnExit();
 	}
 
 	@Test
@@ -109,8 +100,7 @@ public class ObstacleDataFileTest
 	@Test
 	public void aFileFromAnotherSchemaIsReplacedNotMisread() throws Exception
 	{
-		Files.write(new File(directory, ObstacleDataFile.FILE_NAME).toPath(),
-			"#schema\t1\nP\t1\t2\t3\n".getBytes("UTF-8"));
+		contents = "#schema\t1\nP\t1\t2\t3\n";
 		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
 		data.load();
 		Assert.assertEquals(0, data.playerLines());
@@ -132,8 +122,7 @@ public class ObstacleDataFileTest
 
 	private String[] line(String startingWith) throws Exception
 	{
-		for (String line : new String(Files.readAllBytes(new File(directory, ObstacleDataFile.FILE_NAME).toPath()),
-			"UTF-8").split("\n"))
+		for (String line : contents.split("\n"))
 		{
 			if (line.startsWith(startingWith))
 			{

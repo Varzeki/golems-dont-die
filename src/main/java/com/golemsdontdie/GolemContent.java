@@ -3,10 +3,9 @@ package com.golemsdontdie;
 /**
  * Golem Crafting identifiers, harvested once from the game cache and fixed here.
  *
- * <p>Read from the local OSRS cache with {@code dev-tools/}: {@code CacheRecon} (ids),
- * {@code RegionRecon} (frame counts), {@code TerrainProbe} (terrain), {@code FramemapProbe}
- * (rigs), {@code WyrmscraigRecon} (shortcuts), {@code VarbitRecon}. {@code NpcDefinition} carries
- * walk and idle animation IDs RuneLite does not expose on {@code NPCComposition} at all. The four
+ * <p>Read offline from the local OSRS cache: ids, frame counts, terrain, rigs, shortcuts and
+ * varbits. The cache's NPC definition carries walk and idle animation IDs RuneLite does not expose
+ * on {@code NPCComposition} at all. The four
  * island shortcuts are data, not identity, so they ship in the transport table.
  */
 final class GolemContent
@@ -185,8 +184,8 @@ final class GolemContent
 	/**
 	 * Sailing's own raft, the 1x3 boat, as the three models it is built from.
 	 *
-	 * <p>Read with {@code dev-tools/RaftRecon.java}: Sailing's boats are scene objects, whose
-	 * models live only in the cache — {@code SAILING_BOAT_HULL_KANDARIN_1X3_WOOD} (59494),
+	 * <p>Read offline from the cache: Sailing's boats are scene objects, whose models live only in
+	 * the cache — {@code SAILING_BOAT_HULL_KANDARIN_1X3_WOOD} (59494),
 	 * {@code SAILING_BOAT_SAIL_KANDARIN_1X3_WOOD} (59530) and
 	 * {@code SAILING_BOAT_STEERING_KANDARIN_1X3_WOOD_IN_USE} (59555). The hull is centred along z,
 	 * 450 units long; the sail spans it from the middle tile; the helm is one tile at the stern.
@@ -204,7 +203,7 @@ final class GolemContent
 
 	/**
 	 * Colours the hull and helm objects swap in, over their models' place-holder palette of
-	 * purple arrows. Read with RaftRecon.
+	 * purple arrows. Read from the cache with the models.
 	 */
 	static final short[] RAFT_HULL_RECOLOUR_FROM = {-11372, -11362, -11353, 6086, 21435};
 	static final short[] RAFT_HULL_RECOLOUR_TO = {6682, 6930, 6697, 6697, 5652};
@@ -215,8 +214,8 @@ final class GolemContent
 	 * The sailable cave under Wyrmscraig: the water inside the cave mouth at each end, and the way
 	 * a boat faces coming out. The cave dock is on a lake on the underground map; a boat sails to
 	 * the lake mouth ({@code WYRMSCRAIG_CAVE_EXIT_SAILABLE}, 2565,8604) and is put out on the real
-	 * sea at the north coast ({@code WYRMSCRAIG_CAVE_ENTRANCE_SAILABLE}, 2562,2203). Read with
-	 * CavePlankRecon.
+	 * sea at the north coast ({@code WYRMSCRAIG_CAVE_ENTRANCE_SAILABLE}, 2562,2203). Read from the
+	 * cache.
 	 */
 	static final int CAVE_LAKE_MOUTH_X = 2567;
 	static final int CAVE_LAKE_MOUTH_Y = 8606;

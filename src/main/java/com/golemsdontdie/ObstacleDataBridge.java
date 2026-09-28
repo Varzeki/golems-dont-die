@@ -3,9 +3,8 @@ package com.golemsdontdie;
 import com.golemsdontdie.telemetry.GolemCrossing;
 import com.golemsdontdie.telemetry.ObstacleDataFile;
 import com.golemsdontdie.telemetry.PlayerCrossing;
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.client.util.Filepath;
@@ -46,16 +45,16 @@ class ObstacleDataBridge
 			}
 
 			@Override
-			public Reader reader() throws IOException
+			public BufferedReader reader() throws IOException
 			{
 				return path.openBufferedReader();
 			}
 
 			@Override
-			public Writer writer() throws IOException
+			public void write(String text) throws IOException
 			{
 				folder.createDirectories();
-				return path.openWriter();
+				path.write(text);
 			}
 		}, GolemsDontDiePlugin.VERSION);
 		file.load();

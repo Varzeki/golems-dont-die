@@ -34,7 +34,7 @@ final class ObstacleSighting
 
 	/**
 	 * The traversal as it happened, or null if it could not be recorded. Delay and span above
-	 * remain for obstacles no curve was captured for, and for the journal.
+	 * remain for obstacles no curve was captured for.
 	 */
 	final MotionCurve curve;
 

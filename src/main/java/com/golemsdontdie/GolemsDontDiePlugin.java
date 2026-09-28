@@ -459,7 +459,7 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext = new RoamContext(islandMemory, pathfinder, transports, abilities);
 		roamContext.setKnowledge(obstacleKnowledge);
 		roamContext.setObstacles(obstacleIndex);
-		roamContext.setJournal((golem, what) ->
+		roamContext.setDecisions((golem, what) ->
 		{
 			if (DevOptions.LOG_GOLEM_STATE)
 			{
@@ -534,7 +534,7 @@ public class GolemsDontDiePlugin extends Plugin
 			// Each step on its own, so one failing cannot stop the rest: the old shutdown's
 			// first line threw, the roster stayed in memory, and re-enabling doubled every
 			// golem. Save before tearing down.
-			safely("closing the journal", obstacleObserver::shutDown);
+			safely("stopping the obstacle observer", obstacleObserver::shutDown);
 			safely("saving obstacle data", obstacleData::save);
 			safely("saving learned routes", () ->
 			{
@@ -1279,7 +1279,7 @@ public class GolemsDontDiePlugin extends Plugin
 		// A golem mid-obstacle is exempt, because half of them legitimately stand on nothing.
 		// Without this the watchdog fired every tick of every crossing and called relocate,
 		// dropping the path, the step and the itinerary: golems were pulled off the stones by
-		// the thing meant to rescue them, 8,855 times on one tile in the journal. isStuck()
+		// the thing meant to rescue them, 8,855 times on one tile in one session. isStuck()
 		// below exempts transitions; this check simply ran before it.
 		//
 		// Nor a golem at sea, which is on water because it is in a boat: without this every
@@ -1336,10 +1336,6 @@ public class GolemsDontDiePlugin extends Plugin
 		golem.noteUnstuck(tick);
 	}
 
-	/**
-	 * Puts a rescue in the journal, where it is otherwise invisible: the golem simply reappears
-	 * at the plinth. Ninety came off one ladder in a single session.
-	 */
 	/** The plane last harvested for, so moving to another floor harvests that one. */
 	private int harvestedPlane = -1;
 
@@ -1597,6 +1593,10 @@ public class GolemsDontDiePlugin extends Plugin
 		configManager.setConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY, true);
 	}
 
+	/**
+	 * Logs a rescue, which is otherwise invisible: the golem simply reappears at the plinth. Ninety
+	 * came off one ladder in a single session.
+	 */
 	private void noteRescue(Golem golem, WorldPoint from, WorldPoint to, String reason)
 	{
 		if (DevOptions.LOG_GOLEM_STATE)
