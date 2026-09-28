@@ -462,8 +462,7 @@ class Voyage
 	}
 
 	/*
-	 * How a boat moves, from the Turning Circles plugin; not measured against a raft here, though
-	 * BoatMotionRecon in the test sources records the real one.
+	 * How a boat moves, from the Turning Circles plugin; not measured against a raft here.
 	 *
 	 *  - It faces one of sixteen compass points and turns one point, 128 of 2048, per tick, moving
 	 *    as it turns, which makes a turn an arc.

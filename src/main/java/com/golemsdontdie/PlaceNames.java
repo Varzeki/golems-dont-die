@@ -13,7 +13,7 @@ import net.runelite.api.coords.WorldPoint;
 /**
  * What a place is called, so a golem's whereabouts can be said in words.
  *
- * <p>Two sources, built into one file by {@code dev-tools/BuildPlaceNames.java}. A region's curated
+ * <p>Two sources, built offline into one file. A region's curated
  * name is used first: those name a whole 64-tile region and never name a monster. Where there is
  * none — anywhere added to the game since that list was written, Wyrmscraig included — the map's own
  * labels answer instead, the nearest one within a few dozen tiles, preferring the ones the game

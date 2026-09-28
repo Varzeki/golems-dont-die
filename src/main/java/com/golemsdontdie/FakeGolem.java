@@ -133,7 +133,7 @@ class FakeGolem extends RuneLiteObjectController
 	public Model getModel()
 	{
 		// Only asked for when the client actually draws the object, so a golem registered but
-		// not drawn shows in the journal.
+		// not drawn shows in the debug log.
 		lastDrawnCycle = client.getGameCycle();
 		if (animation.getAnimation() == null)
 		{

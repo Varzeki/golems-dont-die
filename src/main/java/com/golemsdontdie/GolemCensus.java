@@ -32,7 +32,7 @@ class GolemCensus
 		}
 	}
 
-	/** Starts a count; used with {@link #add} by the offline roaming simulations. */
+	/** Starts a count, filled with {@link #add}. */
 	void begin()
 	{
 		java.util.Arrays.fill(counts, 0);

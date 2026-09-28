@@ -47,7 +47,7 @@ class GolemNames
 	@Inject
 	private GolemsDontDieConfig config;
 
-	/** The people of Gielinor, harvested from the cache; see dev-tools/BuildNames.java. */
+	/** The people of Gielinor, harvested offline from the cache. */
 	@Getter
 	private String[] gielinor = new String[0];
 

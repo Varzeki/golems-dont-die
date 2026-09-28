@@ -7,12 +7,8 @@ bin/
 out/
 # keep gradle/wrapper/gradle-wrapper.jar
 
-# dev-tools are standalone harvesters run by hand against the game cache; they are
-# kept as a record of where the hardcoded IDs came from, but their inputs and outputs
-# are large and regenerable.
-dev-tools/*.zip
-dev-tools/*.gz
-dev-tools/*.txt
+# Offline tools run by hand against the game cache, kept locally.
+dev-tools/
 
 # Internal copy-review notes; kept locally, not shipped.
 USER-FACING-TEXT.md
@@ -20,10 +16,6 @@ USER-FACING-TEXT.md
 # Full-resolution screenshot source, kept locally: the banners are rendered from it and only
 # the rendered result is published.
 GolemIsland.png
-
-# The game's own fonts, used by the branding scripts. Not ours to redistribute — see
-# dev-tools/branding/make_title.py, which looks here or at $GOLEM_FONTS.
-dev-tools/branding/fonts/
 
 # A record of bugs found and fixed while building this, kept locally rather than published.
 BUGS.md

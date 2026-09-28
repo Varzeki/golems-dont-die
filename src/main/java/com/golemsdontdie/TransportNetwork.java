@@ -17,8 +17,8 @@ import net.runelite.api.Skill;
 /**
  * Every transport a golem could use, indexed by the tile you use it from.
  *
- * <p>Loaded once from {@code /transports.gz}, generated offline from Shortest Path's tables by
- * {@code dev-tools/BuildTransports.java}; shipping it means golems can use a ladder the player
+ * <p>Loaded once from {@code /transports.gz}, generated offline from Shortest Path's tables;
+ * shipping it means golems can use a ladder the player
  * has never stood next to, as with the island map. Indexed by origin tile, the only question
  * asked of it.
  */

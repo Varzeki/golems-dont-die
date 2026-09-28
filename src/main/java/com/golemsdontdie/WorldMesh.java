@@ -137,7 +137,7 @@ class WorldMesh
 				int first = data.readInt();
 				if (first != MAGIC)
 				{
-					log.warn("World mesh is an old format; rebuild it with BuildWorldMesh");
+					log.warn("World mesh is an old format; it needs rebuilding");
 					return;
 				}
 				int version = data.readInt();

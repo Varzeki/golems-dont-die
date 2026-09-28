@@ -1554,7 +1554,7 @@ class Golem
 		landingInstance = transport.entersInstance() ? 1 : transport.leavesInstance() ? 0 : -1;
 
 		// Logged before anything else can return: a row with no animation used to relocate
-		// the golem above this line, so staircases left no trace in the journal.
+		// the golem above this line, so staircases left no trace in the log.
 		note(context, "transport obj=" + transport.getObjectId()
 			+ " to=" + transport.getToX() + "," + transport.getToY() + ","
 			+ transport.getToPlane()
@@ -2210,17 +2210,17 @@ class Golem
 	@Getter
 	private int motionFrame = -1;
 
-	/** Reports a decision to the journal, if one is listening. */
+	/** Reports a decision to the debug log, if one is listening. */
 	private void note(RoamContext context, String what)
 	{
-		if (context != null && context.getJournal() != null)
+		if (context != null && context.getDecisions() != null)
 		{
-			context.getJournal().accept(this, what);
+			context.getDecisions().accept(this, what);
 		}
 	}
 
 	/**
-	 * Everything about this golem's current state, for the developer journal. One flat line
+	 * Everything about this golem's current state, for the debug log. One flat line
 	 * per golem per tick: working out why a golem did something means reading its position,
 	 * animation, path and intention together.
 	 */

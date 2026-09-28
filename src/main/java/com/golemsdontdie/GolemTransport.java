@@ -7,14 +7,13 @@ import net.runelite.api.coords.WorldPoint;
  * One way of getting from one tile to another that is not walking: a door, a ladder, a stile,
  * a ferry.
  *
- * <p>From Shortest Path's tables, reduced offline by {@code dev-tools/BuildTransports.java} to
- * the rows a golem could use, which is most of them. Immutable and shared: ~13,000 rows, one set
+ * <p>From Shortest Path's tables, reduced offline to the rows a golem could use, which is most of them. Immutable and shared: ~13,000 rows, one set
  * for every golem, built once at startup. Requirements are parsed arrays, not strings, because a
  * golem tests them on every tile it enters near a transport.
  */
 final class GolemTransport
 {
-	// Archetypes. Written by BuildTransports; the numbering is a file format, so append only —
+	// Archetypes. Written into the shipped table; the numbering is a file format, so append only —
 	// changing a value silently remaps every row in the shipped resource.
 	static final int ARCHETYPE_NONE = 0;
 	static final int ARCHETYPE_DOOR = 1;

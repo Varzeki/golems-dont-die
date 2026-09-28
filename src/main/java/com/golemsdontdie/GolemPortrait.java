@@ -34,7 +34,7 @@ class GolemPortrait
 
 	/**
 	 * Which way round the model has to be turned to face the viewer, in degrees. Found by drawing
-	 * one golem the whole way round; see PortraitExport.
+	 * one golem the whole way round.
 	 */
 	private static final int FACING = 0;
 

@@ -322,8 +322,7 @@ public interface GolemsDontDieConfig extends Config
 	// @ConfigItem(
 	// 	keyName = "logGolemState",
 	// 	name = "Log golem state (developer)",
-	// 	description = "Records what every visible golem is doing, every tick, into the same "
-	// 		+ "journal as your own obstacle use — so the two can be compared directly. "
+	// 	description = "Logs what every visible golem is doing, every tick, at debug level. "
 	// 		+ "Very verbose; for diagnosing a specific problem, not for ordinary play.",
 	// 	section = obstaclesSection,
 	// 	position = 4

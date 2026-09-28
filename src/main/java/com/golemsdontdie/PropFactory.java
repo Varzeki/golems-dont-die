@@ -19,8 +19,8 @@ import net.runelite.api.ModelData;
  *
  * <p>{@code ObjectComposition} exposes an object's name, actions and size but <b>not its
  * model ids</b>, where {@code NPCComposition} does, so there is no runtime route from an
- * object id to its geometry. The ids are harvested offline by
- * {@code dev-tools/BuildProps.java} and shipped: 206 objects the transport network
+ * object id to its geometry. The ids are read offline from the game cache and shipped: 206
+ * objects the transport network
  * references, in about a kilobyte. Each carries the animation the object itself plays, so a
  * gate, a portcullis and a fairy ring each get their own motion with nothing enumerating
  * which is which.

@@ -265,13 +265,13 @@ class GolemClimate
 		return NEAR + (1f - NEAR) * Math.min(1f, (away - 1) / (float) (REACH - 1));
 	}
 
-	/** Whether a tile is one of the cold places. For the roaming simulation's report. */
+	/** Whether a tile is one of the cold places. */
 	boolean isCold(int x, int y)
 	{
 		return toCold != null && toCold[x >> 6 << 8 | y >> 6] == 0;
 	}
 
-	/** Whether a tile is one of the hot places. For the roaming simulation's report. */
+	/** Whether a tile is one of the hot places. */
 	boolean isHot(int x, int y)
 	{
 		return toHot != null && toHot[x >> 6 << 8 | y >> 6] == 0;

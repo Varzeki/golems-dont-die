@@ -6,8 +6,8 @@ import lombok.Getter;
  * The boats golems sail, and what each is made of.
  *
  * <p>Sailing's boats are scene objects, so their models live only in the cache and are read there
- * rather than named by the client: {@code dev-tools/BoatRecon.java} lists every object built from
- * a model in the boat family, which sorts them into three sizes seven variants apiece. The raft is
+ * rather than named by the client. Every object built from a model in the boat family sorts into
+ * three sizes, seven variants apiece. The raft is
  * the one a golem takes alone; the other two carry a crew.
  *
  * <p>Every hull is painted over a place-holder palette of purple arrows, as the raft's was, and the
@@ -68,7 +68,7 @@ enum GolemBoat
 
 	/**
 	 * How far the hull reaches, in its own model units: across, then along, bow first. Read out of
-	 * the cache by {@code dev-tools/PartRecon.java}, and here so that a berth can be checked
+	 * the cache offline, and here so that a berth can be checked
 	 * against the deck it is meant to be standing on rather than guessed at.
 	 */
 	private final int hullMinX;

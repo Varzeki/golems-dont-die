@@ -29,12 +29,12 @@ final class RoamContext
 	private ObstacleIndex obstacles;
 
 	/**
-	 * Where a golem reports what it just decided, or null. Only wired up with the developer
-	 * journal on: the outcome alone does not say which of the transport roll, the knowledge
-	 * lookup and the pacing went wrong.
+	 * Where a golem reports what it just decided, or null. Logged only with the developer option
+	 * on: the outcome alone does not say which of the transport roll, the knowledge lookup and the
+	 * pacing went wrong.
 	 */
 	@Setter
-	private java.util.function.BiConsumer<Golem, String> journal;
+	private java.util.function.BiConsumer<Golem, String> decisions;
 
 	/** Where every golem is, by region, so golems spread out. Null in tools that do not count. */
 	@Setter

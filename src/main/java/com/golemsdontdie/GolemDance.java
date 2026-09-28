@@ -9,7 +9,7 @@ import lombok.Getter;
  *
  * <p>All of them are the game's own human emotes, and the golem is rigged to the human framemap
  * (see {@link GolemContent#GOLEM_FRAMEMAP}), so they play against it untouched. Checked one by one
- * with {@code dev-tools/AnimationCheck}: an emote on another framemap would fold the golem through
+ * against the cache: an emote on another framemap would fold the golem through
  * itself rather than look slightly wrong.
  *
  * <p>Two of them carry something the golem has not got. The air guitar's guitar is a spot
