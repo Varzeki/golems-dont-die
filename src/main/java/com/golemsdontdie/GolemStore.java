@@ -25,7 +25,8 @@ class GolemStore
 
 	/**
 	 * Ten numbers plus the nickname. The rest are optional: whether the golem is in an instance,
-	 * when it may next sail, its seed, the six of its history, and its traits.
+	 * when it may next sail, its seed, the six of its history, its traits, its star and its craft
+	 * number.
 	 *
 	 * <p>The format only ever grows at the end, and a reader takes what it knows and ignores the
 	 * rest. So a save written by a later version still loads here, less whatever was added since;
@@ -42,6 +43,9 @@ class GolemStore
 
 	/** Whether the player starred the golem, after its traits. */
 	private static final int FAVOURITE_AT = TRAITS_AT + 1;
+
+	/** Its craft number, after the star. */
+	private static final int CRAFT_AT = FAVOURITE_AT + 1;
 
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
@@ -78,6 +82,9 @@ class GolemStore
 
 		/** Starred by the player; see Golem#isFavourite. */
 		boolean favourite;
+
+		/** See Golem#getCraftNumber; 0 for a save written before it was kept, numbered on restore. */
+		int craftNumber;
 
 		/** Its history, in the order GolemHistory.restore takes them; all zero if there was none. */
 		long firstSeen;
@@ -127,7 +134,8 @@ class GolemStore
 				.append(FIELD_SEPARATOR).append(history.getFurthestX())
 				.append(FIELD_SEPARATOR).append(history.getFurthestY())
 				.append(FIELD_SEPARATOR).append(golem.getTraits())
-				.append(FIELD_SEPARATOR).append(golem.isFavourite() ? 1 : 0);
+				.append(FIELD_SEPARATOR).append(golem.isFavourite() ? 1 : 0)
+				.append(FIELD_SEPARATOR).append(golem.getCraftNumber());
 		}
 		return out.toString();
 	}
@@ -185,6 +193,7 @@ class GolemStore
 				}
 				saved.traits = fields.length > TRAITS_AT ? Integer.parseInt(fields[TRAITS_AT].trim()) : 0;
 				saved.favourite = fields.length > FAVOURITE_AT && "1".equals(fields[FAVOURITE_AT].trim());
+				saved.craftNumber = fields.length > CRAFT_AT ? Integer.parseInt(fields[CRAFT_AT].trim()) : 0;
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -232,6 +241,7 @@ class GolemStore
 		}
 		golem.setNickname(saved.nickname);
 		golem.setFavourite(saved.favourite);
+		golem.setCraftNumber(saved.craftNumber);
 		if (saved.firstSeen != 0)
 		{
 			golem.getHistory().restore(saved.firstSeen, saved.transports, saved.voyages, saved.walked,

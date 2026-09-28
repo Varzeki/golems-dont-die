@@ -142,4 +142,16 @@ public class GolemStoreTest
 		assertEquals(false, read.get(1).favourite);
 		assertEquals(false, store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0).favourite);
 	}
+
+	/** A craft number is kept, and a golem saved before they were kept has none until restored. */
+	@Test
+	public void aCraftNumberSurvivesTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem numbered = golem(10L, null);
+		numbered.setCraftNumber(2596);
+		List<GolemStore.SavedGolem> read = store.deserialise(store.serialise(Arrays.asList(numbered)));
+		assertEquals(2596, read.get(0).craftNumber);
+		assertEquals(0, store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0).craftNumber);
+	}
 }

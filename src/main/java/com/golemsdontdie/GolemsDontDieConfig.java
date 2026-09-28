@@ -124,10 +124,9 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "autoName",
 		name = "Auto name golems",
-		description = "Gives golems you have not named one anyway, wherever a golem's name is shown: "
-			+ "a name from Gielinor and a surname off the rocks. A golem always gets the same name, and "
-			+ "one you type yourself is kept whatever this is set to. Only names you give are written on "
-			+ "the world map.",
+		description = "Gives golems you have not named one anyway, wherever a golem's name is shown, in "
+			+ "the name style below. A golem always gets the same name, and one you type yourself is kept "
+			+ "whatever this is set to. Only names you give are written on the world map.",
 		section = golemsSection,
 		position = 6
 	)
@@ -136,13 +135,47 @@ public interface GolemsDontDieConfig extends Config
 		return false;
 	}
 
+	/** What auto naming calls a golem. */
+	enum NameStyle
+	{
+		DEFAULT("Default"),
+		ORDINAL("Ordinal");
+
+		private final String label;
+
+		NameStyle(String label)
+		{
+			this.label = label;
+		}
+
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+	}
+
+	@ConfigItem(
+		keyName = "nameStyle",
+		name = "Name style",
+		description = "The names auto naming gives. Default: a name from Gielinor and a surname off the "
+			+ "rocks. Ordinal: the order the golem was crafted in, in Latin — Primus, Secundus, Tertius. "
+			+ "Golems from before this were numbered oldest first.",
+		section = golemsSection,
+		position = 7
+	)
+	default NameStyle nameStyle()
+	{
+		return NameStyle.DEFAULT;
+	}
+
 	@ConfigItem(
 		keyName = "showSidebar",
 		name = "Enable sidebar",
 		description = "Shows the Golems tab. With it off, missing golems can still be revived by "
 			+ "right-clicking a golem plinth on Wyrmscraig.",
 		section = golemsSection,
-		position = 7
+		position = 8
 	)
 	default boolean showSidebar()
 	{
@@ -155,7 +188,7 @@ public interface GolemsDontDieConfig extends Config
 		description = "While you are finding a golem, the Shortest Path plugin draws the way to it. "
 			+ "Needs Shortest Path installed; without it this does nothing.",
 		section = golemsSection,
-		position = 8
+		position = 9
 	)
 	default boolean findPath()
 	{
@@ -168,7 +201,7 @@ public interface GolemsDontDieConfig extends Config
 		description = "Golems standing near your boat when you step aboard come too: they stand at "
 			+ "the rail while you sail and step off where you do. Not while golem ambition is restricted.",
 		section = golemsSection,
-		position = 9
+		position = 10
 	)
 	default boolean golemsJoinShip()
 	{

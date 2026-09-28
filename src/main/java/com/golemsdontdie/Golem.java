@@ -395,6 +395,15 @@ class Golem
 	private volatile boolean favourite;
 
 	/**
+	 * Which golem this was to be crafted, counting from one: what an ordinal name is made of. 0 until
+	 * it is numbered, which a golem is as it joins the roster. Read by the sidebar's thread for the
+	 * name, so volatile like the star.
+	 */
+	@Getter
+	@Setter
+	private volatile int craftNumber;
+
+	/**
 	 * True while the golem is inside an instance — through the pew, in the Mad Angel's room.
 	 * Golems are simulated in the instance's template, ordinary world coordinates, so
 	 * coordinates alone cannot say who is inside; without this, golems near the cathedral

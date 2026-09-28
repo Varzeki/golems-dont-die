@@ -37,7 +37,8 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Name colour | Yellow (#FFE700) | The colour of the golem names. |
 | Golems on the world map | Named and starred golems | Draws golems on the world map. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
-| Auto name golems | Off | Gives golems you have not named one anyway — a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
+| Auto name golems | Off | Gives golems you have not named one anyway, in the name style below. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
+| Name style | Default | The names auto naming gives. Default: a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. Ordinal: the order the golem was crafted in, in Latin — Primus, Vicesimus Septimus, Bis Millesimus Quingentesimus Nonagesimus Sextus. |
 | Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |
 | Path to a golem being found | On | While you are finding a golem, the [Shortest Path](https://github.com/Skretzo/shortest-path) plugin draws the way to it. Does nothing without Shortest Path installed. |
 | Golems join your ship | On | Golems standing near your boat when you step aboard come too. Not while golem ambition is restricted. |
@@ -75,6 +76,10 @@ still reads as yours. Only names you give are written on the world map itself. N
 down: a golem keeps its name because the name comes from the golem, and turning the setting off
 leaves them all plain golems again.
 
+In the **Ordinal** style a golem is named for the order it was crafted in. Golems you had before
+this are numbered oldest first, and every golem crafted after takes the next number. The list runs
+to fifty thousand; the fifty-one-thousandth golem and every one after it is Ultimus.
+
 **Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
 eight tiles of it or stop looking. While you are looking, that golem is the only one on the world
 map, its face sticks to the edge of the map when you pan away from it, and an infobox says how far
@@ -91,16 +96,6 @@ the boat any other way, by teleport or by logging out, and they go back to the q
 from.
 
 
-## Building
-
-```
-./gradlew jar
-```
-
-Requires a local RuneLite install in `~/.m2` (`./gradlew publishAllToMavenLocal` in the
-runelite repo), or `repo.runelite.net` for the published client artifact.
-
-
 ## Credits
 
 Collision map and transport data from [Shortest Path](https://github.com/Skretzo/shortest-path) by Skretzo. 
@@ -114,6 +109,9 @@ on [Turning Circles](https://github.com/anmcgrath/turning-circles) by anmcgrath.
 Dancing contributed by [NathanVegetable](https://github.com/Varzeki/golems-dont-die/pull/1), who took
 the idea from [Dance Party](https://github.com/dekvall/runelite-external-plugins/tree/dance-party) by
 dekvall. Fireworks after [Death Party](https://github.com/DangItOSRS/death-party) by DangItOSRS. 
+
+Latin ordinal names from the list [Hjaldr](https://github.com/Varzeki/golems-dont-die/issues/2)
+contributed. 
 
 ## Licence
 

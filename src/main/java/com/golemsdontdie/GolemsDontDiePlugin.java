@@ -1238,6 +1238,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (revived > 0)
 		{
+			numberNewGolems();
 			rosterChanged = true;
 			saveGolems();
 			log.debug("Revived {} golems", revived);
@@ -1344,6 +1345,7 @@ public class GolemsDontDiePlugin extends Plugin
 		Golem golem = new Golem(posed, home, seed, fineX, fineY);
 
 		golems.add(golem);
+		numberNewGolems();
 		rosterChanged = true;
 		enforceGolemLimit();
 
@@ -3084,7 +3086,7 @@ public class GolemsDontDiePlugin extends Plugin
 			showSidebar(config.showSidebar());
 		}
 
-		if ("autoName".equals(event.getKey()) && panel != null)
+		if (("autoName".equals(event.getKey()) || "nameStyle".equals(event.getKey())) && panel != null)
 		{
 			panel.namesChanged();
 		}
@@ -3146,6 +3148,18 @@ public class GolemsDontDiePlugin extends Plugin
 		return rooms;
 	}
 
+	/**
+	 * Gives golems just made the next craft numbers, in the order they were made. Not before the save
+	 * is restored: the restored golems take the numbers from one, and replace whatever is in memory.
+	 */
+	private void numberNewGolems()
+	{
+		if (pendingRestore.isEmpty())
+		{
+			CraftNumbers.number(golems, golem -> golem.getHistory().getFirstSeen());
+		}
+	}
+
 	private void restorePending()
 	{
 		if (pendingRestore.isEmpty() || client.getGameState() != GameState.LOGGED_IN)
@@ -3168,11 +3182,15 @@ public class GolemsDontDiePlugin extends Plugin
 		List<GolemStore.SavedGolem> saved = new ArrayList<>(pendingRestore);
 		java.util.Set<Long> rooms = instanceRooms();
 		instanceRoomTiles = rooms;
+		// When each golem was first known as saved, not as restored: a golem saved before that was
+		// kept is given today's date on restore, which would number the oldest golems last.
+		java.util.Map<Golem, Long> savedAge = new java.util.IdentityHashMap<>();
 		for (int i = 0; i < saved.size(); i++)
 		{
 			Golem golem = store.revive(saved.get(i), i);
 			if (golem != null)
 			{
+				savedAge.put(golem, saved.get(i).firstSeen);
 				// A saved tile can have become unstandable, and a golem restored inside a new
 				// wall would never path anywhere again. Moved while nothing is looking, and
 				// moved rather than replaced: same name, same id.
@@ -3195,6 +3213,11 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 		}
 		pendingRestore.clear();
+		int numbered = CraftNumbers.number(golems, golem -> savedAge.getOrDefault(golem, 0L));
+		if (numbered > 0)
+		{
+			log.debug("Gave {} restored golems craft numbers", numbered);
+		}
 		enforceGolemLimit();
 		// Now there is a whole roster to hold against the game's count.
 		trimToGameCount();

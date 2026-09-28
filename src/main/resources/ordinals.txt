@@ -1,0 +1,1053 @@
+# Latin ordinals: 1 to 999, then the thousands, then the last. Contributed by Hjaldr to ten
+# thousand, https://github.com/Varzeki/golems-dont-die/issues/2; the thousands past that follow
+# the same pattern, numeral adverbs after Allen and Greenough.
+1;Primus
+2;Secundus
+3;Tertius
+4;Quartus
+5;Quintus
+6;Sextus
+7;Septimus
+8;Octavus
+9;Nonus
+10;Decimus
+11;Undecimus
+12;Duodecimus
+13;Tertius Decimus
+14;Quartus Decimus
+15;Quintus Decimus
+16;Sextus Decimus
+17;Septimus Decimus
+18;Duodevicesimus
+19;Undevicesimus
+20;Vicesimus
+21;Vicesimus Primus
+22;Vicesimus Secundus
+23;Vicesimus Tertius
+24;Vicesimus Quartus
+25;Vicesimus Quintus
+26;Vicesimus Sextus
+27;Vicesimus Septimus
+28;Duodetricesimus
+29;Undetricesimus
+30;Tricesimus
+31;Tricesimus Primus
+32;Tricesimus Secundus
+33;Tricesimus Tertius
+34;Tricesimus Quartus
+35;Tricesimus Quintus
+36;Tricesimus Sextus
+37;Tricesimus Septimus
+38;Duodequadragesimus
+39;Undequadragesimus
+40;Quadragesimus
+41;Quadragesimus Primus
+42;Quadragesimus Secundus
+43;Quadragesimus Tertius
+44;Quadragesimus Quartus
+45;Quadragesimus Quintus
+46;Quadragesimus Sextus
+47;Quadragesimus Septimus
+48;Duodequinquagesimus
+49;Undequinquagesimus
+50;Quinquagesimus
+51;Quinquagesimus Primus
+52;Quinquagesimus Secundus
+53;Quinquagesimus Tertius
+54;Quinquagesimus Quartus
+55;Quinquagesimus Quintus
+56;Quinquagesimus Sextus
+57;Quinquagesimus Septimus
+58;Duodesexagesimus
+59;Undesexagesimus
+60;Sexagesimus
+61;Sexagesimus Primus
+62;Sexagesimus Secundus
+63;Sexagesimus Tertius
+64;Sexagesimus Quartus
+65;Sexagesimus Quintus
+66;Sexagesimus Sextus
+67;Sexagesimus Septimus
+68;Duodeseptuagesimus
+69;Undeseptuagesimus
+70;Septuagesimus
+71;Septuagesimus Primus
+72;Septuagesimus Secundus
+73;Septuagesimus Tertius
+74;Septuagesimus Quartus
+75;Septuagesimus Quintus
+76;Septuagesimus Sextus
+77;Septuagesimus Septimus
+78;Duodeoctogesimus
+79;Undeoctogesimus
+80;Octogesimus
+81;Octogesimus Primus
+82;Octogesimus Secundus
+83;Octogesimus Tertius
+84;Octogesimus Quartus
+85;Octogesimus Quintus
+86;Octogesimus Sextus
+87;Octogesimus Septimus
+88;Duodenonagesimus
+89;Undenonagesimus
+90;Nonagesimus
+91;Nonagesimus Primus
+92;Nonagesimus Secundus
+93;Nonagesimus Tertius
+94;Nonagesimus Quartus
+95;Nonagesimus Quintus
+96;Nonagesimus Sextus
+97;Nonagesimus Septimus
+98;Nonagesimus Octavus
+99;Nonagesimus Nonus
+100;Centesimus
+101;Centesimus Primus
+102;Centesimus Secundus
+103;Centesimus Tertius
+104;Centesimus Quartus
+105;Centesimus Quintus
+106;Centesimus Sextus
+107;Centesimus Septimus
+108;Centesimus Octavus
+109;Centesimus Nonus
+110;Centesimus Decimus
+111;Centesimus Undecimus
+112;Centesimus Duodecimus
+113;Centesimus Tertius Decimus
+114;Centesimus Quartus Decimus
+115;Centesimus Quintus Decimus
+116;Centesimus Sextus Decimus
+117;Centesimus Septimus Decimus
+118;Centesimus Duodevicesimus
+119;Centesimus Undevicesimus
+120;Centesimus Vicesimus
+121;Centesimus Vicesimus Primus
+122;Centesimus Vicesimus Secundus
+123;Centesimus Vicesimus Tertius
+124;Centesimus Vicesimus Quartus
+125;Centesimus Vicesimus Quintus
+126;Centesimus Vicesimus Sextus
+127;Centesimus Vicesimus Septimus
+128;Centesimus Duodetricesimus
+129;Centesimus Undetricesimus
+130;Centesimus Tricesimus
+131;Centesimus Tricesimus Primus
+132;Centesimus Tricesimus Secundus
+133;Centesimus Tricesimus Tertius
+134;Centesimus Tricesimus Quartus
+135;Centesimus Tricesimus Quintus
+136;Centesimus Tricesimus Sextus
+137;Centesimus Tricesimus Septimus
+138;Centesimus Duodequadragesimus
+139;Centesimus Undequadragesimus
+140;Centesimus Quadragesimus
+141;Centesimus Quadragesimus Primus
+142;Centesimus Quadragesimus Secundus
+143;Centesimus Quadragesimus Tertius
+144;Centesimus Quadragesimus Quartus
+145;Centesimus Quadragesimus Quintus
+146;Centesimus Quadragesimus Sextus
+147;Centesimus Quadragesimus Septimus
+148;Centesimus Duodequinquagesimus
+149;Centesimus Undequinquagesimus
+150;Centesimus Quinquagesimus
+151;Centesimus Quinquagesimus Primus
+152;Centesimus Quinquagesimus Secundus
+153;Centesimus Quinquagesimus Tertius
+154;Centesimus Quinquagesimus Quartus
+155;Centesimus Quinquagesimus Quintus
+156;Centesimus Quinquagesimus Sextus
+157;Centesimus Quinquagesimus Septimus
+158;Centesimus Duodesexagesimus
+159;Centesimus Undesexagesimus
+160;Centesimus Sexagesimus
+161;Centesimus Sexagesimus Primus
+162;Centesimus Sexagesimus Secundus
+163;Centesimus Sexagesimus Tertius
+164;Centesimus Sexagesimus Quartus
+165;Centesimus Sexagesimus Quintus
+166;Centesimus Sexagesimus Sextus
+167;Centesimus Sexagesimus Septimus
+168;Centesimus Duodeseptuagesimus
+169;Centesimus Undeseptuagesimus
+170;Centesimus Septuagesimus
+171;Centesimus Septuagesimus Primus
+172;Centesimus Septuagesimus Secundus
+173;Centesimus Septuagesimus Tertius
+174;Centesimus Septuagesimus Quartus
+175;Centesimus Septuagesimus Quintus
+176;Centesimus Septuagesimus Sextus
+177;Centesimus Septuagesimus Septimus
+178;Centesimus Duodeoctogesimus
+179;Centesimus Undeoctogesimus
+180;Centesimus Octogesimus
+181;Centesimus Octogesimus Primus
+182;Centesimus Octogesimus Secundus
+183;Centesimus Octogesimus Tertius
+184;Centesimus Octogesimus Quartus
+185;Centesimus Octogesimus Quintus
+186;Centesimus Octogesimus Sextus
+187;Centesimus Octogesimus Septimus
+188;Centesimus Duodenonagesimus
+189;Centesimus Undenonagesimus
+190;Centesimus Nonagesimus
+191;Centesimus Nonagesimus Primus
+192;Centesimus Nonagesimus Secundus
+193;Centesimus Nonagesimus Tertius
+194;Centesimus Nonagesimus Quartus
+195;Centesimus Nonagesimus Quintus
+196;Centesimus Nonagesimus Sextus
+197;Centesimus Nonagesimus Septimus
+198;Centesimus Nonagesimus Octavus
+199;Centesimus Nonagesimus Nonus
+200;Ducentesimus
+201;Ducentesimus Primus
+202;Ducentesimus Secundus
+203;Ducentesimus Tertius
+204;Ducentesimus Quartus
+205;Ducentesimus Quintus
+206;Ducentesimus Sextus
+207;Ducentesimus Septimus
+208;Ducentesimus Octavus
+209;Ducentesimus Nonus
+210;Ducentesimus Decimus
+211;Ducentesimus Undecimus
+212;Ducentesimus Duodecimus
+213;Ducentesimus Tertius Decimus
+214;Ducentesimus Quartus Decimus
+215;Ducentesimus Quintus Decimus
+216;Ducentesimus Sextus Decimus
+217;Ducentesimus Septimus Decimus
+218;Ducentesimus Duodevicesimus
+219;Ducentesimus Undevicesimus
+220;Ducentesimus Vicesimus
+221;Ducentesimus Vicesimus Primus
+222;Ducentesimus Vicesimus Secundus
+223;Ducentesimus Vicesimus Tertius
+224;Ducentesimus Vicesimus Quartus
+225;Ducentesimus Vicesimus Quintus
+226;Ducentesimus Vicesimus Sextus
+227;Ducentesimus Vicesimus Septimus
+228;Ducentesimus Duodetricesimus
+229;Ducentesimus Undetricesimus
+230;Ducentesimus Tricesimus
+231;Ducentesimus Tricesimus Primus
+232;Ducentesimus Tricesimus Secundus
+233;Ducentesimus Tricesimus Tertius
+234;Ducentesimus Tricesimus Quartus
+235;Ducentesimus Tricesimus Quintus
+236;Ducentesimus Tricesimus Sextus
+237;Ducentesimus Tricesimus Septimus
+238;Ducentesimus Duodequadragesimus
+239;Ducentesimus Undequadragesimus
+240;Ducentesimus Quadragesimus
+241;Ducentesimus Quadragesimus Primus
+242;Ducentesimus Quadragesimus Secundus
+243;Ducentesimus Quadragesimus Tertius
+244;Ducentesimus Quadragesimus Quartus
+245;Ducentesimus Quadragesimus Quintus
+246;Ducentesimus Quadragesimus Sextus
+247;Ducentesimus Quadragesimus Septimus
+248;Ducentesimus Duodequinquagesimus
+249;Ducentesimus Undequinquagesimus
+250;Ducentesimus Quinquagesimus
+251;Ducentesimus Quinquagesimus Primus
+252;Ducentesimus Quinquagesimus Secundus
+253;Ducentesimus Quinquagesimus Tertius
+254;Ducentesimus Quinquagesimus Quartus
+255;Ducentesimus Quinquagesimus Quintus
+256;Ducentesimus Quinquagesimus Sextus
+257;Ducentesimus Quinquagesimus Septimus
+258;Ducentesimus Duodesexagesimus
+259;Ducentesimus Undesexagesimus
+260;Ducentesimus Sexagesimus
+261;Ducentesimus Sexagesimus Primus
+262;Ducentesimus Sexagesimus Secundus
+263;Ducentesimus Sexagesimus Tertius
+264;Ducentesimus Sexagesimus Quartus
+265;Ducentesimus Sexagesimus Quintus
+266;Ducentesimus Sexagesimus Sextus
+267;Ducentesimus Sexagesimus Septimus
+268;Ducentesimus Duodeseptuagesimus
+269;Ducentesimus Undeseptuagesimus
+270;Ducentesimus Septuagesimus
+271;Ducentesimus Septuagesimus Primus
+272;Ducentesimus Septuagesimus Secundus
+273;Ducentesimus Septuagesimus Tertius
+274;Ducentesimus Septuagesimus Quartus
+275;Ducentesimus Septuagesimus Quintus
+276;Ducentesimus Septuagesimus Sextus
+277;Ducentesimus Septuagesimus Septimus
+278;Ducentesimus Duodeoctogesimus
+279;Ducentesimus Undeoctogesimus
+280;Ducentesimus Octogesimus
+281;Ducentesimus Octogesimus Primus
+282;Ducentesimus Octogesimus Secundus
+283;Ducentesimus Octogesimus Tertius
+284;Ducentesimus Octogesimus Quartus
+285;Ducentesimus Octogesimus Quintus
+286;Ducentesimus Octogesimus Sextus
+287;Ducentesimus Octogesimus Septimus
+288;Ducentesimus Duodenonagesimus
+289;Ducentesimus Undenonagesimus
+290;Ducentesimus Nonagesimus
+291;Ducentesimus Nonagesimus Primus
+292;Ducentesimus Nonagesimus Secundus
+293;Ducentesimus Nonagesimus Tertius
+294;Ducentesimus Nonagesimus Quartus
+295;Ducentesimus Nonagesimus Quintus
+296;Ducentesimus Nonagesimus Sextus
+297;Ducentesimus Nonagesimus Septimus
+298;Ducentesimus Nonagesimus Octavus
+299;Ducentesimus Nonagesimus Nonus
+300;Trecentesimus
+301;Trecentesimus Primus
+302;Trecentesimus Secundus
+303;Trecentesimus Tertius
+304;Trecentesimus Quartus
+305;Trecentesimus Quintus
+306;Trecentesimus Sextus
+307;Trecentesimus Septimus
+308;Trecentesimus Octavus
+309;Trecentesimus Nonus
+310;Trecentesimus Decimus
+311;Trecentesimus Undecimus
+312;Trecentesimus Duodecimus
+313;Trecentesimus Tertius Decimus
+314;Trecentesimus Quartus Decimus
+315;Trecentesimus Quintus Decimus
+316;Trecentesimus Sextus Decimus
+317;Trecentesimus Septimus Decimus
+318;Trecentesimus Duodevicesimus
+319;Trecentesimus Undevicesimus
+320;Trecentesimus Vicesimus
+321;Trecentesimus Vicesimus Primus
+322;Trecentesimus Vicesimus Secundus
+323;Trecentesimus Vicesimus Tertius
+324;Trecentesimus Vicesimus Quartus
+325;Trecentesimus Vicesimus Quintus
+326;Trecentesimus Vicesimus Sextus
+327;Trecentesimus Vicesimus Septimus
+328;Trecentesimus Duodetricesimus
+329;Trecentesimus Undetricesimus
+330;Trecentesimus Tricesimus
+331;Trecentesimus Tricesimus Primus
+332;Trecentesimus Tricesimus Secundus
+333;Trecentesimus Tricesimus Tertius
+334;Trecentesimus Tricesimus Quartus
+335;Trecentesimus Tricesimus Quintus
+336;Trecentesimus Tricesimus Sextus
+337;Trecentesimus Tricesimus Septimus
+338;Trecentesimus Duodequadragesimus
+339;Trecentesimus Undequadragesimus
+340;Trecentesimus Quadragesimus
+341;Trecentesimus Quadragesimus Primus
+342;Trecentesimus Quadragesimus Secundus
+343;Trecentesimus Quadragesimus Tertius
+344;Trecentesimus Quadragesimus Quartus
+345;Trecentesimus Quadragesimus Quintus
+346;Trecentesimus Quadragesimus Sextus
+347;Trecentesimus Quadragesimus Septimus
+348;Trecentesimus Duodequinquagesimus
+349;Trecentesimus Undequinquagesimus
+350;Trecentesimus Quinquagesimus
+351;Trecentesimus Quinquagesimus Primus
+352;Trecentesimus Quinquagesimus Secundus
+353;Trecentesimus Quinquagesimus Tertius
+354;Trecentesimus Quinquagesimus Quartus
+355;Trecentesimus Quinquagesimus Quintus
+356;Trecentesimus Quinquagesimus Sextus
+357;Trecentesimus Quinquagesimus Septimus
+358;Trecentesimus Duodesexagesimus
+359;Trecentesimus Undesexagesimus
+360;Trecentesimus Sexagesimus
+361;Trecentesimus Sexagesimus Primus
+362;Trecentesimus Sexagesimus Secundus
+363;Trecentesimus Sexagesimus Tertius
+364;Trecentesimus Sexagesimus Quartus
+365;Trecentesimus Sexagesimus Quintus
+366;Trecentesimus Sexagesimus Sextus
+367;Trecentesimus Sexagesimus Septimus
+368;Trecentesimus Duodeseptuagesimus
+369;Trecentesimus Undeseptuagesimus
+370;Trecentesimus Septuagesimus
+371;Trecentesimus Septuagesimus Primus
+372;Trecentesimus Septuagesimus Secundus
+373;Trecentesimus Septuagesimus Tertius
+374;Trecentesimus Septuagesimus Quartus
+375;Trecentesimus Septuagesimus Quintus
+376;Trecentesimus Septuagesimus Sextus
+377;Trecentesimus Septuagesimus Septimus
+378;Trecentesimus Duodeoctogesimus
+379;Trecentesimus Undeoctogesimus
+380;Trecentesimus Octogesimus
+381;Trecentesimus Octogesimus Primus
+382;Trecentesimus Octogesimus Secundus
+383;Trecentesimus Octogesimus Tertius
+384;Trecentesimus Octogesimus Quartus
+385;Trecentesimus Octogesimus Quintus
+386;Trecentesimus Octogesimus Sextus
+387;Trecentesimus Octogesimus Septimus
+388;Trecentesimus Duodenonagesimus
+389;Trecentesimus Undenonagesimus
+390;Trecentesimus Nonagesimus
+391;Trecentesimus Nonagesimus Primus
+392;Trecentesimus Nonagesimus Secundus
+393;Trecentesimus Nonagesimus Tertius
+394;Trecentesimus Nonagesimus Quartus
+395;Trecentesimus Nonagesimus Quintus
+396;Trecentesimus Nonagesimus Sextus
+397;Trecentesimus Nonagesimus Septimus
+398;Trecentesimus Nonagesimus Octavus
+399;Trecentesimus Nonagesimus Nonus
+400;Quadringentesimus
+401;Quadringentesimus Primus
+402;Quadringentesimus Secundus
+403;Quadringentesimus Tertius
+404;Quadringentesimus Quartus
+405;Quadringentesimus Quintus
+406;Quadringentesimus Sextus
+407;Quadringentesimus Septimus
+408;Quadringentesimus Octavus
+409;Quadringentesimus Nonus
+410;Quadringentesimus Decimus
+411;Quadringentesimus Undecimus
+412;Quadringentesimus Duodecimus
+413;Quadringentesimus Tertius Decimus
+414;Quadringentesimus Quartus Decimus
+415;Quadringentesimus Quintus Decimus
+416;Quadringentesimus Sextus Decimus
+417;Quadringentesimus Septimus Decimus
+418;Quadringentesimus Duodevicesimus
+419;Quadringentesimus Undevicesimus
+420;Quadringentesimus Vicesimus
+421;Quadringentesimus Vicesimus Primus
+422;Quadringentesimus Vicesimus Secundus
+423;Quadringentesimus Vicesimus Tertius
+424;Quadringentesimus Vicesimus Quartus
+425;Quadringentesimus Vicesimus Quintus
+426;Quadringentesimus Vicesimus Sextus
+427;Quadringentesimus Vicesimus Septimus
+428;Quadringentesimus Duodetricesimus
+429;Quadringentesimus Undetricesimus
+430;Quadringentesimus Tricesimus
+431;Quadringentesimus Tricesimus Primus
+432;Quadringentesimus Tricesimus Secundus
+433;Quadringentesimus Tricesimus Tertius
+434;Quadringentesimus Tricesimus Quartus
+435;Quadringentesimus Tricesimus Quintus
+436;Quadringentesimus Tricesimus Sextus
+437;Quadringentesimus Tricesimus Septimus
+438;Quadringentesimus Duodequadragesimus
+439;Quadringentesimus Undequadragesimus
+440;Quadringentesimus Quadragesimus
+441;Quadringentesimus Quadragesimus Primus
+442;Quadringentesimus Quadragesimus Secundus
+443;Quadringentesimus Quadragesimus Tertius
+444;Quadringentesimus Quadragesimus Quartus
+445;Quadringentesimus Quadragesimus Quintus
+446;Quadringentesimus Quadragesimus Sextus
+447;Quadringentesimus Quadragesimus Septimus
+448;Quadringentesimus Duodequinquagesimus
+449;Quadringentesimus Undequinquagesimus
+450;Quadringentesimus Quinquagesimus
+451;Quadringentesimus Quinquagesimus Primus
+452;Quadringentesimus Quinquagesimus Secundus
+453;Quadringentesimus Quinquagesimus Tertius
+454;Quadringentesimus Quinquagesimus Quartus
+455;Quadringentesimus Quinquagesimus Quintus
+456;Quadringentesimus Quinquagesimus Sextus
+457;Quadringentesimus Quinquagesimus Septimus
+458;Quadringentesimus Duodesexagesimus
+459;Quadringentesimus Undesexagesimus
+460;Quadringentesimus Sexagesimus
+461;Quadringentesimus Sexagesimus Primus
+462;Quadringentesimus Sexagesimus Secundus
+463;Quadringentesimus Sexagesimus Tertius
+464;Quadringentesimus Sexagesimus Quartus
+465;Quadringentesimus Sexagesimus Quintus
+466;Quadringentesimus Sexagesimus Sextus
+467;Quadringentesimus Sexagesimus Septimus
+468;Quadringentesimus Duodeseptuagesimus
+469;Quadringentesimus Undeseptuagesimus
+470;Quadringentesimus Septuagesimus
+471;Quadringentesimus Septuagesimus Primus
+472;Quadringentesimus Septuagesimus Secundus
+473;Quadringentesimus Septuagesimus Tertius
+474;Quadringentesimus Septuagesimus Quartus
+475;Quadringentesimus Septuagesimus Quintus
+476;Quadringentesimus Septuagesimus Sextus
+477;Quadringentesimus Septuagesimus Septimus
+478;Quadringentesimus Duodeoctogesimus
+479;Quadringentesimus Undeoctogesimus
+480;Quadringentesimus Octogesimus
+481;Quadringentesimus Octogesimus Primus
+482;Quadringentesimus Octogesimus Secundus
+483;Quadringentesimus Octogesimus Tertius
+484;Quadringentesimus Octogesimus Quartus
+485;Quadringentesimus Octogesimus Quintus
+486;Quadringentesimus Octogesimus Sextus
+487;Quadringentesimus Octogesimus Septimus
+488;Quadringentesimus Duodenonagesimus
+489;Quadringentesimus Undenonagesimus
+490;Quadringentesimus Nonagesimus
+491;Quadringentesimus Nonagesimus Primus
+492;Quadringentesimus Nonagesimus Secundus
+493;Quadringentesimus Nonagesimus Tertius
+494;Quadringentesimus Nonagesimus Quartus
+495;Quadringentesimus Nonagesimus Quintus
+496;Quadringentesimus Nonagesimus Sextus
+497;Quadringentesimus Nonagesimus Septimus
+498;Quadringentesimus Nonagesimus Octavus
+499;Quadringentesimus Nonagesimus Nonus
+500;Quingentesimus
+501;Quingentesimus Primus
+502;Quingentesimus Secundus
+503;Quingentesimus Tertius
+504;Quingentesimus Quartus
+505;Quingentesimus Quintus
+506;Quingentesimus Sextus
+507;Quingentesimus Septimus
+508;Quingentesimus Octavus
+509;Quingentesimus Nonus
+510;Quingentesimus Decimus
+511;Quingentesimus Undecimus
+512;Quingentesimus Duodecimus
+513;Quingentesimus Tertius Decimus
+514;Quingentesimus Quartus Decimus
+515;Quingentesimus Quintus Decimus
+516;Quingentesimus Sextus Decimus
+517;Quingentesimus Septimus Decimus
+518;Quingentesimus Duodevicesimus
+519;Quingentesimus Undevicesimus
+520;Quingentesimus Vicesimus
+521;Quingentesimus Vicesimus Primus
+522;Quingentesimus Vicesimus Secundus
+523;Quingentesimus Vicesimus Tertius
+524;Quingentesimus Vicesimus Quartus
+525;Quingentesimus Vicesimus Quintus
+526;Quingentesimus Vicesimus Sextus
+527;Quingentesimus Vicesimus Septimus
+528;Quingentesimus Duodetricesimus
+529;Quingentesimus Undetricesimus
+530;Quingentesimus Tricesimus
+531;Quingentesimus Tricesimus Primus
+532;Quingentesimus Tricesimus Secundus
+533;Quingentesimus Tricesimus Tertius
+534;Quingentesimus Tricesimus Quartus
+535;Quingentesimus Tricesimus Quintus
+536;Quingentesimus Tricesimus Sextus
+537;Quingentesimus Tricesimus Septimus
+538;Quingentesimus Duodequadragesimus
+539;Quingentesimus Undequadragesimus
+540;Quingentesimus Quadragesimus
+541;Quingentesimus Quadragesimus Primus
+542;Quingentesimus Quadragesimus Secundus
+543;Quingentesimus Quadragesimus Tertius
+544;Quingentesimus Quadragesimus Quartus
+545;Quingentesimus Quadragesimus Quintus
+546;Quingentesimus Quadragesimus Sextus
+547;Quingentesimus Quadragesimus Septimus
+548;Quingentesimus Duodequinquagesimus
+549;Quingentesimus Undequinquagesimus
+550;Quingentesimus Quinquagesimus
+551;Quingentesimus Quinquagesimus Primus
+552;Quingentesimus Quinquagesimus Secundus
+553;Quingentesimus Quinquagesimus Tertius
+554;Quingentesimus Quinquagesimus Quartus
+555;Quingentesimus Quinquagesimus Quintus
+556;Quingentesimus Quinquagesimus Sextus
+557;Quingentesimus Quinquagesimus Septimus
+558;Quingentesimus Duodesexagesimus
+559;Quingentesimus Undesexagesimus
+560;Quingentesimus Sexagesimus
+561;Quingentesimus Sexagesimus Primus
+562;Quingentesimus Sexagesimus Secundus
+563;Quingentesimus Sexagesimus Tertius
+564;Quingentesimus Sexagesimus Quartus
+565;Quingentesimus Sexagesimus Quintus
+566;Quingentesimus Sexagesimus Sextus
+567;Quingentesimus Sexagesimus Septimus
+568;Quingentesimus Duodeseptuagesimus
+569;Quingentesimus Undeseptuagesimus
+570;Quingentesimus Septuagesimus
+571;Quingentesimus Septuagesimus Primus
+572;Quingentesimus Septuagesimus Secundus
+573;Quingentesimus Septuagesimus Tertius
+574;Quingentesimus Septuagesimus Quartus
+575;Quingentesimus Septuagesimus Quintus
+576;Quingentesimus Septuagesimus Sextus
+577;Quingentesimus Septuagesimus Septimus
+578;Quingentesimus Duodeoctogesimus
+579;Quingentesimus Undeoctogesimus
+580;Quingentesimus Octogesimus
+581;Quingentesimus Octogesimus Primus
+582;Quingentesimus Octogesimus Secundus
+583;Quingentesimus Octogesimus Tertius
+584;Quingentesimus Octogesimus Quartus
+585;Quingentesimus Octogesimus Quintus
+586;Quingentesimus Octogesimus Sextus
+587;Quingentesimus Octogesimus Septimus
+588;Quingentesimus Duodenonagesimus
+589;Quingentesimus Undenonagesimus
+590;Quingentesimus Nonagesimus
+591;Quingentesimus Nonagesimus Primus
+592;Quingentesimus Nonagesimus Secundus
+593;Quingentesimus Nonagesimus Tertius
+594;Quingentesimus Nonagesimus Quartus
+595;Quingentesimus Nonagesimus Quintus
+596;Quingentesimus Nonagesimus Sextus
+597;Quingentesimus Nonagesimus Septimus
+598;Quingentesimus Nonagesimus Octavus
+599;Quingentesimus Nonagesimus Nonus
+600;Sescentesimus
+601;Sescentesimus Primus
+602;Sescentesimus Secundus
+603;Sescentesimus Tertius
+604;Sescentesimus Quartus
+605;Sescentesimus Quintus
+606;Sescentesimus Sextus
+607;Sescentesimus Septimus
+608;Sescentesimus Octavus
+609;Sescentesimus Nonus
+610;Sescentesimus Decimus
+611;Sescentesimus Undecimus
+612;Sescentesimus Duodecimus
+613;Sescentesimus Tertius Decimus
+614;Sescentesimus Quartus Decimus
+615;Sescentesimus Quintus Decimus
+616;Sescentesimus Sextus Decimus
+617;Sescentesimus Septimus Decimus
+618;Sescentesimus Duodevicesimus
+619;Sescentesimus Undevicesimus
+620;Sescentesimus Vicesimus
+621;Sescentesimus Vicesimus Primus
+622;Sescentesimus Vicesimus Secundus
+623;Sescentesimus Vicesimus Tertius
+624;Sescentesimus Vicesimus Quartus
+625;Sescentesimus Vicesimus Quintus
+626;Sescentesimus Vicesimus Sextus
+627;Sescentesimus Vicesimus Septimus
+628;Sescentesimus Duodetricesimus
+629;Sescentesimus Undetricesimus
+630;Sescentesimus Tricesimus
+631;Sescentesimus Tricesimus Primus
+632;Sescentesimus Tricesimus Secundus
+633;Sescentesimus Tricesimus Tertius
+634;Sescentesimus Tricesimus Quartus
+635;Sescentesimus Tricesimus Quintus
+636;Sescentesimus Tricesimus Sextus
+637;Sescentesimus Tricesimus Septimus
+638;Sescentesimus Duodequadragesimus
+639;Sescentesimus Undequadragesimus
+640;Sescentesimus Quadragesimus
+641;Sescentesimus Quadragesimus Primus
+642;Sescentesimus Quadragesimus Secundus
+643;Sescentesimus Quadragesimus Tertius
+644;Sescentesimus Quadragesimus Quartus
+645;Sescentesimus Quadragesimus Quintus
+646;Sescentesimus Quadragesimus Sextus
+647;Sescentesimus Quadragesimus Septimus
+648;Sescentesimus Duodequinquagesimus
+649;Sescentesimus Undequinquagesimus
+650;Sescentesimus Quinquagesimus
+651;Sescentesimus Quinquagesimus Primus
+652;Sescentesimus Quinquagesimus Secundus
+653;Sescentesimus Quinquagesimus Tertius
+654;Sescentesimus Quinquagesimus Quartus
+655;Sescentesimus Quinquagesimus Quintus
+656;Sescentesimus Quinquagesimus Sextus
+657;Sescentesimus Quinquagesimus Septimus
+658;Sescentesimus Duodesexagesimus
+659;Sescentesimus Undesexagesimus
+660;Sescentesimus Sexagesimus
+661;Sescentesimus Sexagesimus Primus
+662;Sescentesimus Sexagesimus Secundus
+663;Sescentesimus Sexagesimus Tertius
+664;Sescentesimus Sexagesimus Quartus
+665;Sescentesimus Sexagesimus Quintus
+666;Sescentesimus Sexagesimus Sextus
+667;Sescentesimus Sexagesimus Septimus
+668;Sescentesimus Duodeseptuagesimus
+669;Sescentesimus Undeseptuagesimus
+670;Sescentesimus Septuagesimus
+671;Sescentesimus Septuagesimus Primus
+672;Sescentesimus Septuagesimus Secundus
+673;Sescentesimus Septuagesimus Tertius
+674;Sescentesimus Septuagesimus Quartus
+675;Sescentesimus Septuagesimus Quintus
+676;Sescentesimus Septuagesimus Sextus
+677;Sescentesimus Septuagesimus Septimus
+678;Sescentesimus Duodeoctogesimus
+679;Sescentesimus Undeoctogesimus
+680;Sescentesimus Octogesimus
+681;Sescentesimus Octogesimus Primus
+682;Sescentesimus Octogesimus Secundus
+683;Sescentesimus Octogesimus Tertius
+684;Sescentesimus Octogesimus Quartus
+685;Sescentesimus Octogesimus Quintus
+686;Sescentesimus Octogesimus Sextus
+687;Sescentesimus Octogesimus Septimus
+688;Sescentesimus Duodenonagesimus
+689;Sescentesimus Undenonagesimus
+690;Sescentesimus Nonagesimus
+691;Sescentesimus Nonagesimus Primus
+692;Sescentesimus Nonagesimus Secundus
+693;Sescentesimus Nonagesimus Tertius
+694;Sescentesimus Nonagesimus Quartus
+695;Sescentesimus Nonagesimus Quintus
+696;Sescentesimus Nonagesimus Sextus
+697;Sescentesimus Nonagesimus Septimus
+698;Sescentesimus Nonagesimus Octavus
+699;Sescentesimus Nonagesimus Nonus
+700;Septingentesimus
+701;Septingentesimus Primus
+702;Septingentesimus Secundus
+703;Septingentesimus Tertius
+704;Septingentesimus Quartus
+705;Septingentesimus Quintus
+706;Septingentesimus Sextus
+707;Septingentesimus Septimus
+708;Septingentesimus Octavus
+709;Septingentesimus Nonus
+710;Septingentesimus Decimus
+711;Septingentesimus Undecimus
+712;Septingentesimus Duodecimus
+713;Septingentesimus Tertius Decimus
+714;Septingentesimus Quartus Decimus
+715;Septingentesimus Quintus Decimus
+716;Septingentesimus Sextus Decimus
+717;Septingentesimus Septimus Decimus
+718;Septingentesimus Duodevicesimus
+719;Septingentesimus Undevicesimus
+720;Septingentesimus Vicesimus
+721;Septingentesimus Vicesimus Primus
+722;Septingentesimus Vicesimus Secundus
+723;Septingentesimus Vicesimus Tertius
+724;Septingentesimus Vicesimus Quartus
+725;Septingentesimus Vicesimus Quintus
+726;Septingentesimus Vicesimus Sextus
+727;Septingentesimus Vicesimus Septimus
+728;Septingentesimus Duodetricesimus
+729;Septingentesimus Undetricesimus
+730;Septingentesimus Tricesimus
+731;Septingentesimus Tricesimus Primus
+732;Septingentesimus Tricesimus Secundus
+733;Septingentesimus Tricesimus Tertius
+734;Septingentesimus Tricesimus Quartus
+735;Septingentesimus Tricesimus Quintus
+736;Septingentesimus Tricesimus Sextus
+737;Septingentesimus Tricesimus Septimus
+738;Septingentesimus Duodequadragesimus
+739;Septingentesimus Undequadragesimus
+740;Septingentesimus Quadragesimus
+741;Septingentesimus Quadragesimus Primus
+742;Septingentesimus Quadragesimus Secundus
+743;Septingentesimus Quadragesimus Tertius
+744;Septingentesimus Quadragesimus Quartus
+745;Septingentesimus Quadragesimus Quintus
+746;Septingentesimus Quadragesimus Sextus
+747;Septingentesimus Quadragesimus Septimus
+748;Septingentesimus Duodequinquagesimus
+749;Septingentesimus Undequinquagesimus
+750;Septingentesimus Quinquagesimus
+751;Septingentesimus Quinquagesimus Primus
+752;Septingentesimus Quinquagesimus Secundus
+753;Septingentesimus Quinquagesimus Tertius
+754;Septingentesimus Quinquagesimus Quartus
+755;Septingentesimus Quinquagesimus Quintus
+756;Septingentesimus Quinquagesimus Sextus
+757;Septingentesimus Quinquagesimus Septimus
+758;Septingentesimus Duodesexagesimus
+759;Septingentesimus Undesexagesimus
+760;Septingentesimus Sexagesimus
+761;Septingentesimus Sexagesimus Primus
+762;Septingentesimus Sexagesimus Secundus
+763;Septingentesimus Sexagesimus Tertius
+764;Septingentesimus Sexagesimus Quartus
+765;Septingentesimus Sexagesimus Quintus
+766;Septingentesimus Sexagesimus Sextus
+767;Septingentesimus Sexagesimus Septimus
+768;Septingentesimus Duodeseptuagesimus
+769;Septingentesimus Undeseptuagesimus
+770;Septingentesimus Septuagesimus
+771;Septingentesimus Septuagesimus Primus
+772;Septingentesimus Septuagesimus Secundus
+773;Septingentesimus Septuagesimus Tertius
+774;Septingentesimus Septuagesimus Quartus
+775;Septingentesimus Septuagesimus Quintus
+776;Septingentesimus Septuagesimus Sextus
+777;Septingentesimus Septuagesimus Septimus
+778;Septingentesimus Duodeoctogesimus
+779;Septingentesimus Undeoctogesimus
+780;Septingentesimus Octogesimus
+781;Septingentesimus Octogesimus Primus
+782;Septingentesimus Octogesimus Secundus
+783;Septingentesimus Octogesimus Tertius
+784;Septingentesimus Octogesimus Quartus
+785;Septingentesimus Octogesimus Quintus
+786;Septingentesimus Octogesimus Sextus
+787;Septingentesimus Octogesimus Septimus
+788;Septingentesimus Duodenonagesimus
+789;Septingentesimus Undenonagesimus
+790;Septingentesimus Nonagesimus
+791;Septingentesimus Nonagesimus Primus
+792;Septingentesimus Nonagesimus Secundus
+793;Septingentesimus Nonagesimus Tertius
+794;Septingentesimus Nonagesimus Quartus
+795;Septingentesimus Nonagesimus Quintus
+796;Septingentesimus Nonagesimus Sextus
+797;Septingentesimus Nonagesimus Septimus
+798;Septingentesimus Nonagesimus Octavus
+799;Septingentesimus Nonagesimus Nonus
+800;Octingentesimus
+801;Octingentesimus Primus
+802;Octingentesimus Secundus
+803;Octingentesimus Tertius
+804;Octingentesimus Quartus
+805;Octingentesimus Quintus
+806;Octingentesimus Sextus
+807;Octingentesimus Septimus
+808;Octingentesimus Octavus
+809;Octingentesimus Nonus
+810;Octingentesimus Decimus
+811;Octingentesimus Undecimus
+812;Octingentesimus Duodecimus
+813;Octingentesimus Tertius Decimus
+814;Octingentesimus Quartus Decimus
+815;Octingentesimus Quintus Decimus
+816;Octingentesimus Sextus Decimus
+817;Octingentesimus Septimus Decimus
+818;Octingentesimus Duodevicesimus
+819;Octingentesimus Undevicesimus
+820;Octingentesimus Vicesimus
+821;Octingentesimus Vicesimus Primus
+822;Octingentesimus Vicesimus Secundus
+823;Octingentesimus Vicesimus Tertius
+824;Octingentesimus Vicesimus Quartus
+825;Octingentesimus Vicesimus Quintus
+826;Octingentesimus Vicesimus Sextus
+827;Octingentesimus Vicesimus Septimus
+828;Octingentesimus Duodetricesimus
+829;Octingentesimus Undetricesimus
+830;Octingentesimus Tricesimus
+831;Octingentesimus Tricesimus Primus
+832;Octingentesimus Tricesimus Secundus
+833;Octingentesimus Tricesimus Tertius
+834;Octingentesimus Tricesimus Quartus
+835;Octingentesimus Tricesimus Quintus
+836;Octingentesimus Tricesimus Sextus
+837;Octingentesimus Tricesimus Septimus
+838;Octingentesimus Duodequadragesimus
+839;Octingentesimus Undequadragesimus
+840;Octingentesimus Quadragesimus
+841;Octingentesimus Quadragesimus Primus
+842;Octingentesimus Quadragesimus Secundus
+843;Octingentesimus Quadragesimus Tertius
+844;Octingentesimus Quadragesimus Quartus
+845;Octingentesimus Quadragesimus Quintus
+846;Octingentesimus Quadragesimus Sextus
+847;Octingentesimus Quadragesimus Septimus
+848;Octingentesimus Duodequinquagesimus
+849;Octingentesimus Undequinquagesimus
+850;Octingentesimus Quinquagesimus
+851;Octingentesimus Quinquagesimus Primus
+852;Octingentesimus Quinquagesimus Secundus
+853;Octingentesimus Quinquagesimus Tertius
+854;Octingentesimus Quinquagesimus Quartus
+855;Octingentesimus Quinquagesimus Quintus
+856;Octingentesimus Quinquagesimus Sextus
+857;Octingentesimus Quinquagesimus Septimus
+858;Octingentesimus Duodesexagesimus
+859;Octingentesimus Undesexagesimus
+860;Octingentesimus Sexagesimus
+861;Octingentesimus Sexagesimus Primus
+862;Octingentesimus Sexagesimus Secundus
+863;Octingentesimus Sexagesimus Tertius
+864;Octingentesimus Sexagesimus Quartus
+865;Octingentesimus Sexagesimus Quintus
+866;Octingentesimus Sexagesimus Sextus
+867;Octingentesimus Sexagesimus Septimus
+868;Octingentesimus Duodeseptuagesimus
+869;Octingentesimus Undeseptuagesimus
+870;Octingentesimus Septuagesimus
+871;Octingentesimus Septuagesimus Primus
+872;Octingentesimus Septuagesimus Secundus
+873;Octingentesimus Septuagesimus Tertius
+874;Octingentesimus Septuagesimus Quartus
+875;Octingentesimus Septuagesimus Quintus
+876;Octingentesimus Septuagesimus Sextus
+877;Octingentesimus Septuagesimus Septimus
+878;Octingentesimus Duodeoctogesimus
+879;Octingentesimus Undeoctogesimus
+880;Octingentesimus Octogesimus
+881;Octingentesimus Octogesimus Primus
+882;Octingentesimus Octogesimus Secundus
+883;Octingentesimus Octogesimus Tertius
+884;Octingentesimus Octogesimus Quartus
+885;Octingentesimus Octogesimus Quintus
+886;Octingentesimus Octogesimus Sextus
+887;Octingentesimus Octogesimus Septimus
+888;Octingentesimus Duodenonagesimus
+889;Octingentesimus Undenonagesimus
+890;Octingentesimus Nonagesimus
+891;Octingentesimus Nonagesimus Primus
+892;Octingentesimus Nonagesimus Secundus
+893;Octingentesimus Nonagesimus Tertius
+894;Octingentesimus Nonagesimus Quartus
+895;Octingentesimus Nonagesimus Quintus
+896;Octingentesimus Nonagesimus Sextus
+897;Octingentesimus Nonagesimus Septimus
+898;Octingentesimus Nonagesimus Octavus
+899;Octingentesimus Nonagesimus Nonus
+900;Nongentesimus
+901;Nongentesimus Primus
+902;Nongentesimus Secundus
+903;Nongentesimus Tertius
+904;Nongentesimus Quartus
+905;Nongentesimus Quintus
+906;Nongentesimus Sextus
+907;Nongentesimus Septimus
+908;Nongentesimus Octavus
+909;Nongentesimus Nonus
+910;Nongentesimus Decimus
+911;Nongentesimus Undecimus
+912;Nongentesimus Duodecimus
+913;Nongentesimus Tertius Decimus
+914;Nongentesimus Quartus Decimus
+915;Nongentesimus Quintus Decimus
+916;Nongentesimus Sextus Decimus
+917;Nongentesimus Septimus Decimus
+918;Nongentesimus Duodevicesimus
+919;Nongentesimus Undevicesimus
+920;Nongentesimus Vicesimus
+921;Nongentesimus Vicesimus Primus
+922;Nongentesimus Vicesimus Secundus
+923;Nongentesimus Vicesimus Tertius
+924;Nongentesimus Vicesimus Quartus
+925;Nongentesimus Vicesimus Quintus
+926;Nongentesimus Vicesimus Sextus
+927;Nongentesimus Vicesimus Septimus
+928;Nongentesimus Duodetricesimus
+929;Nongentesimus Undetricesimus
+930;Nongentesimus Tricesimus
+931;Nongentesimus Tricesimus Primus
+932;Nongentesimus Tricesimus Secundus
+933;Nongentesimus Tricesimus Tertius
+934;Nongentesimus Tricesimus Quartus
+935;Nongentesimus Tricesimus Quintus
+936;Nongentesimus Tricesimus Sextus
+937;Nongentesimus Tricesimus Septimus
+938;Nongentesimus Duodequadragesimus
+939;Nongentesimus Undequadragesimus
+940;Nongentesimus Quadragesimus
+941;Nongentesimus Quadragesimus Primus
+942;Nongentesimus Quadragesimus Secundus
+943;Nongentesimus Quadragesimus Tertius
+944;Nongentesimus Quadragesimus Quartus
+945;Nongentesimus Quadragesimus Quintus
+946;Nongentesimus Quadragesimus Sextus
+947;Nongentesimus Quadragesimus Septimus
+948;Nongentesimus Duodequinquagesimus
+949;Nongentesimus Undequinquagesimus
+950;Nongentesimus Quinquagesimus
+951;Nongentesimus Quinquagesimus Primus
+952;Nongentesimus Quinquagesimus Secundus
+953;Nongentesimus Quinquagesimus Tertius
+954;Nongentesimus Quinquagesimus Quartus
+955;Nongentesimus Quinquagesimus Quintus
+956;Nongentesimus Quinquagesimus Sextus
+957;Nongentesimus Quinquagesimus Septimus
+958;Nongentesimus Duodesexagesimus
+959;Nongentesimus Undesexagesimus
+960;Nongentesimus Sexagesimus
+961;Nongentesimus Sexagesimus Primus
+962;Nongentesimus Sexagesimus Secundus
+963;Nongentesimus Sexagesimus Tertius
+964;Nongentesimus Sexagesimus Quartus
+965;Nongentesimus Sexagesimus Quintus
+966;Nongentesimus Sexagesimus Sextus
+967;Nongentesimus Sexagesimus Septimus
+968;Nongentesimus Duodeseptuagesimus
+969;Nongentesimus Undeseptuagesimus
+970;Nongentesimus Septuagesimus
+971;Nongentesimus Septuagesimus Primus
+972;Nongentesimus Septuagesimus Secundus
+973;Nongentesimus Septuagesimus Tertius
+974;Nongentesimus Septuagesimus Quartus
+975;Nongentesimus Septuagesimus Quintus
+976;Nongentesimus Septuagesimus Sextus
+977;Nongentesimus Septuagesimus Septimus
+978;Nongentesimus Duodeoctogesimus
+979;Nongentesimus Undeoctogesimus
+980;Nongentesimus Octogesimus
+981;Nongentesimus Octogesimus Primus
+982;Nongentesimus Octogesimus Secundus
+983;Nongentesimus Octogesimus Tertius
+984;Nongentesimus Octogesimus Quartus
+985;Nongentesimus Octogesimus Quintus
+986;Nongentesimus Octogesimus Sextus
+987;Nongentesimus Octogesimus Septimus
+988;Nongentesimus Duodenonagesimus
+989;Nongentesimus Undenonagesimus
+990;Nongentesimus Nonagesimus
+991;Nongentesimus Nonagesimus Primus
+992;Nongentesimus Nonagesimus Secundus
+993;Nongentesimus Nonagesimus Tertius
+994;Nongentesimus Nonagesimus Quartus
+995;Nongentesimus Nonagesimus Quintus
+996;Nongentesimus Nonagesimus Sextus
+997;Nongentesimus Nonagesimus Septimus
+998;Nongentesimus Nonagesimus Octavus
+999;Nongentesimus Nonagesimus Nonus
+1000;Millesimus
+2000;Bis Millesimus
+3000;Ter Millesimus
+4000;Quater Millesimus
+5000;Quinquies Millesimus
+6000;Sexies Millesimus
+7000;Septies Millesimus
+8000;Octies Millesimus
+9000;Nonies Millesimus
+10000;Decies Millesimus
+11000;Undecies Millesimus
+12000;Duodecies Millesimus
+13000;Terdecies Millesimus
+14000;Quater Decies Millesimus
+15000;Quinquies Decies Millesimus
+16000;Sexies Decies Millesimus
+17000;Septies Decies Millesimus
+18000;Duodevicies Millesimus
+19000;Undevicies Millesimus
+20000;Vicies Millesimus
+21000;Vicies Semel Millesimus
+22000;Vicies Bis Millesimus
+23000;Vicies Ter Millesimus
+24000;Vicies Quater Millesimus
+25000;Vicies Quinquies Millesimus
+26000;Vicies Sexies Millesimus
+27000;Vicies Septies Millesimus
+28000;Duodetricies Millesimus
+29000;Undetricies Millesimus
+30000;Tricies Millesimus
+31000;Tricies Semel Millesimus
+32000;Tricies Bis Millesimus
+33000;Tricies Ter Millesimus
+34000;Tricies Quater Millesimus
+35000;Tricies Quinquies Millesimus
+36000;Tricies Sexies Millesimus
+37000;Tricies Septies Millesimus
+38000;Duodequadragies Millesimus
+39000;Undequadragies Millesimus
+40000;Quadragies Millesimus
+41000;Quadragies Semel Millesimus
+42000;Quadragies Bis Millesimus
+43000;Quadragies Ter Millesimus
+44000;Quadragies Quater Millesimus
+45000;Quadragies Quinquies Millesimus
+46000;Quadragies Sexies Millesimus
+47000;Quadragies Septies Millesimus
+48000;Duodequinquagies Millesimus
+49000;Undequinquagies Millesimus
+50000;Quinquagies Millesimus
+Last;Ultimus

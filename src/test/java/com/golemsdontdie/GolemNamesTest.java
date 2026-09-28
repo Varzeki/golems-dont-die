@@ -36,6 +36,11 @@ public class GolemNamesTest
 
 	private void setAutoName(boolean on) throws Exception
 	{
+		setConfig(on, GolemsDontDieConfig.NameStyle.DEFAULT);
+	}
+
+	private void setConfig(boolean on, GolemsDontDieConfig.NameStyle style) throws Exception
+	{
 		Field field = GolemNames.class.getDeclaredField("config");
 		field.setAccessible(true);
 		field.set(names, new GolemsDontDieConfig()
@@ -44,6 +49,12 @@ public class GolemNamesTest
 			public boolean autoName()
 			{
 				return on;
+			}
+
+			@Override
+			public NameStyle nameStyle()
+			{
+				return style;
 			}
 		});
 	}
@@ -111,5 +122,53 @@ public class GolemNamesTest
 		assertNull("turning it off takes the name away", names.suggested(golem(7, null)));
 		setAutoName(true);
 		assertEquals("and turning it on gives the same one back", named, names.suggested(golem(7, null)));
+	}
+
+	/** The examples from issue 2, and the ends of the list. */
+	@Test
+	public void ordinalsReadAsTheIssueAskedForThem()
+	{
+		assertEquals("Primus", names.ordinal(1));
+		assertEquals("Vicesimus Septimus", names.ordinal(27));
+		assertEquals("Undeseptuagesimus", names.ordinal(69));
+		assertEquals("Octogesimus Primus", names.ordinal(81));
+		assertEquals("Sescentesimus Tricesimus Quintus", names.ordinal(635));
+		assertEquals("Octingentesimus Quinquagesimus Sextus", names.ordinal(856));
+		assertEquals("Nongentesimus Octavus", names.ordinal(908));
+		assertEquals("Millesimus", names.ordinal(1000));
+		assertEquals("Bis Millesimus Quingentesimus Nonagesimus Sextus", names.ordinal(2596));
+		assertEquals("Septies Millesimus Trecentesimus Duodenonagesimus", names.ordinal(7388));
+		assertEquals("Vicies Septies Millesimus", names.ordinal(27000));
+		assertEquals("Quinquagies Millesimus", names.ordinal(50000));
+		assertEquals("Quinquagies Millesimus Nongentesimus Nonagesimus Nonus", names.ordinal(50999));
+		assertEquals("Ultimus", names.ordinal(51000));
+		assertNull("a golem not yet numbered has no ordinal", names.ordinal(0));
+	}
+
+	/** Every golem to fifty thousand has an ordinal of its own. */
+	@Test
+	public void everyOrdinalToFiftyThousandIsDifferent()
+	{
+		Set<String> seen = new HashSet<>();
+		for (int n = 1; n <= 50_000; n++)
+		{
+			String name = names.ordinal(n);
+			assertNotNull("no ordinal for " + n, name);
+			assertTrue("the ordinal for " + n + " was taken already: " + name, seen.add(name));
+		}
+	}
+
+	/** In the ordinal style an unnamed golem is called by its craft number; a named one keeps its name. */
+	@Test
+	public void theOrdinalStyleCountsCrafts() throws Exception
+	{
+		setConfig(true, GolemsDontDieConfig.NameStyle.ORDINAL);
+		Golem golem = golem(7, null);
+		golem.setCraftNumber(3);
+		assertEquals("Tertius", names.suggested(golem));
+		assertNull(names.suggested(golem(7, "Kevin")));
+
+		setConfig(true, GolemsDontDieConfig.NameStyle.DEFAULT);
+		assertEquals(names.nameFor(golem.getId()), names.suggested(golem));
 	}
 }
