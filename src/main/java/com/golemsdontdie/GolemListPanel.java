@@ -674,7 +674,7 @@ class GolemListPanel extends PluginPanel
 		// as somebody. Left as a prompt rather than put in the field: it is not a name until it
 		// is typed, and a field holding it would save it as one.
 		String suggested = names.suggested(golem);
-		JTextField name = new PlaceholderField(golem.getNickname(),
+		PlaceholderField name = new PlaceholderField(golem.getNickname(),
 			suggested == null ? "Unnamed golem" : suggested);
 		name.setMinimumSize(SQUEEZED);
 		// A field holding more than it can show scrolls to the caret, and a fresh one leaves that
@@ -682,7 +682,7 @@ class GolemListPanel extends PluginPanel
 		// edge. The row is built with the name already in it, so this is where it is wound back.
 		name.setCaretPosition(0);
 		Row[] self = new Row[1];
-		name.setToolTipText("Name this golem");
+		name.nameTip();
 		name.getDocument().addDocumentListener(new DocumentListener()
 		{
 			@Override
@@ -705,6 +705,8 @@ class GolemListPanel extends PluginPanel
 
 			private void rename()
 			{
+				// Typed or put in from the game, the tip says the name the field now holds.
+				name.nameTip();
 				if (self[0] != null && self[0].settingName)
 				{
 					return;
@@ -912,6 +914,19 @@ class GolemListPanel extends PluginPanel
 			setForeground(Color.WHITE);
 			setCaretColor(Color.WHITE);
 			setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+		}
+
+		/**
+		 * Says the whole name, typed or prompted, when a golem's name field is hovered. The field is
+		 * kept narrow so the buttons beside it have their room, and a long name is cut off in it.
+		 */
+		void nameTip()
+		{
+			String typed = getText().trim();
+			String shown = (typed.isEmpty() ? prompt : typed)
+				.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+			setToolTipText("<html>" + shown + "<br>" + (typed.isEmpty() ? "Click to name" : "Click to rename")
+				+ "</html>");
 		}
 
 		@Override
