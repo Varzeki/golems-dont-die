@@ -141,6 +141,21 @@ public class GolemShipmatesTest
 		assertEquals(QUAY, GolemShipmates.stepOff(QUAY, taken, (at, stood) -> null));
 	}
 
+	/** A golem told to go while aboard crumbles on deck and is done, rather than sailing on for good. */
+	@Test
+	public void aGolemToldToGoAboardCrumblesThere()
+	{
+		GolemSnapshot snapshot = new GolemSnapshot(1234, "Golem", new int[0], new short[0], new short[0],
+			128, 128, 1, -1, -1, -1, QUAY, 0);
+		Golem golem = Golem.onTile(snapshot, QUAY, 42L, QUAY);
+		golem.boardShip(7, 3 * Golem.TILE, 4 * Golem.TILE, 1, 512);
+		golem.startDying();
+		assertFalse(golem.isCrumbled());
+		golem.advance(GolemContent.GOLEM_DEATH_CYCLES, null);
+		assertTrue(golem.isAboard());
+		assertTrue(golem.isCrumbled());
+	}
+
 	/** A few golems stand round the ship, not in a queue down one side of it. */
 	@Test
 	public void theFirstFewAreSpreadOut()

@@ -1686,7 +1686,17 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				shipmates.carry(golem);
 				golem.setTickNow(tick);
-				golem.setDancing(celebrating);
+				if (golem.isDying())
+				{
+					// Told to go while aboard: it crumbles on deck, and is then dropped from the
+					// ship and the roster like any other. The crumble only counts down in advance,
+					// which a golem aboard is otherwise never given, so it stood on deck for good.
+					golem.advance(elapsed, roamContext);
+				}
+				else
+				{
+					golem.setDancing(celebrating);
+				}
 				updateRenderer(golem, wv, true, drawnPerTile);
 				continue;
 			}
