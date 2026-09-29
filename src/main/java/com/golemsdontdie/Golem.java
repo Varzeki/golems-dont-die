@@ -986,6 +986,7 @@ class Golem
 		queuedTransport = null;
 		queuedDock = null;
 		facingObstacle = null;
+		wayOffDeadEnd = null;
 		transportMemory.clearPending();
 		// A crossing interrupted by being put somewhere else is not one worth recording.
 		tracing = null;
@@ -1149,7 +1150,7 @@ class Golem
 						// but on ground it can stand on, only a fresh way out is taken.
 						// Going back is how golems ping-ponged up and down the tower ladder
 						// a hundred and sixty times, each shut-in floor sending them back.
-						if (failedSearches >= 2 && takeWayOut(context, false))
+						if (failedSearches >= 2 && (takeWayOut(context, false) || walkToWayOut(context)))
 						{
 							failedSearches = 0;
 							return searched;
@@ -1510,6 +1511,78 @@ class Golem
 		return true;
 	}
 
+	/** How far a golem stuck on a small floor looks for the way off it, in tiles. */
+	private static final int WAY_OUT_REACH = 10;
+
+	/**
+	 * Walks to the nearest way off a floor it can find nowhere to walk on, and takes it, even the
+	 * way it came. A golem that climbed onto a lookout the size of a room found nowhere to go,
+	 * over and over, until the watchdog carried it to the plinth — which, from the ground, looked
+	 * like a golem crafted out of nothing. It goes back down, and the ladder is then on its long
+	 * cooldown both ways, so it does not climb straight back up.
+	 *
+	 * @return true if it set off for one
+	 */
+	private boolean walkToWayOut(RoamContext context)
+	{
+		TransportNetwork network = context.getTransports();
+		if (network == null)
+		{
+			return false;
+		}
+		int tileX = fineX / TILE;
+		int tileY = fineY / TILE;
+		GolemTransport best = null;
+		int bestSpan = Integer.MAX_VALUE;
+		for (int dx = -WAY_OUT_REACH; dx <= WAY_OUT_REACH; dx++)
+		{
+			for (int dy = -WAY_OUT_REACH; dy <= WAY_OUT_REACH; dy++)
+			{
+				int span = Math.max(Math.abs(dx), Math.abs(dy));
+				if (span >= bestSpan)
+				{
+					continue;
+				}
+				for (GolemTransport transport : network.from(tileX + dx, tileY + dy))
+				{
+					if (transport.getFromPlane() == plane && arrivesSomewhereKnown(transport, context)
+						&& context.getAbilities().canUse(transport))
+					{
+						best = transport;
+						bestSpan = span;
+						break;
+					}
+				}
+			}
+		}
+		if (best == null)
+		{
+			return false;
+		}
+		if (bestSpan == 0)
+		{
+			leaveDeadEnd(best, context);
+			return true;
+		}
+		if (walkTo(best.getFromX(), best.getFromY(), context))
+		{
+			queuedTransport = best;
+			wayOffDeadEnd = best;
+			return true;
+		}
+		return false;
+	}
+
+	/** The way off a dead end the golem is walking to, taken whatever its cooldown; or null. */
+	private GolemTransport wayOffDeadEnd;
+
+	private void leaveDeadEnd(GolemTransport transport, RoamContext context)
+	{
+		wayOffDeadEnd = null;
+		take(transport, context);
+		transportMemory.used(transport, context.getTick());
+	}
+
 	/**
 	 * True if the far end of a transport is ground the golem could actually walk on.
 	 *
@@ -1700,6 +1773,11 @@ class Golem
 		GolemTransport transport = queuedTransport;
 		queuedTransport = null;
 
+		if (transport == wayOffDeadEnd)
+		{
+			leaveDeadEnd(transport, context);
+			return true;
+		}
 		if (transportMemory.onCooldown(transport, context.getTick())
 			|| !context.getAbilities().canUse(transport))
 		{
