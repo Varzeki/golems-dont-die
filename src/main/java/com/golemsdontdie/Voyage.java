@@ -166,7 +166,6 @@ class Voyage
 			}
 		}
 
-		notReady = false;
 		Itinerary crossing = crossTo(from, chosen, at, tick, random, context);
 		// Waiting on this crossing's field, or its one search this frame: hold the choice.
 		if (crossing == null && notReady)
@@ -260,6 +259,12 @@ class Voyage
 	 */
 	private boolean notReady;
 
+	/** Whether the last crossing asked for came back empty only because something is not ready. */
+	boolean wasNotReady()
+	{
+		return notReady;
+	}
+
 	/**
 	 * Plans the crossing from one dock to a chosen other, or null if it cannot be sailed now. The
 	 * crossing carries the dock it leaves, for whoever takes it to be kept from sailing back to.
@@ -267,6 +272,7 @@ class Voyage
 	Itinerary crossTo(SailingDocks.Dock from, SailingDocks.Dock to, WorldPoint at, int tick, Random random,
 		RoamContext context)
 	{
+		notReady = false;
 		Itinerary crossing = plotCrossing(from, to, at, tick, random, context);
 		if (crossing != null)
 		{

@@ -53,6 +53,16 @@ class GolemCrews
 		final List<Golem> waiting = new ArrayList<>();
 		final int since;
 
+		/**
+		 * The port chosen for the crew, or null, kept while its crossing is worked out: chosen afresh
+		 * every tick, a crew asked for a new sea field each time and sailed only if one happened to
+		 * be built already. Chosen again whenever someone joins, for them too.
+		 */
+		SailingDocks.Dock port;
+
+		/** The last tick the crew waits on that port's crossing, as a lone golem waits on its own. */
+		int portUntil;
+
 		Muster(SailingDocks.Dock dock, int since)
 		{
 			this.dock = dock;
@@ -138,6 +148,7 @@ class GolemCrews
 		if (!muster.waiting.contains(golem))
 		{
 			muster.waiting.add(golem);
+			muster.port = null;
 		}
 		// Put back on the quayside rather than left where it stands. Crossings begin between game
 		// ticks and this runs on one, so by now the golem is a tile or two out on the water, and
@@ -174,6 +185,7 @@ class GolemCrews
 		if (!muster.waiting.contains(golem))
 		{
 			muster.waiting.add(golem);
+			muster.port = null;
 		}
 		golem.waitAshore(tick, MUSTER_TICKS, placeFor(golem, muster), context);
 		// Planning the crossing booked shore leave for its whole length.
@@ -257,18 +269,28 @@ class GolemCrews
 			memories.add(golem.getTransportMemory());
 		}
 
-		SailingDocks.Dock port = voyage.crewPort(muster.dock, memories, random, context);
-		if (port == null)
+		if (muster.port == null)
 		{
-			// Nowhere all of them would go, and waiting longer changes nothing about that: they go
-			// their separate ways now rather than stand out the muster.
+			muster.port = voyage.crewPort(muster.dock, memories, random, context);
+			muster.portUntil = tick + TransportMemory.PENDING_WAIT_TICKS;
+		}
+		// Nowhere all of them would go, and waiting longer changes nothing about that; nor does
+		// waiting any longer on a crossing still being worked out. They go their separate ways now
+		// rather than stand out the muster.
+		if (muster.port == null || tick > muster.portUntil)
+		{
 			release(muster.waiting, tick);
 			return true;
 		}
 		WorldPoint at = crew.get(0).currentTile();
-		Itinerary crossing = voyage.crossTo(muster.dock, port, at, tick, random, context);
+		Itinerary crossing = voyage.crossTo(muster.dock, muster.port, at, tick, random, context);
 		if (crossing == null)
 		{
+			// Waiting on its sea field: the port is kept. No crossing to be had there at all: another.
+			if (!voyage.wasNotReady())
+			{
+				muster.port = null;
+			}
 			return false;
 		}
 
