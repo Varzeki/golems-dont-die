@@ -305,10 +305,13 @@ class GolemShipmates
 	}
 
 	/**
-	 * What stands in the way on each tile of a deck: its own collision, and for a tile the deck's
-	 * settings mark blocked — a skiff's bow and helm rows — something standing there too. Read from
-	 * collision alone, a skiff was solid down one side that is open deck and open at the bow where
-	 * nobody can stand, and golems found two places on a boat with five.
+	 * What stands in the way on each tile of a deck. Off the hull, its collision. Over the hull, the
+	 * ship itself says, and not in its collision, which on a skiff marks the mast's tile blocked and
+	 * leaves the salvaging station's open: a tile is deck unless the deck's settings mark it blocked,
+	 * as the bow and the helm's row are, or something that fills its tile stands on it — an object
+	 * placed with bit 0x100 of its config, which the stations, the wind catcher and the flag are
+	 * and the mast, the sail, the helm and the cleats are not. Read so, a skiff's deck is the five
+	 * places a player can walk to, where the collision gave golems the stations to stand in.
 	 */
 	static int[][] deckFlags(WorldView deck, int plane)
 	{
@@ -318,17 +321,69 @@ class GolemShipmates
 			return null;
 		}
 		int[][] own = maps[plane].getFlags();
+		int[] hull = hullFootprint(deck);
+		if (hull == null)
+		{
+			return own;
+		}
 		byte[][][] settings = deck.getTileSettings();
+		boolean[][] filled = filledTiles(deck, plane, own.length, own.length == 0 ? 0 : own[0].length);
 		int[][] out = new int[own.length][];
 		for (int x = 0; x < own.length; x++)
 		{
 			out[x] = own[x].clone();
 			for (int y = 0; y < own[x].length; y++)
 			{
-				if (settings != null && plane < settings.length && x < settings[plane].length
-					&& y < settings[plane][x].length && (settings[plane][x][y] & TILE_BLOCKED) != 0)
+				if (!onHull(hull, x, y))
 				{
-					out[x][y] |= CollisionDataFlag.BLOCK_MOVEMENT_OBJECT;
+					continue;
+				}
+				boolean blocked = settings != null && plane < settings.length && x < settings[plane].length
+					&& y < settings[plane][x].length && (settings[plane][x][y] & TILE_BLOCKED) != 0;
+				out[x][y] = blocked || filled[x][y] ? CollisionDataFlag.BLOCK_MOVEMENT_OBJECT : 0;
+			}
+		}
+		return out;
+	}
+
+	/** An object's config bit for one that fills the tile it stands on. See deckFlags. */
+	private static final int FILLS_TILE = 0x100;
+
+	/** The tiles of one floor of a ship that an object filling its tile stands on. */
+	private static boolean[][] filledTiles(WorldView deck, int plane, int sizeX, int sizeY)
+	{
+		boolean[][] out = new boolean[sizeX][sizeY];
+		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
+		if (tiles == null || plane >= tiles.length || tiles[plane] == null)
+		{
+			return out;
+		}
+		for (Tile[] column : tiles[plane])
+		{
+			for (Tile tile : column == null ? new Tile[0] : column)
+			{
+				if (tile == null || tile.getGameObjects() == null)
+				{
+					continue;
+				}
+				for (GameObject object : tile.getGameObjects())
+				{
+					if (object == null || (object.getConfig() & FILLS_TILE) == 0 || isHull(object.getId()))
+					{
+						continue;
+					}
+					int x0 = object.getSceneMinLocation().getX();
+					int y0 = object.getSceneMinLocation().getY();
+					for (int x = x0; x < x0 + Math.max(1, object.sizeX()) && x < sizeX; x++)
+					{
+						for (int y = y0; y < y0 + Math.max(1, object.sizeY()) && y < sizeY; y++)
+						{
+							if (x >= 0 && y >= 0)
+							{
+								out[x][y] = true;
+							}
+						}
+					}
 				}
 			}
 		}

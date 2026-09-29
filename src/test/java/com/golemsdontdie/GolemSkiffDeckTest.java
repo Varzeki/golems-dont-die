@@ -15,9 +15,10 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * A real skiff's deck, as ::gdeck read it off one at sea: where golems may stand. A skiff has eight
- * places to stand, one of them where its helmsman stands; this one has two taken by fittings, so
- * five are left for golems.
+ * A real skiff's deck, as ::gdeck and ::gparts read it off one at sea: where golems may stand. A
+ * skiff has eight places to stand, one of them where its helmsman stands; this one has a salvaging
+ * station and a wind catcher on two, so five are left for golems. Its collision says otherwise —
+ * the mast's tile blocked, the stations' open — which is why the deck is read from its objects.
  */
 public class GolemSkiffDeckTest
 {
@@ -55,6 +56,11 @@ public class GolemSkiffDeckTest
 
 	private static GameObject object(int id, int x, int y, int sizeX, int sizeY)
 	{
+		return object(id, x, y, sizeX, sizeY, 10);
+	}
+
+	private static GameObject object(int id, int x, int y, int sizeX, int sizeY, int config)
+	{
 		return (GameObject) Proxy.newProxyInstance(GameObject.class.getClassLoader(), new Class<?>[]{GameObject.class},
 			(proxy, method, args) ->
 			{
@@ -68,6 +74,8 @@ public class GolemSkiffDeckTest
 						return sizeX;
 					case "sizeY":
 						return sizeY;
+					case "getConfig":
+						return config;
 					default:
 						return null;
 				}
@@ -98,8 +106,17 @@ public class GolemSkiffDeckTest
 				tiles[1][x][y] = tile();
 			}
 		}
-		tiles[0][3][1] = tile(object(HULL_ID, 3, 1, 2, 6));
-		tiles[1][4][6] = tile(object(HELM_ID, 4, 6, 1, 1));
+		tiles[0][3][1] = tile(object(HULL_ID, 3, 1, 2, 6, 266));
+		// The deck's own things, with their configs as read: 0x100 set on what fills a tile.
+		tiles[1][3][1] = tile(object(59704, 3, 1, 1, 1, 266));
+		tiles[1][4][1] = tile(object(60263, 4, 1, 1, 1, 266));
+		tiles[1][3][2] = tile(object(60493, 3, 2, 1, 1, 74));
+		tiles[1][3][3] = tile(object(59700, 3, 3, 1, 1, 458));
+		tiles[1][4][4] = tile(object(59541, 4, 4, 1, 1, 10));
+		tiles[1][3][5] = tile(object(59683, 3, 5, 1, 1, 266));
+		tiles[1][4][5] = tile(object(29525, 4, 5, 1, 1, 10));
+		tiles[1][3][6] = tile(object(59488, 3, 6, 1, 1, 266));
+		tiles[1][4][6] = tile(object(HELM_ID, 4, 6, 1, 1, 10));
 		CollisionData[] maps = {collision(FLOOR_0), collision(FLOOR_1), collision(new int[SIZE][SIZE]),
 			collision(new int[SIZE][SIZE])};
 		Scene scene = (Scene) Proxy.newProxyInstance(Scene.class.getClassLoader(), new Class<?>[]{Scene.class},
@@ -138,6 +155,7 @@ public class GolemSkiffDeckTest
 		{
 			places.add(rail[0] / Golem.TILE + "," + rail[1] / Golem.TILE);
 		}
-		assertEquals(Set.of("3,2", "3,3", "3,4", "3,5", "4,3"), places);
+		// Down the helm's side, and the two either side of the salvaging station.
+		assertEquals(new HashSet<>(java.util.Arrays.asList("4,2", "4,3", "4,4", "3,2", "3,4")), places);
 	}
 }
