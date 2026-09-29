@@ -538,8 +538,9 @@ class GolemShipmates
 	}
 
 	/**
-	 * The player is off the ship. Near where it was, and the golems step off around them; anywhere
-	 * else, and each goes back to the quay it boarded from.
+	 * The player is off the ship. Near where it was, and the golems step off around them, onto the
+	 * player's own tile if there is no room; anywhere else, and each goes back to the quay it
+	 * boarded from.
 	 */
 	private void landed(WorldPoint ashore, int tick, BiFunction<WorldPoint, Set<Long>, WorldPoint> place)
 	{
@@ -553,22 +554,32 @@ class GolemShipmates
 		}
 		for (Golem golem : aboard)
 		{
-			WorldPoint to = golem.getAboardFrom();
-			if (withPlayer && place != null)
-			{
-				WorldPoint ground = place.apply(ashore, taken);
-				if (ground != null && !ground.equals(ashore))
-				{
-					to = ground;
-					taken.add(RoamContext.tileKey(ground.getX(), ground.getY(), ground.getPlane()));
-				}
-			}
+			WorldPoint to = withPlayer ? stepOff(ashore, taken, place) : golem.getAboardFrom();
 			golem.leaveShip(to, tick);
 			onMoved.accept(golem);
 		}
 		aboard.clear();
 		ship = -1;
 		shipAt = null;
+	}
+
+	/**
+	 * Where one golem steps off beside the player: a tile of its own around them if there is one,
+	 * taken so the next golem finds another, and the player's own tile if there is not. A narrow
+	 * quay with no room to spare sent golems back to the port they boarded at, which could be
+	 * across the map from where they had just sailed with the player.
+	 *
+	 * @param taken tiles already stood on, the player's among them
+	 */
+	static WorldPoint stepOff(WorldPoint ashore, Set<Long> taken, BiFunction<WorldPoint, Set<Long>, WorldPoint> place)
+	{
+		WorldPoint ground = place == null ? null : place.apply(ashore, taken);
+		if (ground == null || ground.equals(ashore))
+		{
+			return ashore;
+		}
+		taken.add(RoamContext.tileKey(ground.getX(), ground.getY(), ground.getPlane()));
+		return ground;
 	}
 
 	/**
