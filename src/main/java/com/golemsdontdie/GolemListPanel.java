@@ -134,6 +134,12 @@ class GolemListPanel extends PluginPanel
 	private final JLabel pageLabel = new JLabel();
 	private final JPanel paging = new JPanel(new BorderLayout());
 
+	/**
+	 * Where the rows would be, when a search matches none of them. Not on the pager, which is hidden
+	 * with fewer than two pages and so is never there to say it.
+	 */
+	private final JLabel nothingFound = new JLabel("No golems found");
+
 	/** Says what the order is, under the pager: starred, then nearest, and nothing else said so. */
 	private final JLabel order = new JLabel("Starred first, then closest");
 
@@ -324,6 +330,13 @@ class GolemListPanel extends PluginPanel
 		JPanel filler = new Tracking();
 		filler.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		filler.add(rows, BorderLayout.NORTH);
+		nothingFound.setFont(ROW);
+		nothingFound.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		nothingFound.setHorizontalAlignment(SwingConstants.CENTER);
+		nothingFound.setVerticalAlignment(SwingConstants.TOP);
+		nothingFound.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+		nothingFound.setVisible(false);
+		filler.add(nothingFound, BorderLayout.CENTER);
 
 		JScrollPane scroll = new JScrollPane(filler,
 			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
@@ -541,8 +554,9 @@ class GolemListPanel extends PluginPanel
 		paging.setVisible(pages > 1);
 		previous.setEnabled(page > 0);
 		next.setEnabled(page < pages - 1);
-		pageLabel.setText(matching.isEmpty() ? "No golems found"
-			: "Page " + (page + 1) + " of " + pages + "  (" + matching.size() + ")");
+		pageLabel.setText("Page " + (page + 1) + " of " + pages + "  (" + matching.size() + ")");
+		// Only for a search: an empty roster is already said, as "No golems yet", above.
+		nothingFound.setVisible(matching.isEmpty() && !wanted.isEmpty());
 		rows.revalidate();
 		rows.repaint();
 	}
