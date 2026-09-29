@@ -191,12 +191,14 @@ class Golem
 	}
 
 	/**
-	 * Where to write this golem down in a save: its landfall if it is on a crossing, since a
-	 * golem restored onto water is moved to whatever land is nearest.
+	 * Where to write this golem down in a save: the end of whatever route it is on. On a crossing,
+	 * since a golem restored onto water is moved to whatever land is nearest; out of view on foot,
+	 * since a route there is drawn straight without looking at the map, and partway along one a
+	 * golem can be inside a wall or a sealed room beside it. The end is ground the planner chose.
 	 */
 	WorldPoint saveTile()
 	{
-		return itinerary != null && itinerary.isVoyage() ? itinerary.destination() : currentTile();
+		return itinerary != null ? itinerary.destination() : currentTile();
 	}
 
 	/** Clears the watchdog after the golem has been moved somewhere it can walk. */
