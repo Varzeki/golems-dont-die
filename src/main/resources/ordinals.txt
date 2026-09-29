@@ -1,6 +1,8 @@
 # Latin ordinals: 1 to 999, then the thousands, then the last. Contributed by Hjaldr to ten
 # thousand, https://github.com/Varzeki/golems-dont-die/issues/2; the thousands past that follow
-# the same pattern, numeral adverbs after Allen and Greenough.
+# the same pattern, numeral adverbs after Allen and Greenough. Every eight and nine of a ten is
+# counted down from the next ten, 98 and 99 from the hundred, and a hundred or a thousand is added
+# in front of that unchanged: 198 is Centesimus Duodecentesimus, as 118 is Centesimus Duodevicesimus.
 1;Primus
 2;Secundus
 3;Tertius
@@ -98,8 +100,8 @@
 95;Nonagesimus Quintus
 96;Nonagesimus Sextus
 97;Nonagesimus Septimus
-98;Nonagesimus Octavus
-99;Nonagesimus Nonus
+98;Duodecentesimus
+99;Undecentesimus
 100;Centesimus
 101;Centesimus Primus
 102;Centesimus Secundus
@@ -198,8 +200,8 @@
 195;Centesimus Nonagesimus Quintus
 196;Centesimus Nonagesimus Sextus
 197;Centesimus Nonagesimus Septimus
-198;Centesimus Nonagesimus Octavus
-199;Centesimus Nonagesimus Nonus
+198;Centesimus Duodecentesimus
+199;Centesimus Undecentesimus
 200;Ducentesimus
 201;Ducentesimus Primus
 202;Ducentesimus Secundus
@@ -298,8 +300,8 @@
 295;Ducentesimus Nonagesimus Quintus
 296;Ducentesimus Nonagesimus Sextus
 297;Ducentesimus Nonagesimus Septimus
-298;Ducentesimus Nonagesimus Octavus
-299;Ducentesimus Nonagesimus Nonus
+298;Ducentesimus Duodecentesimus
+299;Ducentesimus Undecentesimus
 300;Trecentesimus
 301;Trecentesimus Primus
 302;Trecentesimus Secundus
@@ -398,8 +400,8 @@
 395;Trecentesimus Nonagesimus Quintus
 396;Trecentesimus Nonagesimus Sextus
 397;Trecentesimus Nonagesimus Septimus
-398;Trecentesimus Nonagesimus Octavus
-399;Trecentesimus Nonagesimus Nonus
+398;Trecentesimus Duodecentesimus
+399;Trecentesimus Undecentesimus
 400;Quadringentesimus
 401;Quadringentesimus Primus
 402;Quadringentesimus Secundus
@@ -498,8 +500,8 @@
 495;Quadringentesimus Nonagesimus Quintus
 496;Quadringentesimus Nonagesimus Sextus
 497;Quadringentesimus Nonagesimus Septimus
-498;Quadringentesimus Nonagesimus Octavus
-499;Quadringentesimus Nonagesimus Nonus
+498;Quadringentesimus Duodecentesimus
+499;Quadringentesimus Undecentesimus
 500;Quingentesimus
 501;Quingentesimus Primus
 502;Quingentesimus Secundus
@@ -598,8 +600,8 @@
 595;Quingentesimus Nonagesimus Quintus
 596;Quingentesimus Nonagesimus Sextus
 597;Quingentesimus Nonagesimus Septimus
-598;Quingentesimus Nonagesimus Octavus
-599;Quingentesimus Nonagesimus Nonus
+598;Quingentesimus Duodecentesimus
+599;Quingentesimus Undecentesimus
 600;Sescentesimus
 601;Sescentesimus Primus
 602;Sescentesimus Secundus
@@ -698,8 +700,8 @@
 695;Sescentesimus Nonagesimus Quintus
 696;Sescentesimus Nonagesimus Sextus
 697;Sescentesimus Nonagesimus Septimus
-698;Sescentesimus Nonagesimus Octavus
-699;Sescentesimus Nonagesimus Nonus
+698;Sescentesimus Duodecentesimus
+699;Sescentesimus Undecentesimus
 700;Septingentesimus
 701;Septingentesimus Primus
 702;Septingentesimus Secundus
@@ -798,8 +800,8 @@
 795;Septingentesimus Nonagesimus Quintus
 796;Septingentesimus Nonagesimus Sextus
 797;Septingentesimus Nonagesimus Septimus
-798;Septingentesimus Nonagesimus Octavus
-799;Septingentesimus Nonagesimus Nonus
+798;Septingentesimus Duodecentesimus
+799;Septingentesimus Undecentesimus
 800;Octingentesimus
 801;Octingentesimus Primus
 802;Octingentesimus Secundus
@@ -898,8 +900,8 @@
 895;Octingentesimus Nonagesimus Quintus
 896;Octingentesimus Nonagesimus Sextus
 897;Octingentesimus Nonagesimus Septimus
-898;Octingentesimus Nonagesimus Octavus
-899;Octingentesimus Nonagesimus Nonus
+898;Octingentesimus Duodecentesimus
+899;Octingentesimus Undecentesimus
 900;Nongentesimus
 901;Nongentesimus Primus
 902;Nongentesimus Secundus
@@ -998,8 +1000,8 @@
 995;Nongentesimus Nonagesimus Quintus
 996;Nongentesimus Nonagesimus Sextus
 997;Nongentesimus Nonagesimus Septimus
-998;Nongentesimus Nonagesimus Octavus
-999;Nongentesimus Nonagesimus Nonus
+998;Nongentesimus Duodecentesimus
+999;Nongentesimus Undecentesimus
 1000;Millesimus
 2000;Bis Millesimus
 3000;Ter Millesimus
@@ -1013,10 +1015,10 @@
 11000;Undecies Millesimus
 12000;Duodecies Millesimus
 13000;Terdecies Millesimus
-14000;Quater Decies Millesimus
-15000;Quinquies Decies Millesimus
-16000;Sexies Decies Millesimus
-17000;Septies Decies Millesimus
+14000;Quaterdecies Millesimus
+15000;Quinquiesdecies Millesimus
+16000;Sexiesdecies Millesimus
+17000;Septiesdecies Millesimus
 18000;Duodevicies Millesimus
 19000;Undevicies Millesimus
 20000;Vicies Millesimus
