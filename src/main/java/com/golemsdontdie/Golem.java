@@ -551,6 +551,58 @@ class Golem
 	private Itinerary waiting;
 
 	/**
+	 * True for a golem in view standing on its wait at a quayside with nothing else in hand: not
+	 * stepping, waving, dancing, climbing or crumbling. Only then is it given anything to do there,
+	 * since a wave begun mid-walk dropped the rest of the walk.
+	 */
+	boolean isIdleOnQuay(int tick)
+	{
+		return renderer != null && isWaiting(tick) && path.isEmpty() && !stepping && !isDying() && !dancing
+			&& !isGreeting(tick) && !isPartying(tick) && !inTransition();
+	}
+
+	/** The place at a quayside this golem is waiting at, or null if it is not waiting. */
+	WorldPoint waitingSpot()
+	{
+		return waiting == null ? null : waiting.destination();
+	}
+
+	/** The tile the golem is walking to, or the one it stands on. */
+	WorldPoint goalTile()
+	{
+		int[] last = path.peekLast();
+		return last == null ? currentTile() : new WorldPoint(last[0], last[1], plane);
+	}
+
+	/** Most tiles a golem waiting at a quay walks to stretch its legs; further is a wander. */
+	private static final int MILL_STEPS = 4;
+
+	/**
+	 * Walks a golem waiting at a quay to a tile near its place there, still waiting. Nothing it
+	 * passes is taken, since no transport is rolled for while it waits.
+	 *
+	 * @return true if it set off
+	 */
+	boolean millTo(WorldPoint to, RoamContext context)
+	{
+		if (to.getPlane() != plane || !walkTo(to.getX(), to.getY(), context) || path.size() > MILL_STEPS)
+		{
+			path.clear();
+			return false;
+		}
+		return true;
+	}
+
+	/** Turns the golem, at its own pace, to look toward something this far east and north. */
+	void faceToward(int dx, int dy)
+	{
+		if (dx != 0 || dy != 0)
+		{
+			targetOrientation = headingFor(dx, dy);
+		}
+	}
+
+	/**
 	 * Turns the golem to a heading at once, without turning through it: a golem on a boat is
 	 * carried round with the boat rather than steering itself.
 	 */
