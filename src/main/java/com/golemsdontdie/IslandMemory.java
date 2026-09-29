@@ -27,9 +27,11 @@ import net.runelite.api.coords.*;
  * a harvest reflects the world as it is now — objects that come and go included, and the
  * window between a game update and the mesh being regenerated.
  *
- * <p>Only the island is persisted. Nine regions of base64 in a properties file is
- * reasonable; the 1,158 the mesh covers would be an abuse of one, so world-scale
- * passability lives in the jar and the live harvest beyond the island is session-scoped.
+ * <p>What is persisted is the island and everywhere golems have been found able to reach from
+ * it: every instance the player loads, and the ground around the far end of every learned route.
+ * That grows as the player plays, deliberately — the shipped data does not cover instances or
+ * every shortcut yet, and until it does, what was learned is kept. The 1,158 regions of open world
+ * the mesh covers stay in the jar.
  */
 @Slf4j
 @Singleton
@@ -263,9 +265,9 @@ class IslandMemory
 	}
 
 	/**
-	 * True if a region is part of the island. A fixed list rather than a radius: the bundled map
-	 * defines exactly which regions the golems have, so harvesting outside it would accumulate
-	 * ground they can never reach.
+	 * True if a region is part of the island, or somewhere golems can get to from it. The nine are a
+	 * fixed list rather than a radius, as the bundled map defines them; the rest are wherever the
+	 * network says a transport leads, so walking the rest of Gielinor harvests nothing.
 	 */
 	private boolean withinIsland(int regionId)
 	{
