@@ -360,7 +360,9 @@ class RoamPlanner
 		{
 			// Back to somewhere outside the trap, not to another room of it.
 			int to = componentNear(way.getToX(), way.getToY(), way.getToPlane());
-			if (!reached.contains(to))
+			// Nor into ground cut off from home: a one-way exit turned round leads nowhere a golem
+			// could come back from, as the Castle Wars tunnels' ways up to the lobby did.
+			if (!reached.contains(to) && !mesh.isCutOff(way.getToX(), way.getToY(), way.getToPlane()))
 			{
 				ways.add(way);
 			}
