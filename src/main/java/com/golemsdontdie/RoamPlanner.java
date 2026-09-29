@@ -223,6 +223,9 @@ class RoamPlanner
 	/** Tiles a flood of unmeshed ground may fill before it counts as open ground, not a room. */
 	private static final int UNMESHED_ROOM = 4000;
 
+	/** Tiles of unmeshed rooms remembered at once, before the memory is started afresh. */
+	private static final int UNMESHED_REMEMBERED = 50_000;
+
 	/** Ways home for ground the mesh has nothing on, by tile, worked out once per change to the network. */
 	private final Map<Long, List<GolemTransport>> unmeshedWays = new HashMap<>();
 
@@ -244,6 +247,12 @@ class RoamPlanner
 		if (known != null || pathfinder == null)
 		{
 			return known == null ? Collections.emptyList() : known;
+		}
+		// Kept to a size: each room remembers every tile of itself, and a session wandering new
+		// content could otherwise hold hundreds of thousands until the network next changed.
+		if (unmeshedWays.size() > UNMESHED_REMEMBERED)
+		{
+			unmeshedWays.clear();
 		}
 		TileMap room = pathfinder.flood(x, y, plane, UNMESHED_ROOM);
 		List<GolemTransport> ways = Collections.emptyList();
