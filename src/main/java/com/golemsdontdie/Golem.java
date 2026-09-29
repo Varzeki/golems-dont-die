@@ -855,7 +855,7 @@ class Golem
 				}
 				else if (itinerary.isVoyage())
 				{
-					history.cameAshore();
+					history.cameAshore(itinerary.destination());
 				}
 			}
 			WorldPoint resolved = itinerary != null
@@ -921,7 +921,7 @@ class Golem
 				// on the sea with nowhere to walk, so it is put ashore.
 			if (wasVoyage)
 			{
-				history.cameAshore();
+				history.cameAshore(currentTile());
 				transportMemory.beginShoreLeaveOnArrival(tick, tick, random);
 				RoamPlanner planner = context.getPlanner();
 				if (planner != null)
@@ -986,7 +986,7 @@ class Golem
 			{
 				// Out of view, a crossing ends here rather than at a landing anyone watched: the
 				// journal hears it came ashore all the same, or it would say the golem walked there.
-				history.cameAshore();
+				history.cameAshore(itinerary.destination());
 			}
 		}
 		WorldPoint at = itinerary == null ? currentTile() : itinerary.destination();
@@ -2377,7 +2377,7 @@ class Golem
 		relocate(ashore);
 		if (sailed)
 		{
-			history.cameAshore();
+			history.cameAshore(ashore);
 			// A trip on the player's ship is a voyage on the golem's page as well as in its journal.
 			history.sailed();
 		}

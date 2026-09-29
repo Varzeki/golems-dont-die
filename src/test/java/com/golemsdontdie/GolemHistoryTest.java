@@ -65,8 +65,32 @@ public class GolemHistoryTest
 	{
 		GolemHistory history = new GolemHistory();
 		history.sample(2596, 2256, 0, HOME);
-		history.cameAshore();
+		history.cameAshore(null);
 		history.sample(2800, 3430, 0, HOME);
 		assertEquals(GolemTravel.SAILED.ordinal(), history.travels()[0][2]);
+	}
+
+	/**
+	 * A gangplank crossed without leaving the region is not how the golem reached the next one it
+	 * walks into: the journal said it took a gangplank to Shilo Village.
+	 */
+	@Test
+	public void aGangplankInPlaceIsNotTheNextJourney()
+	{
+		GolemHistory history = new GolemHistory();
+		history.sample(2596, 2256, 0, HOME);
+		history.tookTransport(new GolemTransport(2600, 2260, 0, 2602, 2260, 1, 1,
+			GolemTransport.ARCHETYPE_GANGPLANK, 1, new int[0], new int[0], new int[0], new int[0]));
+		history.sample(2602, 2260, 1, HOME);
+		history.sample(2800, 3430, 0, HOME);
+		assertEquals(GolemTravel.WALKED.ordinal(), history.travels()[0][2]);
+
+		// And one that did land somewhere new is written as a gangplank.
+		GolemHistory boarded = new GolemHistory();
+		boarded.sample(2596, 2256, 0, HOME);
+		boarded.tookTransport(new GolemTransport(2600, 2260, 0, 2800, 3430, 0, 1,
+			GolemTransport.ARCHETYPE_GANGPLANK, 1, new int[0], new int[0], new int[0], new int[0]));
+		boarded.sample(2800, 3430, 0, HOME);
+		assertEquals(GolemTravel.BOARDED.ordinal(), boarded.travels()[0][2]);
 	}
 }

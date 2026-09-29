@@ -158,7 +158,7 @@ public class GolemStoreTest
 		{
 			if (i % 5 == 3)
 			{
-				history.cameAshore();
+				history.cameAshore(null);
 			}
 			history.sample(2596 + i * 64, 2256, 0, PLINTH);
 		}

@@ -103,6 +103,13 @@ class GolemHistory
 	/** How the golem got where it is going, set as it arrives and spent on the next entry. */
 	private transient GolemTravel manner = GolemTravel.WALKED;
 
+	/**
+	 * The region that manner took it to. Only an entry for that region is written that way: a
+	 * gangplank crossed inside one region was kept until the golem next walked somewhere new, and
+	 * the journal said it took a gangplank to Shilo Village.
+	 */
+	private transient int mannerRegion = -1;
+
 	/** Notes an obstacle as the golem steps off it. */
 	void tookTransport(GolemTransport transport)
 	{
@@ -114,13 +121,20 @@ class GolemHistory
 		{
 			manner = GolemTravel.of(transport.getArchetype(), transport.getFromPlane(),
 				transport.getToPlane());
+			mannerRegion = regionOf(transport.getToX(), transport.getToY());
 		}
 	}
 
-	/** Notes a crossing as the golem steps ashore. */
-	void cameAshore()
+	/** Notes a crossing as the golem steps ashore, where it stepped ashore. */
+	void cameAshore(WorldPoint ashore)
 	{
 		manner = GolemTravel.SAILED;
+		mannerRegion = ashore == null ? -1 : regionOf(ashore.getX(), ashore.getY());
+	}
+
+	private static int regionOf(int x, int y)
+	{
+		return (x >> 6) << 8 | (y >> 6);
 	}
 
 	/**
@@ -147,9 +161,11 @@ class GolemHistory
 
 		// Walked off the surface — into a cave, or somewhere laid out apart from the map, such as
 		// God Wars or Zanaris: that is exploring, and reads better than walking.
-		GolemTravel how = manner == GolemTravel.WALKED && !WorldLayout.isSurface(y)
-			? GolemTravel.EXPLORED : manner;
+		GolemTravel arrived = mannerRegion == -1 || mannerRegion == region ? manner : GolemTravel.WALKED;
+		GolemTravel how = arrived == GolemTravel.WALKED && !WorldLayout.isSurface(y)
+			? GolemTravel.EXPLORED : arrived;
 		manner = GolemTravel.WALKED;
+		mannerRegion = -1;
 
 		// By name, as the page shows it: a place is several regions, and walking from one into the
 		// next wrote "Walked to Wyrmscraig" over and over. A walk to where the last entry already
