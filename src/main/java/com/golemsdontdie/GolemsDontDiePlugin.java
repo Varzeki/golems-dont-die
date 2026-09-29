@@ -596,6 +596,7 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				golem.setNickname(name);
 				saveGolemsSoon();
+				pageRenamed(golem);
 			}),
 			() -> clientThread.invoke(this::reviveMissing),
 			golem -> clientThread.invoke(() -> findGolem(golem)),
@@ -641,6 +642,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			saveGolemsSoon();
+			pageRenamed(golem);
 			List<Golem> living = nearestFirst();
 			panel.refresh(living, tally.getTotal() - living.size(), true);
 		});
@@ -741,6 +743,16 @@ public class GolemsDontDiePlugin extends Plugin
 			SwingUtilities.invokeLater(closing::close);
 		}
 		panel = null;
+	}
+
+	/** Tells an open golem page that a golem has a new name, in case it is that golem's page. */
+	private void pageRenamed(Golem golem)
+	{
+		GolemPage open = page;
+		if (open != null)
+		{
+			open.renamed(golem);
+		}
 	}
 
 	/**
@@ -2985,6 +2997,8 @@ public class GolemsDontDiePlugin extends Plugin
 		if (("autoName".equals(event.getKey()) || "nameStyle".equals(event.getKey())) && panel != null)
 		{
 			panel.namesChanged();
+			GolemPage open = page;
+			pageRenamed(open == null ? null : open.getShowing());
 		}
 
 		if ("maxGolems".equals(event.getKey()) || "limitGolems".equals(event.getKey()))

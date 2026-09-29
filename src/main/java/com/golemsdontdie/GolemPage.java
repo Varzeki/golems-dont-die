@@ -274,9 +274,7 @@ class GolemPage
 		// Named once the client thread has had a look, a frame from now; until then, nothing, and
 		// certainly not the last golem's.
 		furthest = null;
-		String suggested = names == null ? null : names.suggested(golem);
-		title.setText(golem.getNickname() != null ? golem.getNickname()
-			: suggested != null ? suggested : "Unnamed golem");
+		title.setText(nameOf(golem));
 		place.setText(" ");
 		find.setEnabled(true);
 		labelFind();
@@ -299,6 +297,31 @@ class GolemPage
 			frame.setLocationRelativeTo(frame.getOwner());
 		}
 		frame.setVisible(true);
+	}
+
+	/** The golem's own name, the one auto naming gives it, or failing both that it has none. */
+	private String nameOf(Golem golem)
+	{
+		String suggested = names == null ? null : names.suggested(golem);
+		return golem.getNickname() != null ? golem.getNickname()
+			: suggested != null ? suggested : "Unnamed golem";
+	}
+
+	/**
+	 * Names the golem again at the top of the page, if it is the one showing. The title is otherwise
+	 * only set on opening, and a golem renamed from the sidebar or the game, or given another name by
+	 * a change of name style, kept its old one here until the page was opened again. Safe from any
+	 * thread: the title is put right on Swing's.
+	 */
+	void renamed(Golem golem)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (golem != null && golem == showing)
+			{
+				title.setText(nameOf(golem));
+			}
+		});
 	}
 
 	/**
