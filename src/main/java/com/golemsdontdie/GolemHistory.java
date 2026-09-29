@@ -3,6 +3,7 @@ package com.golemsdontdie;
 import java.util.*;
 import lombok.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * What one golem has done, in six numbers: enough for its own page, and little enough to save
@@ -189,7 +190,7 @@ class GolemHistory
 		note(x, y, plane);
 		if (lastX != 0)
 		{
-			int step = Math.max(Math.abs(x - lastX), Math.abs(y - lastY));
+			int step = span(x - lastX, y - lastY);
 			if (step <= WALKED_AT_MOST)
 			{
 				walked += step;
@@ -227,6 +228,6 @@ class GolemHistory
 		{
 			return -1;
 		}
-		return Math.max(Math.abs(x - home.getX()), Math.abs(above - WorldLayout.groundAbove(home.getY())));
+		return span(x - home.getX(), above - WorldLayout.groundAbove(home.getY()));
 	}
 }

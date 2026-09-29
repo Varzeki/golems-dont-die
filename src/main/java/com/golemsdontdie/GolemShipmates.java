@@ -6,6 +6,7 @@ import javax.inject.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Golems that come aboard the player's own ship.
@@ -238,7 +239,7 @@ class GolemShipmates
 				int gap = Integer.MAX_VALUE;
 				for (int[] other : taken)
 				{
-					gap = Math.min(gap, Math.max(Math.abs(rail.get(i)[0] - other[0]), Math.abs(rail.get(i)[1] - other[1])));
+					gap = Math.min(gap, span(rail.get(i)[0] - other[0], rail.get(i)[1] - other[1]));
 				}
 				if (gap > bestGap)
 				{

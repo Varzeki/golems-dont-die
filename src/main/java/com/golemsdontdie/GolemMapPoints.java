@@ -16,6 +16,7 @@ import net.runelite.api.worldmap.WorldMapData;
 import net.runelite.client.ui.*;
 import net.runelite.client.ui.overlay.worldmap.*;
 import net.runelite.client.util.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Golems on the world map: all of them, as faces that say who is there when hovered.
@@ -427,7 +428,7 @@ class GolemMapPoints
 					}
 					// A group of twenty is drawn with a head twice the size, and reaches as far.
 					long reach = (long) (cellTiles * CROWD_SIZES[sizeFor(group.count)]);
-					long away = Math.max(Math.abs(group.x - x), Math.abs(group.y - y));
+					long away = span(group.x - x, group.y - y);
 					if (away <= reach && away < nearest)
 					{
 						nearest = away;
@@ -499,7 +500,7 @@ class GolemMapPoints
 					// Two heads overlap when they are nearer than the two half-widths together.
 					int reach = (int) (cellTiles * (CROWD_SIZES[sizeFor(one.count)]
 						+ CROWD_SIZES[sizeFor(other.count)]));
-					if (Math.max(Math.abs(one.x - other.x), Math.abs(one.y - other.y)) > reach)
+					if (span(one.x - other.x, one.y - other.y) > reach)
 					{
 						continue;
 					}

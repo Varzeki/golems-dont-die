@@ -7,6 +7,7 @@ import javax.inject.*;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Routes a raft across the ocean.
@@ -375,8 +376,8 @@ class SeaMesh
 	private static boolean roomy(Water water, int x, int y, int clearance, int[] start, int[] goal, int openNearEnds)
 	{
 		if (clearance <= 0
-			|| Math.max(Math.abs(x - start[0]), Math.abs(y - start[1])) <= openNearEnds
-			|| Math.max(Math.abs(x - goal[0]), Math.abs(y - goal[1])) <= openNearEnds)
+			|| span(x - start[0], y - start[1]) <= openNearEnds
+			|| span(x - goal[0], y - goal[1]) <= openNearEnds)
 		{
 			return true;
 		}
@@ -409,7 +410,7 @@ class SeaMesh
 				return true;
 			}
 		}
-		return route.size() == 1 && Math.max(Math.abs(x - route.get(0)[0]), Math.abs(y - route.get(0)[1])) <= band;
+		return route.size() == 1 && span(x - route.get(0)[0], y - route.get(0)[1]) <= band;
 	}
 
 	/** The game's corner rule, restricted to water. */

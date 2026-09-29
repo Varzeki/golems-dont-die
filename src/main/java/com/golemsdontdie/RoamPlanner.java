@@ -5,6 +5,7 @@ import javax.inject.*;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Plans where a far-away golem goes next, without pathing on tiles.
@@ -505,7 +506,7 @@ class RoamPlanner
 		for (SailingDocks.Dock dock : docks.getDocks())
 		{
 			WorldPoint shore = dock.getShore();
-			int distance = Math.max(Math.abs(shore.getX() - from.getX()), Math.abs(shore.getY() - from.getY()));
+			int distance = span(shore.getX() - from.getX(), shore.getY() - from.getY());
 			if (shore.getPlane() == from.getPlane() && distance > DOCK_REACH && distance <= TRANSPORT_SEARCH
 				&& docks.isOpen(dock))
 			{
@@ -513,8 +514,8 @@ class RoamPlanner
 			}
 		}
 		near.sort((a, b) -> Integer.compare(
-			Math.max(Math.abs(a.getShore().getX() - from.getX()), Math.abs(a.getShore().getY() - from.getY())),
-			Math.max(Math.abs(b.getShore().getX() - from.getX()), Math.abs(b.getShore().getY() - from.getY()))));
+			span(a.getShore().getX() - from.getX(), a.getShore().getY() - from.getY()),
+			span(b.getShore().getX() - from.getX(), b.getShore().getY() - from.getY())));
 		for (SailingDocks.Dock dock : near)
 		{
 			List<int[]> path = walk(from, dock.getShore().getX(), dock.getShore().getY(), reach);
@@ -660,7 +661,7 @@ class RoamPlanner
 			{
 				continue;
 			}
-			int distance = Math.max(Math.abs(shore.getX() - from.getX()), Math.abs(shore.getY() - from.getY()));
+			int distance = span(shore.getX() - from.getX(), shore.getY() - from.getY());
 			if (distance > DOCK_REACH && distance <= DOCK_ATTRACTION && distance < nearestDistance && docks.isOpen(dock))
 			{
 				nearest = dock;
@@ -683,7 +684,7 @@ class RoamPlanner
 	{
 		WorldPoint shore = dock.getShore();
 		return shore.getPlane() == from.getPlane()
-			&& Math.max(Math.abs(shore.getX() - from.getX()), Math.abs(shore.getY() - from.getY())) <= DOCK_REACH;
+			&& span(shore.getX() - from.getX(), shore.getY() - from.getY()) <= DOCK_REACH;
 	}
 
 	/** Rolls for a crossing for a golem that walked to a dock on purpose: the far golem's chance. */

@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.function.*;
 import javax.inject.*;
 import lombok.extern.slf4j.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * What is actually known about how each obstacle is traversed, and what golems may use.
@@ -588,7 +589,7 @@ class ObstacleKnowledge
 	{
 		int dx = to[0] - fromX;
 		int dy = to[1] - fromY;
-		int span = Math.max(Math.abs(dx), Math.abs(dy));
+		int span = span(dx, dy);
 		if (to[2] != plane || span < 2 || dx != 0 && dy != 0 && Math.abs(dx) != Math.abs(dy))
 		{
 			return false;

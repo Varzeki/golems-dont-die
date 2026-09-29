@@ -24,6 +24,12 @@ final class RouteGeometry
 	{
 	}
 
+	/** Tiles between two points as a golem walks them, a diagonal step counting as one. */
+	static int span(int dx, int dy)
+	{
+		return Math.max(Math.abs(dx), Math.abs(dy));
+	}
+
 	/** True if a movement is short enough to have a line at all. */
 	static boolean local(int dx, int dy)
 	{

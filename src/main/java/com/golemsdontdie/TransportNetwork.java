@@ -7,6 +7,7 @@ import java.util.zip.*;
 import javax.inject.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Every transport a golem could use, indexed by the tile you use it from.
@@ -260,7 +261,7 @@ class TransportNetwork
 		for (GolemTransport t : from(x, y))
 		{
 			if (t.getFromPlane() == plane && t.getToPlane() == plane
-				&& Math.max(Math.abs(t.getToX() - x), Math.abs(t.getToY() - y)) <= STONE_HOP)
+				&& span(t.getToX() - x, t.getToY() - y) <= STONE_HOP)
 			{
 				return true;
 			}

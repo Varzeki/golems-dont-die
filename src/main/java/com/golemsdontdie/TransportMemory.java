@@ -3,6 +3,7 @@ package com.golemsdontdie;
 import java.util.*;
 import java.util.function.*;
 import lombok.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * What one golem has used recently, so it does not pace back and forth through a door.
@@ -62,7 +63,7 @@ final class TransportMemory
 
 	private static boolean isCrossing(int fromX, int fromY, int toX, int toY)
 	{
-		return Math.max(Math.abs(toX - fromX), Math.abs(toY - fromY)) <= OBSTACLE_REACH;
+		return span(toX - fromX, toY - fromY) <= OBSTACLE_REACH;
 	}
 
 	/** The port this golem last sailed from, or -1: reachable again from the next, so it tours. */
@@ -299,7 +300,7 @@ final class TransportMemory
 
 	private static boolean near(int x, int y, int otherX, int otherY)
 	{
-		return Math.max(Math.abs(x - otherX), Math.abs(y - otherY)) <= SAME_OBSTACLE_TILES;
+		return span(x - otherX, y - otherY) <= SAME_OBSTACLE_TILES;
 	}
 
 	/**

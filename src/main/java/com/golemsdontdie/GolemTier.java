@@ -1,6 +1,7 @@
 package com.golemsdontdie;
 
 import net.runelite.api.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * How much of a golem needs simulating, decided by how close the player is to it.
@@ -58,7 +59,7 @@ enum GolemTier
 		}
 
 		// Chebyshev, not Euclidean: the scene and the ring around it are squares.
-		int distance = Math.max(Math.abs(worldX - playerX), Math.abs(worldY - playerY));
+		int distance = span(worldX - playerX, worldY - playerY);
 		return distance <= NEAR_RANGE ? NEAR : FAR;
 	}
 }

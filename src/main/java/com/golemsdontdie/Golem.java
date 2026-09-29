@@ -6,6 +6,7 @@ import java.util.function.*;
 import lombok.*;
 import net.runelite.api.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * One golem, simulated in world coordinates whether or not it is on screen.
@@ -1787,8 +1788,7 @@ class Golem
 			return false;
 		}
 
-		int span = Math.max(Math.abs(transport.getToX() - fineX / TILE),
-			Math.abs(transport.getToY() - fineY / TILE));
+		int span = span(transport.getToX() - fineX / TILE, transport.getToY() - fineY / TILE);
 		if (span < 1 || span > CLIMB_MAX_TILES)
 		{
 			return false;
@@ -2610,8 +2610,7 @@ class Golem
 		tracing = null;
 		if (tier != GolemTier.SCENE || context.getTraversals() == null
 			|| transport.getFromPlane() != transport.getToPlane()
-			|| Math.max(Math.abs(transport.getToX() - transport.getFromX()),
-				Math.abs(transport.getToY() - transport.getFromY())) > TRACE_REACH)
+			|| span(transport.getToX() - transport.getFromX(), transport.getToY() - transport.getFromY()) > TRACE_REACH)
 		{
 			return;
 		}

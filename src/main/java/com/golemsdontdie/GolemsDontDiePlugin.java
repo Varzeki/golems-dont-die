@@ -21,6 +21,7 @@ import net.runelite.client.ui.*;
 import net.runelite.client.ui.overlay.*;
 import net.runelite.client.ui.overlay.infobox.*;
 import net.runelite.client.util.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Keeps crafted golems alive by replacing each one with a client-side copy, so it
@@ -395,7 +396,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return true;
 		}
-		int steps = Math.max(Math.abs(toX - fromX), Math.abs(toY - fromY));
+		int steps = span(toX - fromX, toY - fromY);
 		java.util.Deque<int[]> walk = pathfinder.findPath(fromX, fromY, fromPlane, toX, toY,
 			new RoamBounds(islandMemory, fromPlane, fromX, fromY));
 		return walk.isEmpty() || walk.size() > steps * 2 + 4;
@@ -403,16 +404,11 @@ public class GolemsDontDiePlugin extends Plugin
 
 	private void saveLearnedObstacles()
 	{
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP,
-			ObstacleKnowledge.LEARNED_KEY, obstacleKnowledge.serialise());
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP,
-			ObstacleKnowledge.CONFIRMED_KEY, obstacleKnowledge.serialiseConfirmed());
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP,
-			ObstacleKnowledge.ROUTES_KEY, obstacleKnowledge.serialiseRoutes());
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP,
-			ObstacleKnowledge.CURVES_KEY, obstacleKnowledge.serialiseCurves());
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP,
-			ObstacleKnowledge.LINES_KEY, obstacleKnowledge.serialiseLines());
+		setSetting(ObstacleKnowledge.LEARNED_KEY, obstacleKnowledge.serialise());
+		setSetting(ObstacleKnowledge.CONFIRMED_KEY, obstacleKnowledge.serialiseConfirmed());
+		setSetting(ObstacleKnowledge.ROUTES_KEY, obstacleKnowledge.serialiseRoutes());
+		setSetting(ObstacleKnowledge.CURVES_KEY, obstacleKnowledge.serialiseCurves());
+		setSetting(ObstacleKnowledge.LINES_KEY, obstacleKnowledge.serialiseLines());
 	}
 
 	/**
@@ -452,6 +448,17 @@ public class GolemsDontDiePlugin extends Plugin
 		return configManager.getConfig(GolemsDontDieConfig.class);
 	}
 
+	/** One of the plugin's own stored values, in its config group, or null if never set. */
+	private String setting(String key)
+	{
+		return configManager.getConfiguration(GolemsDontDieConfig.GROUP, key);
+	}
+
+	private void setSetting(String key, Object value)
+	{
+		configManager.setConfiguration(GolemsDontDieConfig.GROUP, key, value);
+	}
+
 	@Override
 	protected void startUp()
 	{
@@ -462,15 +469,15 @@ public class GolemsDontDiePlugin extends Plugin
 		// Obstacles already taught, and the settings governing learning. Before the transport
 		// network, whose usability gate consults it.
 		obstacleKnowledge.deserialise(
-			configManager.getConfiguration(GolemsDontDieConfig.GROUP, ObstacleKnowledge.LEARNED_KEY));
+			setting(ObstacleKnowledge.LEARNED_KEY));
 		obstacleKnowledge.deserialiseConfirmed(
-			configManager.getConfiguration(GolemsDontDieConfig.GROUP, ObstacleKnowledge.CONFIRMED_KEY));
+			setting(ObstacleKnowledge.CONFIRMED_KEY));
 		obstacleKnowledge.deserialiseRoutes(
-			configManager.getConfiguration(GolemsDontDieConfig.GROUP, ObstacleKnowledge.ROUTES_KEY));
+			setting(ObstacleKnowledge.ROUTES_KEY));
 		obstacleKnowledge.deserialiseCurves(
-			configManager.getConfiguration(GolemsDontDieConfig.GROUP, ObstacleKnowledge.CURVES_KEY));
+			setting(ObstacleKnowledge.CURVES_KEY));
 		obstacleKnowledge.deserialiseLines(
-			configManager.getConfiguration(GolemsDontDieConfig.GROUP, ObstacleKnowledge.LINES_KEY));
+			setting(ObstacleKnowledge.LINES_KEY));
 		applyObstacleSettings();
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
@@ -493,7 +500,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Saved map first, shipped baseline underneath: what the player has walked beats a
 		// static export of the same ground.
-		islandMemory.deserialise(configManager.getConfiguration(GolemsDontDieConfig.GROUP, IslandMemory.MAP_KEY));
+		islandMemory.deserialise(setting(IslandMemory.MAP_KEY));
 		islandMemory.loadBundled();
 		// Anywhere a transport from the island leads is ground golems will walk; resolved
 		// lazily, after the network has loaded.
@@ -534,7 +541,7 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext.setModels(modelFactory);
 
 		pendingRestore.addAll(store.deserialise(
-			configManager.getConfiguration(GolemsDontDieConfig.GROUP, GolemsDontDieConfig.SAVED_GOLEMS_KEY)));
+			setting(GolemsDontDieConfig.SAVED_GOLEMS_KEY)));
 
 		tally.load();
 
@@ -2114,19 +2121,19 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void checkForUpdate()
 	{
-		if (configManager.getConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY) != null)
+		if (setting(ANNOUNCED_KEY) != null)
 		{
 			return;
 		}
 		for (String key : OLD_VERSION_KEYS)
 		{
-			if (configManager.getConfiguration(GolemsDontDieConfig.GROUP, key) != null)
+			if (setting(key) != null)
 			{
 				announcementPending = true;
 				return;
 			}
 		}
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY, true);
+		setSetting(ANNOUNCED_KEY, true);
 	}
 
 	/** Says it once, on the first tick logged in, and marks it only once said. */
@@ -2138,7 +2145,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		announcementPending = false;
 		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>The Golems have learned to sail...</col>", null);
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP, ANNOUNCED_KEY, true);
+		setSetting(ANNOUNCED_KEY, true);
 	}
 
 	/**
@@ -3211,8 +3218,7 @@ public class GolemsDontDiePlugin extends Plugin
 			log.debug("Not saving golems: {} saved golems are not restored yet", pendingRestore.size());
 			return;
 		}
-		configManager.setConfiguration(
-			GolemsDontDieConfig.GROUP, GolemsDontDieConfig.SAVED_GOLEMS_KEY, store.serialise(livingGolems()));
+		setSetting(GolemsDontDieConfig.SAVED_GOLEMS_KEY, store.serialise(livingGolems()));
 	}
 
 	private void saveIslandMemory()
@@ -3221,8 +3227,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		configManager.setConfiguration(
-			GolemsDontDieConfig.GROUP, IslandMemory.MAP_KEY, islandMemory.serialise());
+		setSetting(IslandMemory.MAP_KEY, islandMemory.serialise());
 	}
 
 	// ---- hiding the original ----

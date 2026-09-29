@@ -3,6 +3,7 @@ package com.golemsdontdie;
 import java.util.*;
 import lombok.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Where a golem will be, expressed so that knowing costs nothing until someone asks.
@@ -120,7 +121,7 @@ final class Itinerary
 			{
 				// Chebyshev: a diagonal step costs one tick exactly as a cardinal one does.
 				// Euclidean tiles would make diagonal legs take longer than the game does.
-				travelled += Math.max(Math.abs(xs[i] - xs[i - 1]), Math.abs(ys[i] - ys[i - 1]));
+				travelled += span(xs[i] - xs[i - 1], ys[i] - ys[i - 1]);
 			}
 			reached[i] = travelled;
 		}
@@ -179,7 +180,7 @@ final class Itinerary
 			ys[i] = Math.floorDiv(fineYs[i], Golem.TILE);
 			if (i > 0)
 			{
-				travelled += Math.max(Math.abs(xs[i] - xs[i - 1]), Math.abs(ys[i] - ys[i - 1]));
+				travelled += span(xs[i] - xs[i - 1], ys[i] - ys[i - 1]);
 			}
 			reached[i] = travelled;
 		}

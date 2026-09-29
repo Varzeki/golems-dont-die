@@ -5,6 +5,7 @@ import java.util.concurrent.*;
 import javax.inject.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * Decides where a golem sails, and plans the crossing.
@@ -643,7 +644,7 @@ class Voyage
 				break;
 			}
 			if (!docking && t > 1 && landing != null
-				&& Math.max(Math.abs(tileX - landing.getX()), Math.abs(tileY - landing.getY())) <= DISEMBARK_RANGE)
+				&& span(tileX - landing.getX(), tileY - landing.getY()) <= DISEMBARK_RANGE)
 			{
 				// In range of the gangplank: bring the raft to a stop, and the golem steps ashore.
 				docking = true;
@@ -726,7 +727,7 @@ class Voyage
 				}
 				int dx = targetX - x;
 				int dy = targetY - y;
-				int gap = Math.max(Math.abs(dx), Math.abs(dy));
+				int gap = span(dx, dy);
 				if (gap > 0)
 				{
 					int toward = compassPoint(dx, dy);
@@ -959,7 +960,7 @@ class Voyage
 			{
 				continue;
 			}
-			int distance = Math.max(Math.abs(dock.getMooring().getX() - x), Math.abs(dock.getMooring().getY() - y));
+			int distance = span(dock.getMooring().getX() - x, dock.getMooring().getY() - y);
 			if (distance < best)
 			{
 				best = distance;
@@ -1138,7 +1139,7 @@ class Voyage
 	/** True if the raft could move straight between these points without leaving the field. */
 	private static boolean clear(SeaMesh.Field field, int fromX, int fromY, int toX, int toY)
 	{
-		int span = Math.max(Math.abs(toX - fromX), Math.abs(toY - fromY));
+		int span = span(toX - fromX, toY - fromY);
 		int samples = Math.max(1, span / (QUARTER_TILE / 2));
 		for (int s = 0; s <= samples; s++)
 		{

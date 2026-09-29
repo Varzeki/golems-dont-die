@@ -6,6 +6,7 @@ import java.util.zip.*;
 import javax.inject.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.coords.*;
+import static com.golemsdontdie.RouteGeometry.span;
 
 /**
  * What a place is called, so a golem's whereabouts can be said in words.
@@ -135,7 +136,7 @@ class PlaceNames
 		for (int i = 0; i < labels.length; i++)
 		{
 			int[] label = labels[i];
-			int distance = Math.max(Math.abs(label[0] - x), Math.abs(label[1] - y));
+			int distance = span(label[0] - x, label[1] - y);
 			if (distance > LABEL_REACH)
 			{
 				continue;
