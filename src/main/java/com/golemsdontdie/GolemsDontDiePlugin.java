@@ -431,7 +431,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (++placesSinceOrder >= ORDERS_EVERY)
 		{
 			placesSinceOrder = 0;
-			list.reorder(nearestFirst(), tally.getTotal() - countLiving());
+			list.reorder(nearestFirst(), missingGolems(countLiving()));
 		}
 	}
 
@@ -732,7 +732,7 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 			saveGolemsSoon();
 			List<Golem> living = nearestFirst();
-			panel.refresh(living, tally.getTotal() - living.size(), true);
+			panel.refresh(living, missingGolems(living.size()), true);
 		});
 		navButton = NavigationButton.builder()
 			.tooltip("Golems")
@@ -1335,7 +1335,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void reviveMissing()
 	{
-		int missing = tally.getTotal() - livingGolems().size();
+		int missing = missingGolems(countLiving());
 		if (missing <= 0)
 		{
 			return;
@@ -1494,13 +1494,28 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
+	 * How many golems reviving would bring back: the gap between golems crafted and golems here,
+	 * but never past the limit when there is one. Offering the whole gap under a limit of 25
+	 * revived four hundred golems, and the next craft culled the oldest of them to pay.
+	 */
+	private int missingGolems(int living)
+	{
+		int missing = tally.getTotal() - living;
+		if (config.limitGolems())
+		{
+			missing = Math.min(missing, Math.max(1, config.maxGolems()) - living);
+		}
+		return Math.max(0, missing);
+	}
+
+	/**
 	 * Retires the oldest unnamed golems until the roster is inside the limit. Unlimited by
 	 * default: a golem costs an animated model every frame, so a cap is worth offering, but
 	 * choosing one would quietly delete golems collected on purpose.
 	 *
-	 * <p><b>Named golems are never culled</b>, even over the limit: a name is the one
-	 * unambiguous signal the player cares. Retired golems crumble, and leave the roster when
-	 * the animation finishes.
+	 * <p><b>Named and starred golems are never culled</b>, even over the limit: a name or a star
+	 * is the player saying they care about that golem. Retired golems crumble, and leave the
+	 * roster when the animation finishes.
 	 */
 	private void enforceGolemLimit()
 	{
@@ -1518,7 +1533,7 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				break;
 			}
-			if (golem.isDying() || isNamed(golem))
+			if (golem.isDying() || isKept(golem))
 			{
 				continue;
 			}
@@ -1565,9 +1580,15 @@ public class GolemsDontDiePlugin extends Plugin
 		return name != null && !name.isEmpty();
 	}
 
+	/** Whether the limit leaves a golem alone: one the player has named or starred. */
+	private static boolean isKept(Golem golem)
+	{
+		return isNamed(golem) || golem.isFavourite();
+	}
+
 	/**
-	 * Whether a new golem can be taken over. False when the roster is full of named golems:
-	 * nothing can make room, so the plugin stands aside rather than killing one to pay.
+	 * Whether a new golem can be taken over. False when the roster is full of named or starred
+	 * golems: nothing can make room, so the plugin stands aside rather than killing one to pay.
 	 */
 	private boolean hasRoomForAnother()
 	{
@@ -1581,7 +1602,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		for (Golem golem : golems)
 		{
-			if (!golem.isDying() && !isNamed(golem))
+			if (!golem.isDying() && !isKept(golem))
 			{
 				return true;
 			}
@@ -2791,7 +2812,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		int missing = tally.getTotal() - countLiving();
+		int missing = missingGolems(countLiving());
 		if (missing <= 0)
 		{
 			return;
@@ -2866,7 +2887,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			rosterChanged = false;
 			List<Golem> living = nearestFirst();
-			panel.refresh(living, tally.getTotal() - living.size());
+			panel.refresh(living, missingGolems(living.size()));
 		}
 
 		if (routesChanged)
@@ -3087,6 +3108,8 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				enforceGolemLimit();
 				saveGolems();
+				// The revive button offers only what the limit leaves room for.
+				rosterChanged = true;
 			});
 		}
 	}

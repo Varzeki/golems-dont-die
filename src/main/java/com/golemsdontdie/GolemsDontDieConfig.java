@@ -24,7 +24,7 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "limitGolems",
 		name = "Limit golems",
-		description = "Cap golems to improve performance if too many spawn",
+		description = "Cap golems to improve performance. Golems over the cap crumble, oldest first; named and starred golems are kept.",
 		section = golemsSection,
 		position = 0
 	)
