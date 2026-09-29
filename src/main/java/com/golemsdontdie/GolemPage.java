@@ -18,7 +18,7 @@ import net.runelite.client.util.*;
  * still beside it, and a trait and its line do not fit in 225 pixels.
  *
  * <p>Swing thread throughout, and the golem it holds is only ever read: its name and traits, and a
- * whereabouts line the plugin works out on the client thread and hands over. One window, reused —
+ * whereabouts line the plugin works out on the client thread and hands over. One window, reused -
  * opening a second golem's page replaces what is in it, rather than filling the desktop with
  * windows a player then has to close.
  */
@@ -483,7 +483,7 @@ class GolemPage
 		}
 		if (history.getFurthest() > 0)
 		{
-			String where = furthest == null ? "" : " — " + furthest;
+			String where = furthest == null ? "" : " (" + furthest + ")";
 			line(record, "Been " + NUMBERS.format(history.getFurthest()) + " tiles from home" + where);
 		}
 		// Blank lines to the most the record can have, so every golem's heading is the same height.
@@ -536,7 +536,7 @@ class GolemPage
 	 * Where the golem has been lately: the last twenty places it arrived in, newest first, each
 	 * with how it got there.
 	 *
-	 * <p>The regions are named here rather than as they happen — the same names serve
+	 * <p>The regions are named here rather than as they happen - the same names serve
 	 * every golem that has been to the same places, and a golem that is never looked at should
 	 * cost nothing but twenty numbers.
 	 */

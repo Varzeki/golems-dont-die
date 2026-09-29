@@ -13,7 +13,7 @@ import static com.golemsdontdie.RouteGeometry.span;
  *
  * <p>Two sources, built offline into one file. A region's curated
  * name is used first: those name a whole 64-tile region and never name a monster. Where there is
- * none — anywhere added to the game since that list was written, Wyrmscraig included — the map's own
+ * none - anywhere added to the game since that list was written, Wyrmscraig included - the map's own
  * labels answer instead, the nearest one within a few dozen tiles, preferring the ones the game
  * draws largest so a region beats a monster standing in it.
  *
@@ -54,7 +54,7 @@ class PlaceNames
 				int version = data.readInt();
 				if (version != VERSION)
 				{
-					log.warn("Place names are version {}, expected {} — ignoring them", version, VERSION);
+					log.warn("Place names are version {}, expected {}; ignoring them", version, VERSION);
 					return;
 				}
 				int count = data.readInt();
@@ -84,7 +84,7 @@ class PlaceNames
 	/**
 	 * The regions any of the given names belong to, from both sources: a region the curated list
 	 * calls one of them, and the region a map label of that name stands in. Nothing is matched
-	 * loosely — the name must be the whole of it — and a name that matches nothing is logged, which
+	 * loosely - the name must be the whole of it - and a name that matches nothing is logged, which
 	 * is how a curated list is kept honest as the game changes under it.
 	 */
 	Set<Integer> regionsNamed(String[] names)

@@ -53,7 +53,7 @@ class ObstacleIndex
 		final int sizeY;
 
 		/**
-		 * True if this is mounted in a wall — a door or a gate. Kept rather than dropped, because a
+		 * True if this is mounted in a wall - a door or a gate. Kept rather than dropped, because a
 		 * handful are not doors at all: the Wyrmscraig cathedral door does not swing open, it puts you
 		 * on the other side.
 		 */
@@ -99,7 +99,7 @@ class ObstacleIndex
 				int version = in.readInt();
 				if (version != VERSION)
 				{
-					log.warn("Obstacle index is version {}, expected {} — ignoring it",
+					log.warn("Obstacle index is version {}, expected {}; ignoring it",
 						version, VERSION);
 					return;
 				}
@@ -177,7 +177,7 @@ class ObstacleIndex
 	/**
 	 * True if the cache lists this object as something you traverse: the first question asked of
 	 * anything the player is seen using, watching alone not telling an obstacle from a tree. The
-	 * index holds objects whose menu offers a way across — climb, cross, squeeze, jump.
+	 * index holds objects whose menu offers a way across - climb, cross, squeeze, jump.
 	 */
 	boolean knows(int objectId)
 	{

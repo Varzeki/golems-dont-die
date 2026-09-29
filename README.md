@@ -38,7 +38,7 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | World map | Named | Draws golems on the world map: Off, Named (golems you have named or starred) or All. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
 | Auto name golems | Off | Gives golems you have not named one anyway, in the name style below. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
-| Name style | Default | The names auto naming gives. Default: a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. Ordinal: the order the golem was crafted in, in Latin — Primus, Vicesimus Septimus, Bis Millesimus Quingentesimus Nonagesimus Sextus. |
+| Name style | Default | The names auto naming gives. Default: a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. Ordinal: the order the golem was crafted in, in Latin: Primus, Vicesimus Septimus, Bis Millesimus Quingentesimus Nonagesimus Sextus. |
 | Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |
 | Path to a golem being found | On | While you are finding a golem, the [Shortest Path](https://github.com/Skretzo/shortest-path) plugin draws the way to it. Does nothing without Shortest Path installed. |
 | Golems join your ship | On | Golems standing near your boat when you step aboard come too. Not while golem ambition is restricted. |
@@ -63,14 +63,14 @@ Golems in view stop what they are doing, dance for about ten seconds and set off
 ## Finding a golem
 
 The sidebar lists your golems nearest first, fifteen to a page, with a search box for names. Under
-each name is where that golem is — "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
+each name is where that golem is: "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
 
 Star a golem to keep it at the top of the list, wherever it is.
 
 Right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar. The
 option carries the number missing, and is only there while any are.
 
-With **Auto name golems** on, the ones you have not named are called something anyway — above
+With **Auto name golems** on, the ones you have not named are called something anyway: above
 their heads, on their page and in the map's tooltips, and dimmed in the list so a name you typed
 still reads as yours. Only names you give are written on the world map itself. Nothing is written
 down: a golem keeps its name because the name comes from the golem, and turning the setting off
@@ -83,15 +83,15 @@ to fifty thousand; the fifty-one-thousandth golem and every one after it is Ulti
 **Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
 eight tiles of it or stop looking. While you are looking, that golem is the only one on the world
 map, its face sticks to the edge of the map when you pan away from it, and an infobox says how far
-off it is — right-click it to stop. With Shortest Path installed, the way there is drawn too.
+off it is; right-click it to stop. With Shortest Path installed, the way there is drawn too.
 
 On the map, a named golem wears its name. Hover any face to see where it is.
 
 
 ## Your ship
 
-Golems standing near your boat when you step aboard come with you — starred golems first, then
-named ones — and stand at the rail looking out while you sail. They step off where you do. Leave
+Golems standing near you when you step aboard come with you (starred golems first, then
+named ones) and stand at the rail looking out while you sail. They step off where you do. Leave
 the boat any other way, by teleport or by logging out, and they go back to the quay they boarded
 from.
 

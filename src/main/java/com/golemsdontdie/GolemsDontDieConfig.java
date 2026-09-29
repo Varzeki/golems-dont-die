@@ -158,7 +158,7 @@ public interface GolemsDontDieConfig extends Config
 		keyName = "nameStyle",
 		name = "Name style",
 		description = "The names auto naming gives. Default: a name from Gielinor and a surname off the "
-			+ "rocks. Ordinal: the order the golem was crafted in, in Latin — Primus, Secundus, Tertius. "
+			+ "rocks. Ordinal: the order the golem was crafted in, in Latin: Primus, Secundus, Tertius. "
 			+ "Golems from before this were numbered oldest first.",
 		section = golemsSection,
 		position = 7

@@ -21,7 +21,7 @@ import static com.golemsdontdie.RouteGeometry.span;
 /**
  * Golems on the world map: all of them, as faces that say who is there when hovered.
  *
- * <p>A face per golem does not scale — a player who has crafted for months has ten thousand, and the
+ * <p>A face per golem does not scale - a player who has crafted for months has ten thousand, and the
  * map overlay looks up a widget and measures it for every point it holds, on every frame the map is
  * open. So golems are gathered by where they would be drawn: the map is cut into cells the size of
  * one face at the current zoom, and each cell holding golems gets one point saying how many. Zoom in
@@ -52,7 +52,7 @@ class GolemMapPoints
 	/**
 	 * The map being looked at, which is what decides where a golem belongs on it.
 	 *
-	 * <p>The client draws each map — the surface, every dungeon — in its own coordinate space, and
+	 * <p>The client draws each map - the surface, every dungeon - in its own coordinate space, and
 	 * refuses a point whose coordinates are not in the one on screen. This is the client's own
 	 * answer to "is this tile on this map", so it is the one asked, rather than the plugin working
 	 * it out from where the player happens to be standing.
@@ -87,7 +87,7 @@ class GolemMapPoints
 	 * Whether the map wants a refresh before the next game tick: on the frame it opens, and on the
 	 * frame the measurement succeeds. A tick is 600ms, and a golem underground has no place on the
 	 * map until the measurement is made; asked once a tick, the golems in a cave came onto the map
-	 * a second or more after everything else. Only the measurement is tried each frame — a whole
+	 * a second or more after everything else. Only the measurement is tried each frame - a whole
 	 * refresh every frame, for a map that could not be measured, was the roster sorted fifty times
 	 * a second for seven seconds.
 	 */
@@ -114,8 +114,8 @@ class GolemMapPoints
 
 	/**
 	 * How long after the map opens, in game ticks, the translation may be measured. The first
-	 * frames can be too early — the map still holds the position it was left at, and the centre is
-	 * not the player yet, which measure's checks turn down — and long after it the player may have
+	 * frames can be too early - the map still holds the position it was left at, and the centre is
+	 * not the player yet, which measure's checks turn down - and long after it the player may have
 	 * panned somewhere else, where the centre means nothing.
 	 */
 	private static final int MEASURE_TICKS = 12;
@@ -126,7 +126,7 @@ class GolemMapPoints
 
 	/**
 	 * Translations further than this are not believed. A player on the grass looking at a dungeon
-	 * map is not on the map at all, and the distance between them says so — a hundred regions,
+	 * map is not on the map at all, and the distance between them says so - a hundred regions,
 	 * against the three that separate a dungeon from its true place.
 	 */
 	private static final int MOST_OFFSET = 4096;
@@ -213,7 +213,7 @@ class GolemMapPoints
 	 * As {@link #refresh(List, boolean, int)}, but showing one golem alone.
 	 *
 	 * <p>While a golem is being looked for it is the only thing on the map, and its face sticks to
-	 * the edge when the map is panned away from it, the way a clue scroll's marker does — the point
+	 * the edge when the map is panned away from it, the way a clue scroll's marker does - the point
 	 * of looking for a golem is to be told which way it lies.
 	 */
 	void refresh(List<Golem> golems, boolean named, int tick, Golem only)
@@ -300,8 +300,8 @@ class GolemMapPoints
 	 * <p>Run on the frame the map opens, because that is when the client has centred it on the
 	 * player: the centre is then the player, in the map's own coordinates, and the player's real
 	 * tile is the player in the game's. The difference is the translation for everything else on
-	 * that layer. It is only believed if it looks like one — whole regions, and near enough that
-	 * the player could be on the map at all — so a map of somewhere else leaves it unmeasured and
+	 * that layer. It is only believed if it looks like one - whole regions, and near enough that
+	 * the player could be on the map at all - so a map of somewhere else leaves it unmeasured and
 	 * the golems fall back to the surface.
 	 */
 	private void measure(Point centre, List<Golem> golems)
@@ -384,7 +384,7 @@ class GolemMapPoints
 			if (golem.isSailing(tick))
 			{
 				// Where the raft is now, which on a map is where you would look for it. The golem's
-				// own tile is the port it is bound for — that is what a crossing saves — so the
+				// own tile is the port it is bound for - that is what a crossing saves - so the
 				// crossing itself is asked where it has got to.
 				WorldPoint at = golem.seaPosition(tick);
 				if (at != null)
@@ -394,7 +394,7 @@ class GolemMapPoints
 				}
 			}
 			// Where this golem goes on the map that is open. Its own coordinates if they are on it
-			// — a dungeon's own view draws the dungeon where it really is. Otherwise the surface
+			// - a dungeon's own view draws the dungeon where it really is. Otherwise the surface
 			// coordinates it is beneath, because the surface map draws a dungeon over the ground
 			// above it. Neither, and it is on some other map and is not drawn at all.
 			//
@@ -786,14 +786,14 @@ class GolemMapPoints
 			}
 			String place = whereabouts.of(cell.first, tick);
 			// What it is called, then where: its own name, or the one auto naming gives it. Only a
-			// name the player gave is drawn on the map itself — auto named, every face on the map
-			// would carry a label — but the tooltip is for one golem, and says who it is.
+			// name the player gave is drawn on the map itself - auto named, every face on the map
+			// would carry a label - but the tooltip is for one golem, and says who it is.
 			if (cell.count == 1)
 			{
 				String name = names.of(cell.first);
-				return name == null ? place : name + " — " + place;
+				return name == null ? place : name + " · " + place;
 			}
-			return title() + " — " + place;
+			return title() + " · " + place;
 		}
 	}
 }
