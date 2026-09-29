@@ -2066,6 +2066,9 @@ class Golem
 		// boarded from, or being sent back there, is not a voyage for the journal.
 		boolean sailed = aboardFrom == null || regionOf(ashore) != regionOf(aboardFrom);
 		aboardView = -1;
+		// Nothing is drawn beside a golem aboard, so a guitar asked for by a dance on deck was
+		// still owed when it stepped off, and was played on the quay beside a golem long done.
+		propPending = false;
 		relocate(ashore);
 		if (sailed)
 		{

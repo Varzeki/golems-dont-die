@@ -2542,10 +2542,12 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
+		// And on the floor it is drawn on: inside an instance that is not the one it is simulated
+		// on either, and fireworks went off a floor above or below it.
 		int height = Perspective.getTileHeight(client,
-			new LocalPoint(localX, localY, wv), golem.getPlane());
+			new LocalPoint(localX, localY, wv), golem.getDrawPlane());
 		FakeProp drawn = new FakeProp(client, model, modelFactory.animationFor(animationId),
-			animationId, golem.getDrawFineX(), golem.getDrawFineY(), golem.getPlane(), height, cycles);
+			animationId, golem.getDrawFineX(), golem.getDrawFineY(), golem.getDrawPlane(), height, cycles);
 		drawn.setFacing(golem::drawOrientation);
 		client.registerRuneLiteObject(drawn);
 		props.add(drawn);
