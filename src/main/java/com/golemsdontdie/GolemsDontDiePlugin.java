@@ -336,8 +336,15 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private static final String ADOPTED_KEY = "savedGolemsAdoptedBy";
 
-	/** How many golems the old, profile-wide save holds; -1 until counted. */
+	/** How many golems the old, profile-wide save holds, and how many unnamed; -1 until counted. */
 	private int legacyGolems = -1;
+	private int legacyUnnamed;
+
+	/**
+	 * Which account and kind of world the old, profile-wide save belongs to, as 2.0.1 wrote it:
+	 * the account hash and the RuneScape profile type. Absent for a save from before 2.0.1.
+	 */
+	private static final String ROSTER_OWNER_KEY = "rosterOwner";
 
 	@Subscribe
 	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
@@ -366,22 +373,32 @@ public class GolemsDontDiePlugin extends Plugin
 		String total = configManager.getConfiguration(GolemsDontDieConfig.GROUP, account, GolemTally.TOTAL_KEY);
 		if (saved == null && setting(ADOPTED_KEY) == null)
 		{
-			// The roster saved before golems were kept per account goes to the first account that
-			// could have crafted every golem in it. An alt, or a seasonal world, has crafted fewer.
-			// The count is waited for: 0 is also what it reads before the server has sent it.
+			// The roster saved before golems were kept per account goes to the account it belongs to.
+			// 2.0.1 wrote down which account and kind of world that is. Without that, it goes to the
+			// first that could have crafted every unnamed golem in it: an alt, or a seasonal world,
+			// has crafted fewer, and named golems are kept whatever the count, so they are not
+			// counted. The count is waited for: 0 is also what it reads before the server sends it.
 			String legacy = setting(GolemsDontDieConfig.SAVED_GOLEMS_KEY);
 			if (legacyGolems < 0)
 			{
-				legacyGolems = store.deserialise(legacy).size();
+				List<GolemStore.SavedGolem> old = store.deserialise(legacy);
+				legacyGolems = old.size();
+				legacyUnnamed = 0;
+				for (GolemStore.SavedGolem one : old)
+				{
+					legacyUnnamed += one.nickname == null ? 1 : 0;
+				}
 			}
+			String owner = setting(ROSTER_OWNER_KEY);
 			if (legacyGolems > 0)
 			{
 				int count = client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT);
-				if (count <= 0)
+				if (owner == null && count <= 0)
 				{
 					return;
 				}
-				if (count >= legacyGolems)
+				String here = client.getAccountHash() + ":" + RuneScapeProfileType.getCurrent(client);
+				if (owner != null ? owner.equals(here) : count >= legacyUnnamed)
 				{
 					saved = legacy;
 					total = setting(GolemTally.TOTAL_KEY);
