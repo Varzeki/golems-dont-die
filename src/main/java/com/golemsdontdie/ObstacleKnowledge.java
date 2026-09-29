@@ -1,13 +1,11 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
+import java.util.function.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.slf4j.*;
 
 /**
  * What is actually known about how each obstacle is traversed, and what golems may use.
@@ -114,7 +112,7 @@ class ObstacleKnowledge
 	 * trees recorded as obstacles, routes in the coordinates of a vanished instance.
 	 */
 	@lombok.Setter
-	private java.util.function.Predicate<int[]> routeFilter;
+	private Predicate<int[]> routeFilter;
 
 	/** The recording performed for each object, chosen from {@link #curves}. */
 	private final Map<Integer, MotionCurve> chosenCurves = new HashMap<>();
@@ -518,7 +516,7 @@ class ObstacleKnowledge
 		// Every tile a learned route along its obstacle's line starts or ends on; see jumpsOver.
 		// Routes off the line are no evidence, an old diagonal stile route ending beside the right
 		// one.
-		java.util.Set<Long> ends = new java.util.HashSet<>();
+		Set<Long> ends = new HashSet<>();
 		// Each key read as numbers once, not once per use.
 		List<int[]> keys = new ArrayList<>(routes.size());
 		for (String key : routes.keySet())
@@ -588,7 +586,7 @@ class ObstacleKnowledge
 	 * stone. A hop recorded wrongly came out two tiles long, over the stone the true hops use;
 	 * held out rather than deleted, the next correct crossing overwriting it in place.
 	 */
-	private static boolean jumpsOver(int fromX, int fromY, int plane, int[] to, java.util.Set<Long> ends)
+	private static boolean jumpsOver(int fromX, int fromY, int plane, int[] to, Set<Long> ends)
 	{
 		int dx = to[0] - fromX;
 		int dy = to[1] - fromY;
@@ -870,7 +868,7 @@ class ObstacleKnowledge
 		{
 			values[i] = rows.get(i)[column];
 		}
-		java.util.Arrays.sort(values);
+		Arrays.sort(values);
 		return values[values.length / 2];
 	}
 

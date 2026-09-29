@@ -1,58 +1,27 @@
 package com.golemsdontdie;
 
-import com.google.inject.Provides;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
+import com.google.inject.*;
+import java.awt.image.*;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.*;
 import javax.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.MenuEntry;
-import net.runelite.api.Model;
-import net.runelite.api.ModelData;
-import net.runelite.api.NPC;
-import net.runelite.api.Perspective;
-import net.runelite.api.Player;
-import net.runelite.api.Renderable;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.events.AnimationChanged;
-import net.runelite.api.events.BeforeRender;
-import net.runelite.api.events.ChatMessage;
-import net.runelite.api.events.ClientTick;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.GameTick;
-import net.runelite.api.events.NpcDespawned;
-import net.runelite.api.events.MenuOpened;
-import net.runelite.api.events.MenuOptionClicked;
-import net.runelite.api.events.NpcSpawned;
-import net.runelite.api.events.ScriptPreFired;
-import net.runelite.api.events.StatChanged;
-import net.runelite.api.events.VarbitChanged;
-import net.runelite.api.events.WidgetLoaded;
-import net.runelite.client.callback.ClientThread;
-import net.runelite.client.events.ClientShutdown;
-import net.runelite.client.callback.RenderCallback;
-import net.runelite.client.callback.RenderCallbackManager;
-import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.plugins.Plugin;
-import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.ui.ClientToolbar;
-import net.runelite.client.ui.NavigationButton;
-import net.runelite.client.ui.overlay.OverlayManager;
-import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
-import net.runelite.client.eventbus.EventBus;
-import net.runelite.client.events.PluginMessage;
-import net.runelite.client.util.ImageUtil;
+import javax.swing.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
+import net.runelite.api.events.*;
+import net.runelite.api.gameval.*;
+import net.runelite.client.callback.*;
+import net.runelite.client.config.*;
+import net.runelite.client.eventbus.*;
+import net.runelite.client.events.*;
+import net.runelite.client.plugins.*;
+import net.runelite.client.ui.*;
+import net.runelite.client.ui.overlay.*;
+import net.runelite.client.ui.overlay.infobox.*;
+import net.runelite.client.util.*;
 
 /**
  * Keeps crafted golems alive by replacing each one with a client-side copy, so it
@@ -263,7 +232,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * Whether a learned route is an obstacle. The answer can take a path search, and every
 	 * route used to be re-asked on every sighting — one search per stone of a crossing.
 	 */
-	private final java.util.Map<String, Boolean> obstacleVerdicts = new java.util.HashMap<>();
+	private final Map<String, Boolean> obstacleVerdicts = new HashMap<>();
 
 	@Inject
 	private Voyage voyage;
@@ -316,7 +285,7 @@ public class GolemsDontDiePlugin extends Plugin
 		WorldPoint me = PlayerPosition.of(client);
 		// Starred golems first, wherever they are: that is what starring one is for. Nearest first
 		// within each, so the favourites keep the same order as everyone else.
-		java.util.Comparator<Golem> order = java.util.Comparator.comparing(golem -> !golem.isFavourite());
+		Comparator<Golem> order = Comparator.comparing(golem -> !golem.isFavourite());
 		if (me != null)
 		{
 			order = order.thenComparingInt(golem -> golem.currentTile().distanceTo2D(me));
@@ -508,12 +477,12 @@ public class GolemsDontDiePlugin extends Plugin
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
 		obstacleObserver.startUp();
 		// In the plugin's own folder, which RuneLite hands out; a plugin writes nowhere else.
-		net.runelite.client.util.Filepath folder = null;
+		Filepath folder = null;
 		try
 		{
 			folder = getPluginDirectory();
 		}
-		catch (java.io.IOException | RuntimeException e)
+		catch (IOException | RuntimeException e)
 		{
 			log.warn("No folder for the obstacle data; it will not be kept this session", e);
 		}
@@ -612,7 +581,7 @@ public class GolemsDontDiePlugin extends Plugin
 			if (open != null)
 			{
 				// Swing's, from the client thread: the page is a window, not part of the game.
-				javax.swing.SwingUtilities.invokeLater(() ->
+				SwingUtilities.invokeLater(() ->
 				{
 					open.show(golem, panel);
 					clientThread.invoke(() -> dressPage(open, golem));
@@ -725,7 +694,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			GolemPage closing = page;
 			page = null;
-			javax.swing.SwingUtilities.invokeLater(closing::close);
+			SwingUtilities.invokeLater(closing::close);
 		}
 		panel = null;
 	}
@@ -736,11 +705,11 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void dressPage(GolemPage open, Golem golem)
 	{
-		java.awt.image.BufferedImage drawn = portraits.of(golem);
+		BufferedImage drawn = portraits.of(golem);
 		GolemHistory history = golem.getHistory();
 		String far = history.getFurthest() <= 0 ? null
 			: placeNames.nameFor(history.getFurthestX(), history.getFurthestY(), 0);
-		javax.swing.SwingUtilities.invokeLater(() ->
+		SwingUtilities.invokeLater(() ->
 		{
 			open.setFurthest(golem, far);
 			open.showPicture(golem, drawn);
@@ -792,7 +761,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		java.util.concurrent.CompletableFuture<Void> saved = new java.util.concurrent.CompletableFuture<>();
+		CompletableFuture<Void> saved = new CompletableFuture<>();
 		event.waitFor(saved);
 		onClientThread(() ->
 		{
@@ -887,14 +856,14 @@ public class GolemsDontDiePlugin extends Plugin
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired event)
 	{
-		if (event.getScriptId() == net.runelite.api.ScriptID.NOTIFICATION_START)
+		if (event.getScriptId() == ScriptID.NOTIFICATION_START)
 		{
 			popupStarting = true;
 		}
-		else if (event.getScriptId() == net.runelite.api.ScriptID.NOTIFICATION_DELAY && popupStarting)
+		else if (event.getScriptId() == ScriptID.NOTIFICATION_DELAY && popupStarting)
 		{
 			popupStarting = false;
-			celebration.popup(client.getVarcStrValue(net.runelite.api.gameval.VarClientID.NOTIFICATION_TITLE),
+			celebration.popup(client.getVarcStrValue(VarClientID.NOTIFICATION_TITLE),
 				client.getTickCount());
 		}
 	}
@@ -1032,7 +1001,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/** "Stop" on the find infobox's right-click menu. */
 	@Subscribe
-	public void onInfoBoxMenuClicked(net.runelite.client.events.InfoBoxMenuClicked event)
+	public void onInfoBoxMenuClicked(InfoBoxMenuClicked event)
 	{
 		if (event.getInfoBox() == findBox && findBox != null
 			&& GolemFindBox.STOP.equals(event.getEntry().getOption()))
@@ -1130,7 +1099,7 @@ public class GolemsDontDiePlugin extends Plugin
 	private void clearOurArrow()
 	{
 		if (arrowAt != null && client.hasHintArrow()
-			&& client.getHintArrowType() == net.runelite.api.HintArrowType.COORDINATE
+			&& client.getHintArrowType() == HintArrowType.COORDINATE
 			&& arrowAt.equals(client.getHintArrowPoint()))
 		{
 			client.clearHintArrow();
@@ -1177,7 +1146,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		// Then, if still over, every golem after the first with each name.
-		java.util.Set<String> names = new java.util.HashSet<>();
+		Set<String> names = new HashSet<>();
 		for (Golem golem : golems)
 		{
 			if (removed >= excess)
@@ -1809,13 +1778,13 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/** A door opened: the shut door's wall object went and the open door's came. */
 	@Subscribe
-	public void onWallObjectSpawned(net.runelite.api.events.WallObjectSpawned event)
+	public void onWallObjectSpawned(WallObjectSpawned event)
 	{
 		islandMemory.passabilityChanged(event.getWallObject().getWorldLocation());
 	}
 
 	@Subscribe
-	public void onWallObjectDespawned(net.runelite.api.events.WallObjectDespawned event)
+	public void onWallObjectDespawned(WallObjectDespawned event)
 	{
 		islandMemory.passabilityChanged(event.getWallObject().getWorldLocation());
 	}
@@ -1916,10 +1885,10 @@ public class GolemsDontDiePlugin extends Plugin
 			+ (golem.debugState().contains(" itinerary") ? " route" : ""));
 	}
 
-	private static final int LIVE_UNWALKABLE = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_FULL
-		| net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
-		| net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
-		| net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
+	private static final int LIVE_UNWALKABLE = CollisionDataFlag.BLOCK_MOVEMENT_FULL
+		| CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
+		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
+		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
 
 	/** The game's rule for one step, on raw scene flags: both ways round a corner clear. */
 	private static boolean liveStepBlocked(int[][] flags, int x, int y, int dx, int dy)
@@ -1940,23 +1909,23 @@ public class GolemsDontDiePlugin extends Plugin
 		int in;
 		if (dy == 1)
 		{
-			out = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_NORTH;
-			in = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_SOUTH;
+			out = CollisionDataFlag.BLOCK_MOVEMENT_NORTH;
+			in = CollisionDataFlag.BLOCK_MOVEMENT_SOUTH;
 		}
 		else if (dy == -1)
 		{
-			out = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_SOUTH;
-			in = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_NORTH;
+			out = CollisionDataFlag.BLOCK_MOVEMENT_SOUTH;
+			in = CollisionDataFlag.BLOCK_MOVEMENT_NORTH;
 		}
 		else if (dx == 1)
 		{
-			out = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_EAST;
-			in = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_WEST;
+			out = CollisionDataFlag.BLOCK_MOVEMENT_EAST;
+			in = CollisionDataFlag.BLOCK_MOVEMENT_WEST;
 		}
 		else
 		{
-			out = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_WEST;
-			in = net.runelite.api.CollisionDataFlag.BLOCK_MOVEMENT_EAST;
+			out = CollisionDataFlag.BLOCK_MOVEMENT_WEST;
+			in = CollisionDataFlag.BLOCK_MOVEMENT_EAST;
 		}
 		return (flags[x][y] & out) != 0 || (flags[nx][ny] & (in | LIVE_UNWALKABLE)) != 0;
 	}
@@ -1965,12 +1934,12 @@ public class GolemsDontDiePlugin extends Plugin
 	 * Wyrmscraig, its caves and floors, and everywhere its own transports lead; recomputed
 	 * whenever a route is learned. See {@link TransportNetwork#homeRegions}.
 	 */
-	private java.util.Set<Integer> homeRegions = java.util.Collections.emptySet();
+	private Set<Integer> homeRegions = Collections.emptySet();
 
 	/** {@link #homeRegions} by region id, for the check made of every golem every frame. */
 	private boolean[] homeRegionBits = new boolean[1 << 16];
 
-	private void setHomeRegions(java.util.Set<Integer> regions)
+	private void setHomeRegions(Set<Integer> regions)
 	{
 		boolean[] bits = new boolean[1 << 16];
 		for (int regionId : regions)
@@ -2197,7 +2166,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * one raft — whichever was updated last had it, and if the other was ashore it took the
 	 * raft away again, leaving a golem at the helm of nothing.
 	 */
-	private final Map<Golem, FakeRaft> rafts = new java.util.IdentityHashMap<>();
+	private final Map<Golem, FakeRaft> rafts = new IdentityHashMap<>();
 
 	/**
 	 * Gives a golem a boat if it is standing on open water, and takes it away otherwise. About
@@ -2385,7 +2354,7 @@ public class GolemsDontDiePlugin extends Plugin
 	private int lastSocialTick = -1;
 
 	/** Whose fireworks go off and who feels like dancing: the golems' own generators are theirs. */
-	private final java.util.Random moods = new java.util.Random();
+	private final Random moods = new Random();
 
 	/** Models for the celebration, built once each: see GolemContent. */
 	private final Map<Integer, Model> celebrationModels = new HashMap<>();
@@ -2828,7 +2797,7 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onHitsplatApplied(net.runelite.api.events.HitsplatApplied event)
+	public void onHitsplatApplied(HitsplatApplied event)
 	{
 		// A hit while using an obstacle means it failed; a fall is not the way across.
 		if (event.getActor() == client.getLocalPlayer())
@@ -2937,7 +2906,7 @@ public class GolemsDontDiePlugin extends Plugin
 				Golem shown = page.getShowing();
 				String where = whereabouts.of(shown, roamContext.getTick());
 				boolean living = shown != null && golems.contains(shown) && !shown.isDying();
-				javax.swing.SwingUtilities.invokeLater(() -> page.showPlace(living ? where : "Gone", living));
+				SwingUtilities.invokeLater(() -> page.showPlace(living ? where : "Gone", living));
 			}
 
 			// And the order, now and then: nearest first, but not so often that the list shuffles
@@ -3111,7 +3080,7 @@ public class GolemsDontDiePlugin extends Plugin
 	// ---- persistence ----
 
 	/** Every tile of every instance room, from the last time routes changed. */
-	private java.util.Set<Long> instanceRoomTiles = java.util.Collections.emptySet();
+	private Set<Long> instanceRoomTiles = Collections.emptySet();
 
 	/** Tiles flooded from an instance route's landing before it counts as open ground. */
 	private static final int ROOM_FLOOD = 4000;
@@ -3122,9 +3091,9 @@ public class GolemsDontDiePlugin extends Plugin
 	 * tracked which were in an instance, and ones that walked into the Mad Angel's sealed room
 	 * before the planner learned not to.
 	 */
-	private java.util.Set<Long> instanceRooms()
+	private Set<Long> instanceRooms()
 	{
-		java.util.Set<Long> rooms = new java.util.HashSet<>();
+		Set<Long> rooms = new HashSet<>();
 		for (GolemTransport t : transports.all())
 		{
 			if (!t.entersInstance())
@@ -3180,11 +3149,11 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		List<GolemStore.SavedGolem> saved = new ArrayList<>(pendingRestore);
-		java.util.Set<Long> rooms = instanceRooms();
+		Set<Long> rooms = instanceRooms();
 		instanceRoomTiles = rooms;
 		// When each golem was first known as saved, not as restored: a golem saved before that was
 		// kept is given today's date on restore, which would number the oldest golems last.
-		java.util.Map<Golem, Long> savedAge = new java.util.IdentityHashMap<>();
+		Map<Golem, Long> savedAge = new IdentityHashMap<>();
 		for (int i = 0; i < saved.size(); i++)
 		{
 			Golem golem = store.revive(saved.get(i), i);

@@ -1,12 +1,11 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Random;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.coords.WorldPoint;
+import lombok.extern.slf4j.*;
+import net.runelite.api.coords.*;
 
 /**
  * Plans where a far-away golem goes next, without pathing on tiles.
@@ -174,10 +173,10 @@ class RoamPlanner
 	private int componentsRevision = -1;
 
 	/** Per mesh component: transports starting in it that go somewhere else. */
-	private final java.util.Map<Integer, List<GolemTransport>> exitsFrom = new java.util.HashMap<>();
+	private final Map<Integer, List<GolemTransport>> exitsFrom = new HashMap<>();
 
 	/** Per mesh component: the way back out through each transport that comes into it from elsewhere. */
-	private final java.util.Map<Integer, List<GolemTransport>> waysBackFrom = new java.util.HashMap<>();
+	private final Map<Integer, List<GolemTransport>> waysBackFrom = new HashMap<>();
 
 	/**
 	 * The way back out through something that led here, for a golem somewhere with no known way out;
@@ -217,7 +216,7 @@ class RoamPlanner
 	private static final int SHUT_IN = 8;
 
 	/** Ways home by component, worked out once per change to the network; empty where there is no need. */
-	private final java.util.Map<Integer, List<GolemTransport>> waysHome = new java.util.HashMap<>();
+	private final Map<Integer, List<GolemTransport>> waysHome = new HashMap<>();
 
 	/**
 	 * The ways back out, for a golem in this component, if everywhere it can reach from here is shut
@@ -229,8 +228,8 @@ class RoamPlanner
 	 */
 	private List<GolemTransport> findWaysHome(int start)
 	{
-		java.util.Set<Integer> reached = new java.util.HashSet<>();
-		java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+		Set<Integer> reached = new HashSet<>();
+		ArrayDeque<Integer> queue = new ArrayDeque<>();
 		reached.add(start);
 		queue.add(start);
 		while (!queue.isEmpty())
@@ -250,13 +249,13 @@ class RoamPlanner
 				// Somewhere the mesh knows nothing about is somewhere else entirely: not shut in.
 				if (to == 0)
 				{
-					return java.util.Collections.emptyList();
+					return Collections.emptyList();
 				}
 				if (reached.add(to))
 				{
 					if (reached.size() > SHUT_IN)
 					{
-						return java.util.Collections.emptyList();
+						return Collections.emptyList();
 					}
 					queue.add(to);
 				}
@@ -264,7 +263,7 @@ class RoamPlanner
 		}
 
 		List<GolemTransport> ways = new ArrayList<>();
-		for (GolemTransport way : waysBackFrom.getOrDefault(start, java.util.Collections.emptyList()))
+		for (GolemTransport way : waysBackFrom.getOrDefault(start, Collections.emptyList()))
 		{
 			// Back to somewhere outside the trap, not to another room of it.
 			int to = componentNear(way.getToX(), way.getToY(), way.getToPlane());
@@ -775,7 +774,7 @@ class RoamPlanner
 	{
 		List<GolemTransport> near = new ArrayList<>();
 		transports.near(from.getX(), from.getY(), TRANSPORT_SEARCH, near);
-		java.util.Collections.shuffle(near, random);
+		Collections.shuffle(near, random);
 		GolemClimate climate = reach.context == null ? null : reach.context.getClimates();
 		if (climate != null && climate.cares(memory))
 		{

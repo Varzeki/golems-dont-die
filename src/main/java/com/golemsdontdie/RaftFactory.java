@@ -1,11 +1,10 @@
 package com.golemsdontdie;
 
+import java.util.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.Model;
-import net.runelite.api.ModelData;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 
 /**
  * Builds the boats drawn under golems at sea, one of each kind: hull, mast, sail and helm, each
@@ -26,8 +25,8 @@ class RaftFactory
 	private Client client;
 
 	/** One built model per kind of boat, and whether building it has been tried. */
-	private final java.util.Map<GolemBoat, Model> models = new java.util.EnumMap<>(GolemBoat.class);
-	private final java.util.Set<GolemBoat> searched = java.util.EnumSet.noneOf(GolemBoat.class);
+	private final Map<GolemBoat, Model> models = new EnumMap<>(GolemBoat.class);
+	private final Set<GolemBoat> searched = EnumSet.noneOf(GolemBoat.class);
 
 	/**
 	 * A boat's model, or null if it could not be built.

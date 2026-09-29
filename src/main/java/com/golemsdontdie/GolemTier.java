@@ -1,6 +1,6 @@
 package com.golemsdontdie;
 
-import net.runelite.api.WorldView;
+import net.runelite.api.*;
 
 /**
  * How much of a golem needs simulating, decided by how close the player is to it.

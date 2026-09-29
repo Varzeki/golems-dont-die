@@ -1,18 +1,13 @@
 package com.golemsdontdie;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Quest;
-import net.runelite.api.Skill;
+import java.util.function.*;
+import java.util.zip.*;
+import javax.inject.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 
 /**
  * Every transport a golem could use, indexed by the tile you use it from.
@@ -133,7 +128,7 @@ class TransportNetwork
 
 		suppressed.clear();
 		// One row per journey. Two saved routes can drift onto the same ends as they are merged.
-		java.util.Set<Long> journeys = new java.util.HashSet<>();
+		Set<Long> journeys = new HashSet<>();
 		for (int[] r : routes)
 		{
 			if (!journeys.add(endpoints(r[1], r[2], r[3], r[4], r[5], r[6])))
@@ -210,8 +205,8 @@ class TransportNetwork
 	private final Map<Long, GolemTransport> shippedByEndpoints = new HashMap<>();
 
 	/** Shipped rows a learned route has replaced. Kept in the table, never offered. */
-	private final java.util.Set<GolemTransport> suppressed =
-		Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+	private final Set<GolemTransport> suppressed =
+		Collections.newSetFromMap(new IdentityHashMap<>());
 
 	private static final int[] NO_REQUIREMENT = new int[0];
 
@@ -225,7 +220,7 @@ class TransportNetwork
 		return shippedObjects.contains(objectId);
 	}
 
-	private final java.util.Set<Integer> shippedObjects = new java.util.HashSet<>();
+	private final Set<Integer> shippedObjects = new HashSet<>();
 
 	/**
 	 * The archetype this object is given wherever it appears, or -1. Keyed by object rather than
@@ -332,9 +327,9 @@ class TransportNetwork
 	 * without a list. The region either side of each landing is allowed too, a floor rarely
 	 * fitting one region, but does not seed further transports, which leaks along coasts.
 	 */
-	java.util.Set<Integer> homeRegions()
+	Set<Integer> homeRegions()
 	{
-		java.util.Set<Integer> seeds = new java.util.HashSet<>();
+		Set<Integer> seeds = new HashSet<>();
 		for (int region : GolemContent.ISLAND_REGIONS)
 		{
 			seeds.add(region);
@@ -355,10 +350,10 @@ class TransportNetwork
 		}
 		// Not around the island itself: its nine regions cover it, and a margin reached the next
 		// island's dock.
-		java.util.Set<Integer> home = new java.util.HashSet<>(seeds);
+		Set<Integer> home = new HashSet<>(seeds);
 		for (int region : seeds)
 		{
-			if (java.util.Arrays.stream(GolemContent.ISLAND_REGIONS).anyMatch(r -> r == region))
+			if (Arrays.stream(GolemContent.ISLAND_REGIONS).anyMatch(r -> r == region))
 			{
 				continue;
 			}
@@ -388,7 +383,7 @@ class TransportNetwork
 	 * chain: looking one hop ahead passed on every stone of a crossing where none led to a bank.
 	 */
 	boolean leadsToGround(int x, int y, int plane, int cameX, int cameY, int camePlane, int hops,
-		java.util.function.Predicate<GolemTransport> usable, Ground ground)
+		Predicate<GolemTransport> usable, Ground ground)
 	{
 		if (ground.walkable(x, y, plane))
 		{
@@ -629,7 +624,7 @@ class TransportNetwork
 
 	/** Regions the island's transports and learned routes lead into, with the regions around
 	 * each, since an arrival rarely stays in the region it lands in. */
-	private final java.util.Set<Integer> reachedRegions = new java.util.HashSet<>();
+	private final Set<Integer> reachedRegions = new HashSet<>();
 
 	/** True if golems can get into this region by transport, so its ground is worth mapping. */
 	boolean leadsToRegion(int regionId)
@@ -640,7 +635,7 @@ class TransportNetwork
 	private void rebuildReachedRegions()
 	{
 		reachedRegions.clear();
-		java.util.Set<Integer> island = new java.util.HashSet<>();
+		Set<Integer> island = new HashSet<>();
 		for (int region : GolemContent.ISLAND_REGIONS)
 		{
 			island.add(region);

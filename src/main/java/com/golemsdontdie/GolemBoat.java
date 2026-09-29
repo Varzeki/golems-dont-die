@@ -1,6 +1,6 @@
 package com.golemsdontdie;
 
-import lombok.Getter;
+import lombok.*;
 
 /**
  * The boats golems sail, and what each is made of.

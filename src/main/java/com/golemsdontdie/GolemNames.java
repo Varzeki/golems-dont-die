@@ -1,18 +1,14 @@
 package com.golemsdontdie;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.io.*;
+import java.nio.charset.*;
+import java.util.*;
 import java.util.List;
-import java.util.Random;
-import java.util.zip.GZIPInputStream;
+import java.util.zip.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
+import lombok.*;
+import lombok.extern.slf4j.*;
 
 /**
  * What to call a golem the player has not named: one of the names of Gielinor, and a surname off

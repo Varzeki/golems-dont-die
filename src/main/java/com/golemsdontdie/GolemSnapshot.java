@@ -1,10 +1,8 @@
 package com.golemsdontdie;
 
-import lombok.Value;
-import net.runelite.api.Client;
-import net.runelite.api.NPC;
-import net.runelite.api.NPCComposition;
-import net.runelite.api.coords.WorldPoint;
+import lombok.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Everything about a live golem that a copy will need, recorded while the real one

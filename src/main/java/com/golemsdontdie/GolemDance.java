@@ -1,8 +1,7 @@
 package com.golemsdontdie;
 
-import java.util.Random;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import java.util.*;
+import lombok.*;
 
 /**
  * The emotes a golem dances, one picked per move.

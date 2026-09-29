@@ -1,7 +1,8 @@
 package com.golemsdontdie;
 
-import lombok.Getter;
-import net.runelite.api.coords.WorldPoint;
+import java.util.*;
+import lombok.*;
+import net.runelite.api.coords.*;
 
 /**
  * What one golem has done, in six numbers: enough for its own page, and little enough to save
@@ -142,7 +143,7 @@ class GolemHistory
 		if (journal == null)
 		{
 			journal = new int[KEPT];
-			java.util.Arrays.fill(journal, -1);
+			Arrays.fill(journal, -1);
 		}
 		journal[written % KEPT] = region << 6 | (plane & 3) << 4 | how.ordinal();
 		written++;
@@ -158,7 +159,7 @@ class GolemHistory
 		{
 			return new int[0][];
 		}
-		java.util.List<int[]> out = new java.util.ArrayList<>(KEPT);
+		java.util.List<int[]> out = new ArrayList<>(KEPT);
 		for (int i = 1; i <= KEPT; i++)
 		{
 			int packed = journal[Math.floorMod(written - i, KEPT)];

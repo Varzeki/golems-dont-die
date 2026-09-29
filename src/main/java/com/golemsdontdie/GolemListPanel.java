@@ -1,30 +1,14 @@
 package com.golemsdontdie;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.util.ArrayList;
+import java.awt.*;
+import java.awt.geom.*;
+import java.text.*;
+import java.util.*;
 import java.util.List;
-import java.util.function.Consumer;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.ScrollPaneConstants;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
-import net.runelite.client.ui.PluginPanel;
+import java.util.function.*;
+import javax.swing.*;
+import javax.swing.event.*;
+import net.runelite.client.ui.*;
 
 /**
  * Side panel listing every golem, with a name field and a remove button each.
@@ -53,7 +37,7 @@ class GolemListPanel extends PluginPanel
 	 * pushed off the edge, under the scrollbar: a text field and a label both ask for room enough
 	 * for all of their text, and a layout takes that as a floor.
 	 */
-	private static final java.awt.Dimension SQUEEZED = new Dimension(24, 16);
+	private static final Dimension SQUEEZED = new Dimension(24, 16);
 
 	/**
 	 * The two button icons, painted rather than stored as pixels.
@@ -62,11 +46,11 @@ class GolemListPanel extends PluginPanel
 	 * blurred fourteen pixels. Painting into the graphics it is given puts the lines wherever the
 	 * scale asks for them.
 	 */
-	private static final javax.swing.Icon INFO = new Drawn(false);
-	private static final javax.swing.Icon TARGET = new Drawn(true);
+	private static final Icon INFO = new Drawn(false);
+	private static final Icon TARGET = new Drawn(true);
 
 	/** An (i) in a ring, or a ring with a cross through it. */
-	private static final class Drawn implements javax.swing.Icon
+	private static final class Drawn implements Icon
 	{
 		private static final int SIZE = 14;
 
@@ -90,28 +74,28 @@ class GolemListPanel extends PluginPanel
 		}
 
 		@Override
-		public void paintIcon(java.awt.Component on, Graphics g, int x, int y)
+		public void paintIcon(Component on, Graphics g, int x, int y)
 		{
 			Graphics2D drawing = (Graphics2D) g.create();
 			drawing.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			drawing.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 			drawing.translate(x, y);
 			drawing.setColor(ColorScheme.LIGHT_GRAY_COLOR);
-			drawing.setStroke(new java.awt.BasicStroke(1.4f));
+			drawing.setStroke(new BasicStroke(1.4f));
 			if (target)
 			{
 				// A ring with a cross through it: what the hint arrow does at the other end.
-				drawing.draw(new java.awt.geom.Ellipse2D.Float(3.5f, 3.5f, SIZE - 7f, SIZE - 7f));
-				drawing.draw(new java.awt.geom.Line2D.Float(SIZE / 2f, 0.5f, SIZE / 2f, 2.5f));
-				drawing.draw(new java.awt.geom.Line2D.Float(SIZE / 2f, SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f));
-				drawing.draw(new java.awt.geom.Line2D.Float(0.5f, SIZE / 2f, 2.5f, SIZE / 2f));
-				drawing.draw(new java.awt.geom.Line2D.Float(SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f, SIZE / 2f));
+				drawing.draw(new Ellipse2D.Float(3.5f, 3.5f, SIZE - 7f, SIZE - 7f));
+				drawing.draw(new Line2D.Float(SIZE / 2f, 0.5f, SIZE / 2f, 2.5f));
+				drawing.draw(new Line2D.Float(SIZE / 2f, SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f));
+				drawing.draw(new Line2D.Float(0.5f, SIZE / 2f, 2.5f, SIZE / 2f));
+				drawing.draw(new Line2D.Float(SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f, SIZE / 2f));
 			}
 			else
 			{
-				drawing.draw(new java.awt.geom.Ellipse2D.Float(0.7f, 0.7f, SIZE - 2.4f, SIZE - 2.4f));
-				drawing.fill(new java.awt.geom.Ellipse2D.Float(SIZE / 2f - 0.9f, 3f, 1.8f, 1.8f));
-				drawing.fill(new java.awt.geom.Rectangle2D.Float(SIZE / 2f - 0.8f, 6f, 1.6f, 5f));
+				drawing.draw(new Ellipse2D.Float(0.7f, 0.7f, SIZE - 2.4f, SIZE - 2.4f));
+				drawing.fill(new Ellipse2D.Float(SIZE / 2f - 0.9f, 3f, 1.8f, 1.8f));
+				drawing.fill(new Rectangle2D.Float(SIZE / 2f - 0.8f, 6f, 1.6f, 5f));
 			}
 			drawing.dispose();
 		}
@@ -132,13 +116,13 @@ class GolemListPanel extends PluginPanel
 	private final JLabel order = new JLabel("Starred first, then closest");
 
 	/** The whole roster, as the client thread last gave it. */
-	private List<Golem> roster = java.util.Collections.emptyList();
+	private List<Golem> roster = Collections.emptyList();
 
 	/** The golems matching the search, in the roster's order. */
-	private List<Golem> matching = java.util.Collections.emptyList();
+	private List<Golem> matching = Collections.emptyList();
 
 	/** The golems on the page now, for whoever wants to know what is worth updating. */
-	private volatile List<Golem> onScreen = java.util.Collections.emptyList();
+	private volatile List<Golem> onScreen = Collections.emptyList();
 
 	private int page;
 
@@ -166,7 +150,7 @@ class GolemListPanel extends PluginPanel
 	private final JButton finding = new JButton();
 
 	/** A golem and its new name, or null for none. Called on the Swing thread. */
-	private final java.util.function.BiConsumer<Golem, String> onRename;
+	private final BiConsumer<Golem, String> onRename;
 
 	private final Runnable onRevive;
 
@@ -174,7 +158,7 @@ class GolemListPanel extends PluginPanel
 	 * The row showing each golem, keyed by the golem itself: one restored at login is a new
 	 * object, and a row holding the old one would rename a golem no longer in the roster.
 	 */
-	private final java.util.Map<Golem, Row> shown = new java.util.IdentityHashMap<>();
+	private final Map<Golem, Row> shown = new IdentityHashMap<>();
 
 	/** One golem's row: what goes in the list, the name field in it, and where the golem is. */
 	private static final class Row
@@ -194,7 +178,7 @@ class GolemListPanel extends PluginPanel
 	}
 
 	GolemListPanel(GolemNames names, Consumer<Golem> onRemove,
-		java.util.function.BiConsumer<Golem, String> onRename, Runnable onRevive,
+		BiConsumer<Golem, String> onRename, Runnable onRevive,
 		Consumer<Golem> onFind, Consumer<Golem> onStar, Consumer<Golem> onOpen)
 	{
 		super(false);
@@ -413,7 +397,7 @@ class GolemListPanel extends PluginPanel
 			relist();
 			if (names)
 			{
-				for (java.util.Map.Entry<Golem, Row> entry : shown.entrySet())
+				for (Map.Entry<Golem, Row> entry : shown.entrySet())
 				{
 					showName(entry.getValue(), entry.getKey());
 				}
@@ -446,12 +430,12 @@ class GolemListPanel extends PluginPanel
 		onScreen = new ArrayList<>(wantedRows);
 
 		// Rows belong to golems, not to places in the list: a row kept is a name still being typed.
-		java.util.Set<Golem> keep = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+		Set<Golem> keep = Collections.newSetFromMap(new IdentityHashMap<>());
 		keep.addAll(wantedRows);
-		java.util.Iterator<java.util.Map.Entry<Golem, Row>> it = shown.entrySet().iterator();
+		Iterator<Map.Entry<Golem, Row>> it = shown.entrySet().iterator();
 		while (it.hasNext())
 		{
-			java.util.Map.Entry<Golem, Row> entry = it.next();
+			Map.Entry<Golem, Row> entry = it.next();
 			if (!keep.contains(entry.getKey()))
 			{
 				rows.remove(entry.getValue().component);
@@ -533,7 +517,7 @@ class GolemListPanel extends PluginPanel
 		});
 	}
 
-	private static final java.text.NumberFormat TILES = java.text.NumberFormat.getIntegerInstance();
+	private static final NumberFormat TILES = NumberFormat.getIntegerInstance();
 
 	/** Shows or hides the bar offering to stop pointing at a golem. */
 	void setFinding(String name)
@@ -733,7 +717,7 @@ class GolemListPanel extends PluginPanel
 	}
 
 	/** A star, filled in gold for a starred golem and drawn in outline for the rest. */
-	private static final class Star implements javax.swing.Icon
+	private static final class Star implements Icon
 	{
 		private static final int SIZE = 14;
 		private static final Color GOLD = new Color(0xFFB83F);
@@ -758,12 +742,12 @@ class GolemListPanel extends PluginPanel
 		}
 
 		@Override
-		public void paintIcon(java.awt.Component on, Graphics g, int x, int y)
+		public void paintIcon(Component on, Graphics g, int x, int y)
 		{
 			Graphics2D drawing = (Graphics2D) g.create();
 			drawing.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			drawing.translate(x, y);
-			java.awt.geom.Path2D.Float shape = new java.awt.geom.Path2D.Float();
+			Path2D.Float shape = new Path2D.Float();
 			float middle = SIZE / 2f;
 			for (int point = 0; point < 10; point++)
 			{
@@ -790,7 +774,7 @@ class GolemListPanel extends PluginPanel
 			else
 			{
 				drawing.setColor(ColorScheme.MEDIUM_GRAY_COLOR);
-				drawing.setStroke(new java.awt.BasicStroke(1.2f));
+				drawing.setStroke(new BasicStroke(1.2f));
 				drawing.draw(shape);
 			}
 			drawing.dispose();
@@ -806,7 +790,7 @@ class GolemListPanel extends PluginPanel
 	 * under the scrollbar. Tracking the viewport's width squeezes the text instead, which is what
 	 * a text field and a label are for.
 	 */
-	private static final class Tracking extends JPanel implements javax.swing.Scrollable
+	private static final class Tracking extends JPanel implements Scrollable
 	{
 		private Tracking()
 		{
@@ -820,13 +804,13 @@ class GolemListPanel extends PluginPanel
 		}
 
 		@Override
-		public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction)
+		public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction)
 		{
 			return 16;
 		}
 
 		@Override
-		public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction)
+		public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction)
 		{
 			return visible.height;
 		}

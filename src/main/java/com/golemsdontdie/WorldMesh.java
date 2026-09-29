@@ -1,14 +1,11 @@
 package com.golemsdontdie;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Constants;
+import java.io.*;
+import java.util.*;
+import java.util.zip.*;
+import javax.inject.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 
 /**
  * Where a golem may walk, anywhere in the world. Read-only, shipped, never written to.
@@ -183,7 +180,7 @@ class WorldMesh
 		{
 			log.warn("Bundled world mesh unreadable", e);
 			regions.clear();
-			java.util.Arrays.fill(byRegion, null);
+			Arrays.fill(byRegion, null);
 		}
 	}
 
@@ -383,10 +380,10 @@ class WorldMesh
 	private boolean[] fromHome;
 
 	/** Every space a dock stands in. The sea joins them to each other. */
-	private final java.util.Set<Integer> ports = new java.util.HashSet<>();
+	private final Set<Integer> ports = new HashSet<>();
 
 	/** Every space a transport touches, at either end. Rebuilt with the graph. */
-	private final java.util.Set<Integer> touched = new java.util.HashSet<>();
+	private final Set<Integer> touched = new HashSet<>();
 
 	/** Space to the spaces a transport leads to. */
 	private final Map<Integer, java.util.List<Integer>> leadsTo = new HashMap<>();
@@ -450,7 +447,7 @@ class WorldMesh
 	/** Spreads out from home over one direction of the graph, the sea counting as one hop. */
 	private void walkSpaces(int home, Map<Integer, java.util.List<Integer>> edges, boolean[] seen)
 	{
-		java.util.Deque<Integer> queue = new java.util.ArrayDeque<>();
+		java.util.Deque<Integer> queue = new ArrayDeque<>();
 		seen[home] = true;
 		queue.add(home);
 		boolean sailed = false;
@@ -531,7 +528,7 @@ class WorldMesh
 	/** Admits the floor under both ends of every transport. Replaces what was admitted before. */
 	void admitTransportEnds(java.util.List<GolemTransport> transports)
 	{
-		java.util.Arrays.fill(landComponents, false);
+		Arrays.fill(landComponents, false);
 		leadsTo.clear();
 		touched.clear();
 		for (GolemTransport t : transports)
@@ -544,7 +541,7 @@ class WorldMesh
 					touched.add(to);
 					if (from != to)
 					{
-						leadsTo.computeIfAbsent(from, space -> new java.util.ArrayList<>()).add(to);
+						leadsTo.computeIfAbsent(from, space -> new ArrayList<>()).add(to);
 					}
 				}
 			}
@@ -578,9 +575,9 @@ class WorldMesh
 		int own = componentAt(x, y, plane);
 		if (own != 0)
 		{
-			return java.util.Collections.singletonList(own);
+			return Collections.singletonList(own);
 		}
-		java.util.List<Integer> around = new java.util.ArrayList<>(4);
+		java.util.List<Integer> around = new ArrayList<>(4);
 		for (int dx = -1; dx <= 1; dx++)
 		{
 			for (int dy = -1; dy <= 1; dy++)

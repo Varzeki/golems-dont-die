@@ -1,14 +1,11 @@
 package com.golemsdontdie;
 
-import java.util.ArrayDeque;
+import java.util.*;
 import java.util.Deque;
-import java.util.Random;
-import lombok.Getter;
-import lombok.Setter;
-import net.runelite.api.Client;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
+import java.util.function.*;
+import lombok.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * One golem, simulated in world coordinates whether or not it is on screen.
@@ -1656,7 +1653,7 @@ class Golem
 		}
 		wanted = Math.max(TRANSITION_MIN_CYCLES, wanted);
 
-		note(context, "clips=" + java.util.Arrays.toString(clips) + " total=" + total
+		note(context, "clips=" + Arrays.toString(clips) + " total=" + total
 			+ " wanted=" + wanted + " measured=" + measuredTicks + " authored=" + authored
 			+ " obstacleTicks=" + obstacleTicks + " stretchable=" + stretchable
 			+ " delay=" + (context.getKnowledge() == null ? -1
@@ -2601,7 +2598,7 @@ class Golem
 
 	/** The crossing being traced, or null. See GolemTraversal. */
 	private GolemTransport tracing;
-	private java.util.function.Consumer<GolemTraversal> traceSink;
+	private Consumer<GolemTraversal> traceSink;
 	private int traceStartX;
 	private int traceStartY;
 	private int traceElapsed;
@@ -2623,7 +2620,7 @@ class Golem
 		traceStartX = fineX;
 		traceStartY = fineY;
 		traceElapsed = 0;
-		traceSamples = new java.util.ArrayList<>();
+		traceSamples = new ArrayList<>();
 		traceSamples.add(new int[]{0, fineX, fineY});
 	}
 

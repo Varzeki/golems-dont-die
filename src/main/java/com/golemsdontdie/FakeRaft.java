@@ -1,12 +1,7 @@
 package com.golemsdontdie;
 
-import net.runelite.api.AnimationController;
-import net.runelite.api.Client;
-import net.runelite.api.Model;
-import net.runelite.api.Perspective;
-import net.runelite.api.RuneLiteObjectController;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Draws the boat a golem crosses the ocean in.

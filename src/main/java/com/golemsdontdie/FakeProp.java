@@ -1,12 +1,7 @@
 package com.golemsdontdie;
 
-import lombok.Getter;
-import net.runelite.api.Animation;
-import net.runelite.api.AnimationController;
-import net.runelite.api.Client;
-import net.runelite.api.Model;
-import net.runelite.api.RuneLiteObjectController;
-import net.runelite.api.WorldView;
+import lombok.*;
+import net.runelite.api.*;
 
 /**
  * A one-shot animated object played beside a golem that is using something.

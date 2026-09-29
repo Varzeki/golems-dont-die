@@ -1,6 +1,6 @@
 package com.golemsdontdie;
 
-import java.util.Arrays;
+import java.util.*;
 
 /**
  * Packed tiles mapped to packed tiles, without boxing, remembering insertion order.

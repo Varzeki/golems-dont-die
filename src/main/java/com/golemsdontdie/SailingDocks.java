@@ -1,17 +1,16 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
+import java.io.*;
+import java.util.*;
 import java.util.List;
+import java.util.zip.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.Quest;
-import net.runelite.api.QuestState;
-import net.runelite.api.Skill;
-import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.gameval.DBTableID;
+import lombok.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
+import net.runelite.api.gameval.*;
 
 /**
  * The game's own list of ports, read from its database at login.
@@ -275,7 +274,7 @@ class SailingDocks
 	private static final long QUEST_RECHECK_MILLIS = 5 * 60 * 1000L;
 
 	/** Quest id to {finished ? 1 : 0, when it was asked}. */
-	private final java.util.Map<Integer, long[]> questStates = new java.util.HashMap<>();
+	private final Map<Integer, long[]> questStates = new HashMap<>();
 
 	private boolean questFinished(Quest quest)
 	{
@@ -296,7 +295,7 @@ class SailingDocks
 	}
 
 	/** Quests by id. Quest.values() copies the whole list each call, once per dock considered. */
-	private static final java.util.Map<Integer, Quest> QUESTS_BY_ID = new java.util.HashMap<>();
+	private static final Map<Integer, Quest> QUESTS_BY_ID = new HashMap<>();
 
 	static
 	{
@@ -362,15 +361,15 @@ class SailingDocks
 			return;
 		}
 
-		try (java.io.InputStream raw = SailingDocks.class.getResourceAsStream(BUOYS))
+		try (InputStream raw = SailingDocks.class.getResourceAsStream(BUOYS))
 		{
 			if (raw == null)
 			{
 				log.warn("Docking buoy table missing from the jar; golems cannot sail");
 				return;
 			}
-			try (java.util.zip.GZIPInputStream gz = new java.util.zip.GZIPInputStream(raw);
-				 java.io.DataInputStream data = new java.io.DataInputStream(gz))
+			try (GZIPInputStream gz = new GZIPInputStream(raw);
+				 DataInputStream data = new DataInputStream(gz))
 			{
 				int count = data.readInt();
 				for (int i = 0; i < count; i++)
@@ -387,7 +386,7 @@ class SailingDocks
 				log.debug("Loaded {} docking buoys", buoys.size());
 			}
 		}
-		catch (java.io.IOException | RuntimeException e)
+		catch (IOException | RuntimeException e)
 		{
 			log.warn("Docking buoy table unreadable", e);
 			buoys.clear();

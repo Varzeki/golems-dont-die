@@ -1,9 +1,8 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.*;
 import java.util.List;
-import java.util.function.ToLongFunction;
+import java.util.function.*;
 
 /**
  * Hands out craft numbers: which golem each was to be crafted, the number an ordinal name is made

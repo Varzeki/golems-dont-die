@@ -1,8 +1,8 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import lombok.Getter;
+import lombok.*;
 
 /**
  * Golems crossing together on one boat.

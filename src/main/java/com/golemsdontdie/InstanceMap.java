@@ -1,9 +1,8 @@
 package com.golemsdontdie;
 
-import java.util.HashMap;
-import java.util.Map;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.WorldPoint;
+import java.util.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Between an instance and the fixed place in the world it is copied from.

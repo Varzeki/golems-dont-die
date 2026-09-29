@@ -1,16 +1,11 @@
 package com.golemsdontdie;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
+import java.awt.*;
+import java.awt.image.*;
+import java.util.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import net.runelite.api.Animation;
-import net.runelite.api.AnimationController;
-import net.runelite.api.Client;
-import net.runelite.api.JagexColor;
-import net.runelite.api.Model;
+import net.runelite.api.*;
 
 /**
  * A picture of one golem, drawn from its own model: the golem's page has a portrait of the golem
@@ -212,7 +207,7 @@ class GolemPortrait
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
 		// Something behind it, so the figure is stood in a place rather than cut out of the air.
-		g.setPaint(new java.awt.GradientPaint(0, 0, BEHIND_TOP, 0, HEIGHT, BEHIND_BOTTOM));
+		g.setPaint(new GradientPaint(0, 0, BEHIND_TOP, 0, HEIGHT, BEHIND_BOTTOM));
 		g.fillRect(0, 0, WIDTH, HEIGHT);
 
 		int faces = model.getFaceCount();
@@ -233,7 +228,7 @@ class GolemPortrait
 			order[f] = f;
 			away[f] = depth[first[f]] + depth[second[f]] + depth[third[f]];
 		}
-		java.util.Arrays.sort(order, (one, other) -> Float.compare(away[other], away[one]));
+		Arrays.sort(order, (one, other) -> Float.compare(away[other], away[one]));
 
 		int[] pointsX = new int[3];
 		int[] pointsY = new int[3];

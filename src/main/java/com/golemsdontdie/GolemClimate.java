@@ -1,10 +1,8 @@
 package com.golemsdontdie;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
+import java.util.*;
+import javax.inject.*;
+import lombok.extern.slf4j.*;
 
 /**
  * Where it is cold, where it is hot, and where home is, so that a golem with a taste for one of

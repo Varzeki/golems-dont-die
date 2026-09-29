@@ -1,6 +1,7 @@
 package com.golemsdontdie;
 
-import java.util.Random;
+import java.util.*;
+import java.util.function.*;
 
 /**
  * The area a golem is allowed to wander: everywhere the island map says is walkable.
@@ -23,7 +24,7 @@ class RoamBounds
 	private final int centreY;
 
 	/** Destinations to pass over — a crowded tile — or null. Never blocks walking through. */
-	private final java.util.function.BiPredicate<Integer, Integer> avoid;
+	private final BiPredicate<Integer, Integer> avoid;
 
 	RoamBounds(IslandMemory memory, int plane, int centreX, int centreY)
 	{
@@ -31,7 +32,7 @@ class RoamBounds
 	}
 
 	RoamBounds(IslandMemory memory, int plane, int centreX, int centreY,
-		java.util.function.BiPredicate<Integer, Integer> avoid)
+		BiPredicate<Integer, Integer> avoid)
 	{
 		this.memory = memory;
 		this.plane = plane;

@@ -1,8 +1,9 @@
 package com.golemsdontdie;
 
+import java.util.*;
 import java.util.List;
-import lombok.Getter;
-import net.runelite.api.coords.WorldPoint;
+import lombok.*;
+import net.runelite.api.coords.*;
 
 /**
  * Where a golem will be, expressed so that knowing costs nothing until someone asks.
@@ -467,7 +468,7 @@ final class Itinerary
 			return null;
 		}
 
-		List<int[]> back = new java.util.ArrayList<>();
+		List<int[]> back = new ArrayList<>();
 		for (int i = at; i >= 0; i--)
 		{
 			back.add(new int[]{xs[i], ys[i]});

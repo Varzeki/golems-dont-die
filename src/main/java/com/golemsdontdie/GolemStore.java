@@ -1,12 +1,12 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.coords.WorldPoint;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Reads and writes the saved golem roster.

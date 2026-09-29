@@ -1,7 +1,8 @@
 package com.golemsdontdie;
 
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
+import java.util.*;
+import javax.inject.*;
+import lombok.extern.slf4j.*;
 
 /**
  * How many golems are in each part of the world, so that they spread out rather than gather.
@@ -35,7 +36,7 @@ class GolemCensus
 	/** Starts a count, filled with {@link #add}. */
 	void begin()
 	{
-		java.util.Arrays.fill(counts, 0);
+		Arrays.fill(counts, 0);
 	}
 
 	void add(int x, int y, int plane)
@@ -45,7 +46,7 @@ class GolemCensus
 
 	void clear()
 	{
-		java.util.Arrays.fill(counts, 0);
+		Arrays.fill(counts, 0);
 	}
 
 	/** Golems in the region and floor this tile is in. */

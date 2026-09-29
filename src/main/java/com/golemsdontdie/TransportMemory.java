@@ -1,7 +1,8 @@
 package com.golemsdontdie;
 
-import lombok.Getter;
-import lombok.Setter;
+import java.util.*;
+import java.util.function.*;
+import lombok.*;
 
 /**
  * What one golem has used recently, so it does not pace back and forth through a door.
@@ -33,7 +34,7 @@ final class TransportMemory
 	private static final long MILLIS_PER_TICK = 600;
 
 	/** The clock shore leave is measured on: real time, because it is saved with the golem. */
-	static java.util.function.LongSupplier clock = System::currentTimeMillis;
+	static LongSupplier clock = System::currentTimeMillis;
 
 	/** Ring of recently travelled endpoint pairs, and when each expires. */
 	private final long[] recent = new long[HISTORY];
@@ -306,7 +307,7 @@ final class TransportMemory
 	 * <em>arrives</em>, not the tick it sets out: a crossing is planned up front, so shore leave
 	 * would otherwise be spent at sea.
 	 */
-	void beginShoreLeaveOnArrival(int arrivalTick, int nowTick, java.util.Random random)
+	void beginShoreLeaveOnArrival(int arrivalTick, int nowTick, Random random)
 	{
 		long arrival = clock.getAsLong() + Math.max(0, arrivalTick - nowTick) * MILLIS_PER_TICK;
 		long spread = random == null ? 0 : (long) (random.nextDouble() * SHORE_LEAVE_SPREAD_MILLIS);

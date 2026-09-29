@@ -1,11 +1,13 @@
 package com.golemsdontdie;
 
+import java.util.*;
+import java.util.regex.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Skill;
-import net.runelite.api.gameval.VarbitID;
-import net.runelite.client.util.Text;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.gameval.*;
+import net.runelite.client.util.*;
 
 /**
  * What the golems think is worth celebrating, and for how long.
@@ -37,8 +39,8 @@ class GolemCelebration
 	private static final String CLUE_TRAILS = "Treasure";
 
 	/** A combat achievement, in chat: "Congratulations, you've completed an easy combat task: …". */
-	private static final java.util.regex.Pattern COMBAT_TASK =
-		java.util.regex.Pattern.compile("Congratulations, you've completed an? \\w+ combat task");
+	private static final Pattern COMBAT_TASK =
+		Pattern.compile("Congratulations, you've completed an? \\w+ combat task");
 
 	/** Every way the game tells a player a pet has found them, in their backpack or not. */
 	private static final String[] PET = {
@@ -261,7 +263,7 @@ class GolemCelebration
 	{
 		until = 0;
 		golems = -1;
-		java.util.Arrays.fill(levels, 0);
+		Arrays.fill(levels, 0);
 		diaries = null;
 		diaryReads = 0;
 	}

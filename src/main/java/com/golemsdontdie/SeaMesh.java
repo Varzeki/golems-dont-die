@@ -1,15 +1,13 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
+import java.util.zip.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.coords.WorldPoint;
+import lombok.extern.slf4j.*;
+import net.runelite.api.coords.*;
 
 /**
  * Routes a raft across the ocean.
@@ -72,15 +70,15 @@ class SeaMesh
 			return;
 		}
 		shippedLoaded = true;
-		try (java.io.InputStream raw = SeaMesh.class.getResourceAsStream(SHIPPED))
+		try (InputStream raw = SeaMesh.class.getResourceAsStream(SHIPPED))
 		{
 			if (raw == null)
 			{
 				log.warn("Shipped sea routes missing from the jar; crossings will be searched live");
 				return;
 			}
-			try (java.util.zip.GZIPInputStream gz = new java.util.zip.GZIPInputStream(raw);
-				 java.io.DataInputStream data = new java.io.DataInputStream(gz))
+			try (GZIPInputStream gz = new GZIPInputStream(raw);
+				 DataInputStream data = new DataInputStream(gz))
 			{
 				int count = data.readInt();
 				for (int i = 0; i < count; i++)
@@ -101,7 +99,7 @@ class SeaMesh
 				log.debug("Loaded {} shipped sea routes", count);
 			}
 		}
-		catch (java.io.IOException | RuntimeException e)
+		catch (IOException | RuntimeException e)
 		{
 			log.warn("Shipped sea routes unreadable; crossings will be searched live", e);
 		}

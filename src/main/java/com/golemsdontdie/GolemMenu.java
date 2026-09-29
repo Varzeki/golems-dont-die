@@ -1,22 +1,16 @@
 package com.golemsdontdie;
 
-import java.awt.Shape;
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
-import net.runelite.api.KeyCode;
-import net.runelite.api.MenuAction;
-import net.runelite.api.Perspective;
+import net.runelite.api.*;
 import net.runelite.api.Point;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.client.callback.ClientThread;
-import net.runelite.client.game.chatbox.ChatboxPanelManager;
+import net.runelite.api.coords.*;
+import net.runelite.client.callback.*;
+import net.runelite.client.game.chatbox.*;
 
 /**
  * Gives the copies the right-click menu the real golems have.

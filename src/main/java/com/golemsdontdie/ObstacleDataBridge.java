@@ -1,13 +1,10 @@
 package com.golemsdontdie;
 
-import com.golemsdontdie.telemetry.GolemCrossing;
-import com.golemsdontdie.telemetry.ObstacleDataFile;
-import com.golemsdontdie.telemetry.PlayerCrossing;
-import java.io.BufferedReader;
-import java.io.IOException;
+import com.golemsdontdie.telemetry.*;
+import java.io.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import net.runelite.client.util.Filepath;
+import net.runelite.client.util.*;
 
 /**
  * The one place the plugin hands anything to the obstacle data file.

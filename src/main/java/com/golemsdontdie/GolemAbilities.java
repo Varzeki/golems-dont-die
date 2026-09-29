@@ -1,12 +1,10 @@
 package com.golemsdontdie;
 
+import java.util.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.Quest;
-import net.runelite.api.QuestState;
-import net.runelite.api.Skill;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 
 /**
  * What a golem is allowed to do — the player's account, minus an inventory.
@@ -125,7 +123,7 @@ class GolemAbilities
 	/** Forgets every quest state, for a login that may be another account. */
 	void forgetQuests()
 	{
-		java.util.Arrays.fill(questAskedAt, 0);
+		Arrays.fill(questAskedAt, 0);
 	}
 
 	/**

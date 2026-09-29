@@ -1,13 +1,9 @@
 package com.golemsdontdie;
 
-import net.runelite.api.Animation;
-import net.runelite.api.AnimationController;
-import net.runelite.api.Client;
-import net.runelite.api.Model;
-import net.runelite.api.Perspective;
-import net.runelite.api.RuneLiteObjectController;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
+import java.awt.*;
+import java.util.function.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Draws a {@link Golem} while it is inside the loaded scene.
@@ -43,13 +39,13 @@ class FakeGolem extends RuneLiteObjectController
 	 * Where each drawn frame of a traversal is reported, or null. Here rather than in the
 	 * simulation because this is what is on screen: the position after the renderer copied it.
 	 */
-	private java.util.function.Consumer<String> trace;
+	private Consumer<String> trace;
 
 	/**
 	 * Whether anyone is recording. A golem mid-obstacle otherwise built a dozen strings every
 	 * frame for nothing to read.
 	 */
-	private java.util.function.BooleanSupplier tracing = () -> true;
+	private BooleanSupplier tracing = () -> true;
 
 	/** How tall the golem is drawn, in the client's height units, for putting things above its head. */
 	int getModelHeight()
@@ -79,7 +75,7 @@ class FakeGolem extends RuneLiteObjectController
 		applyPose();
 	}
 
-	void setTrace(java.util.function.Consumer<String> trace, java.util.function.BooleanSupplier tracing)
+	void setTrace(Consumer<String> trace, BooleanSupplier tracing)
 	{
 		this.trace = trace;
 		this.tracing = tracing;
@@ -156,7 +152,7 @@ class FakeGolem extends RuneLiteObjectController
 	 *
 	 * @return the clickbox, or null if it cannot be computed this frame
 	 */
-	java.awt.Shape clickbox()
+	Shape clickbox()
 	{
 		// The world it is drawn in: aboard the player's ship, the ship's own.
 		WorldView wv = golem.isAboard() ? client.getWorldView(golem.getAboardView()) : client.getTopLevelWorldView();

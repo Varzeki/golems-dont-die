@@ -1,11 +1,12 @@
 package com.golemsdontdie;
 
+import java.util.*;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.coords.WorldPoint;
+import lombok.extern.slf4j.*;
+import net.runelite.api.coords.*;
 
 /**
  * Decides where a golem sails, and plans the crossing.
@@ -33,20 +34,20 @@ class Voyage
 	 * saves.
 	 */
 	@Inject
-	private java.util.concurrent.ScheduledExecutorService executor;
+	private ScheduledExecutorService executor;
 
 	/** How many field builds may wait for the builder; beyond it a golem asks later. */
 	private static final int BUILD_QUEUE = 8;
 
 	/** One low-priority daemon thread of its own, made on first use; see {@link #shutDown}. */
-	private java.util.concurrent.ThreadPoolExecutor builder;
+	private ThreadPoolExecutor builder;
 
-	private synchronized java.util.concurrent.ThreadPoolExecutor builder()
+	private synchronized ThreadPoolExecutor builder()
 	{
 		if (builder == null)
 		{
-			builder = new java.util.concurrent.ThreadPoolExecutor(1, 1, 30, java.util.concurrent.TimeUnit.SECONDS,
-				new java.util.concurrent.ArrayBlockingQueue<>(BUILD_QUEUE), task ->
+			builder = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS,
+				new ArrayBlockingQueue<>(BUILD_QUEUE), task ->
 				{
 					Thread thread = new Thread(task, "golems-sea-fields");
 					thread.setDaemon(true);
@@ -97,7 +98,7 @@ class Voyage
 		}
 
 		// Candidates: anywhere open, except here and except where we just came from.
-		List<SailingDocks.Dock> candidates = new java.util.ArrayList<>(open);
+		List<SailingDocks.Dock> candidates = new ArrayList<>(open);
 		candidates.removeIf(d -> d.getRowId() == from.getRowId()
 			|| d.getRowId() == memory.getBlockedPort());
 
@@ -197,7 +198,7 @@ class Voyage
 		{
 			return null;
 		}
-		List<SailingDocks.Dock> candidates = new java.util.ArrayList<>(docks.openDocks());
+		List<SailingDocks.Dock> candidates = new ArrayList<>(docks.openDocks());
 		candidates.removeIf(d -> d.getRowId() == from.getRowId());
 		for (TransportMemory memory : crew)
 		{
@@ -299,7 +300,7 @@ class Voyage
 			return null;
 		}
 		// From the water beside one gangplank to the other, by the shipped route between moorings.
-		List<int[]> course = new java.util.ArrayList<>(route.size() + 2);
+		List<int[]> course = new ArrayList<>(route.size() + 2);
 		WorldPoint setOut = from.getBerth();
 		WorldPoint comeIn = to.getBerth();
 		if (setOut.getX() != route.get(0)[0] || setOut.getY() != route.get(0)[1])
@@ -330,7 +331,7 @@ class Voyage
 	}
 
 	/** Crossings whose distance field is being built right now, so each is built once. */
-	private final java.util.Set<Long> building = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private final Set<Long> building = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * The distance field for a route, or null while it is built in the background. Safe off the
@@ -378,7 +379,7 @@ class Voyage
 					}
 				});
 			}
-			catch (java.util.concurrent.RejectedExecutionException e)
+			catch (RejectedExecutionException e)
 			{
 				// Queue full, or stopping. Nothing is building it, so the next golem to ask may try.
 				building.remove(key);
@@ -435,7 +436,7 @@ class Voyage
 	 * busy port does not refill one per golem. Bounded by tiles held, not count: eight fields was
 	 * far fewer than sixty ports make.
 	 */
-	private final java.util.LinkedHashMap<Long, SeaMesh.Field> fields = new java.util.LinkedHashMap<>(64, 0.75f, true);
+	private final LinkedHashMap<Long, SeaMesh.Field> fields = new LinkedHashMap<>(64, 0.75f, true);
 
 	/** Tiles across every cached field. Guarded by {@link #fields}. */
 	private long cachedTiles;
@@ -452,7 +453,7 @@ class Voyage
 		{
 			SeaMesh.Field old = fields.put(key, field);
 			cachedTiles += field.size() - (old == null ? 0 : old.size());
-			java.util.Iterator<SeaMesh.Field> oldest = fields.values().iterator();
+			Iterator<SeaMesh.Field> oldest = fields.values().iterator();
 			while (fields.size() > MIN_FIELDS && cachedTiles > FIELD_TILE_BUDGET && oldest.hasNext())
 			{
 				cachedTiles -= oldest.next().size();
@@ -880,7 +881,7 @@ class Voyage
 		{
 			return null;
 		}
-		List<int[]> seaCourse = new java.util.ArrayList<>(mouthToGateway);
+		List<int[]> seaCourse = new ArrayList<>(mouthToGateway);
 		if (seaDock.getRowId() != gateway.getRowId())
 		{
 			List<int[]> onward = searchedRoute(gateway.getMooring(), seaDock.getMooring(), context);
@@ -893,10 +894,10 @@ class Voyage
 		seaCourse.add(new int[]{seaDock.getBerth().getX(), seaDock.getBerth().getY()});
 		if (!fromCave)
 		{
-			java.util.Collections.reverse(seaCourse);
+			Collections.reverse(seaCourse);
 		}
 
-		List<int[]> lakeCourse = new java.util.ArrayList<>();
+		List<int[]> lakeCourse = new ArrayList<>();
 		lakeCourse.add(fromCave ? caveBerth : lakeMouth);
 		lakeCourse.add(fromCave ? lakeMouth : caveBerth);
 
@@ -1179,7 +1180,7 @@ class Voyage
 		{
 			if (size == values.length)
 			{
-				values = java.util.Arrays.copyOf(values, size * 2);
+				values = Arrays.copyOf(values, size * 2);
 			}
 			values[size++] = value;
 		}
@@ -1196,7 +1197,7 @@ class Voyage
 
 		int[] toArray()
 		{
-			return java.util.Arrays.copyOf(values, size);
+			return Arrays.copyOf(values, size);
 		}
 	}
 

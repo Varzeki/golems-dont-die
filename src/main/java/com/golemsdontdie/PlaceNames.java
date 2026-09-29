@@ -1,14 +1,11 @@
 package com.golemsdontdie;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.coords.WorldPoint;
+import java.io.*;
+import java.util.*;
+import java.util.zip.*;
+import javax.inject.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.coords.*;
 
 /**
  * What a place is called, so a golem's whereabouts can be said in words.
@@ -89,9 +86,9 @@ class PlaceNames
 	 * loosely — the name must be the whole of it — and a name that matches nothing is logged, which
 	 * is how a curated list is kept honest as the game changes under it.
 	 */
-	java.util.Set<Integer> regionsNamed(String[] names)
+	Set<Integer> regionsNamed(String[] names)
 	{
-		java.util.Set<Integer> found = new java.util.HashSet<>();
+		Set<Integer> found = new HashSet<>();
 		for (String name : names)
 		{
 			boolean any = false;

@@ -1,8 +1,8 @@
 package com.golemsdontdie;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
+import java.util.*;
+import java.util.function.*;
+import lombok.*;
 
 /**
  * The world as one golem sees it while deciding what to do next: passability, pathfinder,
@@ -34,7 +34,7 @@ final class RoamContext
 	 * pacing went wrong.
 	 */
 	@Setter
-	private java.util.function.BiConsumer<Golem, String> decisions;
+	private BiConsumer<Golem, String> decisions;
 
 	/** Where every golem is, by region, so golems spread out. Null in tools that do not count. */
 	@Setter
@@ -46,7 +46,7 @@ final class RoamContext
 
 	/** Where a golem in view reports each crossing, for the obstacle record; null if none. */
 	@Setter
-	private java.util.function.Consumer<GolemTraversal> traversals;
+	private Consumer<GolemTraversal> traversals;
 
 	/** How willing a golem is to enter this tile's region: 1 unless crowded. */
 	float roominess(int x, int y, int plane)
@@ -198,7 +198,7 @@ final class RoamContext
 	/** How long a measured area is trusted, in ticks, before doors may have changed it. */
 	private static final int AREA_REFRESH_TICKS = 500;
 
-	private final java.util.Map<Long, int[]> areas = new java.util.LinkedHashMap<Long, int[]>(1024, 0.75f, true)
+	private final Map<Long, int[]> areas = new LinkedHashMap<Long, int[]>(1024, 0.75f, true)
 	{
 		/**
 		 * Kept to the tiles asked about lately. Every tile a golem plans from is asked about, and over
@@ -206,7 +206,7 @@ final class RoamContext
 		 * answers that go stale in a minute anyway.
 		 */
 		@Override
-		protected boolean removeEldestEntry(java.util.Map.Entry<Long, int[]> eldest)
+		protected boolean removeEldestEntry(Map.Entry<Long, int[]> eldest)
 		{
 			return size() > MOST_AREAS;
 		}

@@ -1,15 +1,11 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.coords.WorldPoint;
+import lombok.extern.slf4j.*;
+import net.runelite.api.coords.*;
 
 /**
  * Golems that leave a dock together sail together.
@@ -106,7 +102,7 @@ class GolemCrews
 	 */
 	private void forget(List<Golem> golems)
 	{
-		java.util.Set<Golem> alive = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+		Set<Golem> alive = Collections.newSetFromMap(new IdentityHashMap<>());
 		alive.addAll(golems);
 		sailing.keySet().retainAll(alive);
 		released.keySet().retainAll(alive);
@@ -155,7 +151,7 @@ class GolemCrews
 	/** Makes up the crews that are ready, and lets go of the ones nobody joined. */
 	private void sail(int tick, RoamContext context)
 	{
-		for (java.util.Iterator<Map.Entry<Integer, Muster>> it = mustering.entrySet().iterator(); it.hasNext(); )
+		for (Iterator<Map.Entry<Integer, Muster>> it = mustering.entrySet().iterator(); it.hasNext(); )
 		{
 			Muster muster = it.next().getValue();
 			// Anyone who wandered off, died or was carried away is no longer waiting.

@@ -1,11 +1,8 @@
 package com.golemsdontdie;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import javax.inject.Singleton;
-import net.runelite.api.NPC;
+import java.util.*;
+import javax.inject.*;
+import net.runelite.api.*;
 
 /**
  * Decides what counts as a golem, and when one is dying.

@@ -1,26 +1,15 @@
 package com.golemsdontdie;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import java.io.*;
+import java.util.*;
+import java.util.function.*;
+import java.util.zip.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.CollisionData;
-import net.runelite.api.CollisionDataFlag;
-import net.runelite.api.Constants;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.WorldPoint;
+import lombok.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * The plugin's memory of where a golem can walk on Wyrmscraig, in world coordinates,
@@ -110,7 +99,7 @@ class IslandMemory
 	private void clearRegions()
 	{
 		regions.clear();
-		java.util.Arrays.fill(mayHold, false);
+		Arrays.fill(mayHold, false);
 	}
 
 	/** Regions harvested this session, so a reload is not redone every scene change. */
@@ -177,7 +166,7 @@ class IslandMemory
 			}
 
 			try (GZIPInputStream gz = new GZIPInputStream(raw);
-				 java.io.DataInputStream data = new java.io.DataInputStream(gz))
+				 DataInputStream data = new DataInputStream(gz))
 			{
 				int count = data.readInt();
 				for (int i = 0; i < count; i++)
@@ -297,9 +286,9 @@ class IslandMemory
 	 * cathedral's basement is under the island but in another region, and golems that went down
 	 * found nowhere to walk.
 	 */
-	private java.util.function.IntPredicate alsoIsland;
+	private IntPredicate alsoIsland;
 
-	void setAlsoIsland(java.util.function.IntPredicate alsoIsland)
+	void setAlsoIsland(IntPredicate alsoIsland)
 	{
 		this.alsoIsland = alsoIsland;
 	}
@@ -729,7 +718,7 @@ class IslandMemory
 		{
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			try (GZIPOutputStream gz = new GZIPOutputStream(out);
-				 java.io.DataOutputStream data = new java.io.DataOutputStream(gz))
+				 DataOutputStream data = new DataOutputStream(gz))
 			{
 				data.writeInt(anchorRegionId);
 				data.writeInt(regions.size());
@@ -778,7 +767,7 @@ class IslandMemory
 		}
 
 		try (GZIPInputStream gz = new GZIPInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(encoded)));
-			 java.io.DataInputStream data = new java.io.DataInputStream(gz))
+			 DataInputStream data = new DataInputStream(gz))
 		{
 			anchorRegionId = data.readInt();
 			int count = data.readInt();
@@ -812,7 +801,7 @@ class IslandMemory
 				}
 				masked = true;
 			}
-			catch (java.io.EOFException e)
+			catch (EOFException e)
 			{
 				masked = false;
 			}

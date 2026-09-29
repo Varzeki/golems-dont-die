@@ -1,14 +1,10 @@
 package com.golemsdontdie;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Animation;
-import net.runelite.api.Client;
-import net.runelite.api.Model;
-import net.runelite.api.ModelData;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 
 /**
  * Rebuilds a golem's model from the cache, unposed.

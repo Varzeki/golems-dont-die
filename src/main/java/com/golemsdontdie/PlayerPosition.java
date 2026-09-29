@@ -1,11 +1,7 @@
 package com.golemsdontdie;
 
-import net.runelite.api.Client;
-import net.runelite.api.Player;
-import net.runelite.api.WorldEntity;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Where the player is in the world, including when they are aboard a boat.

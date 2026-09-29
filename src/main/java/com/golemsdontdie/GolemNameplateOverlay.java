@@ -1,17 +1,11 @@
 package com.golemsdontdie;
 
-import java.awt.Dimension;
-import java.awt.Graphics2D;
+import java.awt.*;
 import javax.inject.Inject;
-import net.runelite.api.Client;
-import net.runelite.api.Perspective;
+import net.runelite.api.*;
 import net.runelite.api.Point;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.client.ui.overlay.Overlay;
-import net.runelite.client.ui.overlay.OverlayLayer;
-import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayUtil;
+import net.runelite.api.coords.*;
+import net.runelite.client.ui.overlay.*;
 
 /**
  * Draws a named golem's name above its head, the way NPC highlighting names an NPC.
@@ -57,7 +51,7 @@ class GolemNameplateOverlay extends Overlay
 		}
 
 		// Read once for the frame, not through the config proxy for every named golem.
-		java.awt.Color colour = config.nameplateColour();
+		Color colour = config.nameplateColour();
 		for (Golem golem : plugin.drawnGolems())
 		{
 			String name = names.of(golem);
@@ -102,7 +96,7 @@ class GolemNameplateOverlay extends Overlay
 	 * once a tick: over a walking golem that reads as an arrow trailing along behind it. This one
 	 * is drawn at wherever the golem is this frame, which is where the golem looks.
 	 */
-	private void pointAtFound(Graphics2D graphics, net.runelite.api.WorldView wv)
+	private void pointAtFound(Graphics2D graphics, WorldView wv)
 	{
 		Golem golem = plugin.getFinding();
 		FakeGolem drawn = golem == null ? null : golem.getRenderer();
@@ -126,16 +120,16 @@ class GolemNameplateOverlay extends Overlay
 
 		int x = at.getX();
 		int y = at.getY() + bob;
-		java.awt.Polygon arrow = new java.awt.Polygon(
+		Polygon arrow = new Polygon(
 			new int[]{x - ARROW_WIDE / 2, x + ARROW_WIDE / 2, x},
 			new int[]{y - ARROW_TALL, y - ARROW_TALL, y}, 3);
-		graphics.setColor(java.awt.Color.BLACK);
-		graphics.setStroke(new java.awt.BasicStroke(4f));
+		graphics.setColor(Color.BLACK);
+		graphics.setStroke(new BasicStroke(4f));
 		graphics.drawPolygon(arrow);
 		graphics.setColor(ARROW_COLOUR);
 		graphics.fillPolygon(arrow);
 	}
 
 	/** The game's own hint arrow yellow. */
-	private static final java.awt.Color ARROW_COLOUR = new java.awt.Color(0xFFE700);
+	private static final Color ARROW_COLOUR = new Color(0xFFE700);
 }

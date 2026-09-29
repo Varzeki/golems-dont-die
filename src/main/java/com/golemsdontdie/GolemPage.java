@@ -1,25 +1,14 @@
 package com.golemsdontdie;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Window;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.util.function.Consumer;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.SwingUtilities;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.*;
+import java.text.*;
+import java.util.*;
+import java.util.function.*;
+import javax.swing.*;
+import net.runelite.client.ui.*;
+import net.runelite.client.util.*;
 
 /**
  * One golem's own page: what it is called, where it is, and what it is like.
@@ -42,7 +31,7 @@ class GolemPage
 	 * so it stays above the client without being put above everything else on the screen, and goes
 	 * where the client goes.
 	 */
-	private javax.swing.JDialog frame;
+	private JDialog frame;
 
 	/** What the window shows, built once. */
 	private final JPanel body = new JPanel(new BorderLayout());
@@ -59,7 +48,7 @@ class GolemPage
 
 	/** The journal's own scrolling part, and the tabs the two of them sit in. */
 	private final JScrollPane travels;
-	private final javax.swing.JTabbedPane tabs = new javax.swing.JTabbedPane();
+	private final JTabbedPane tabs = new JTabbedPane();
 
 	/** The golem's own picture, in its frame. Empty until the client thread has drawn one. */
 	private final JLabel picture = new JLabel();
@@ -209,12 +198,12 @@ class GolemPage
 	 * Makes the page's window, owned by the client's: the window the sidebar is in, or failing that
 	 * the client's own frame.
 	 */
-	private javax.swing.JDialog window(Component beside)
+	private JDialog window(Component beside)
 	{
 		Window owner = beside == null ? null : SwingUtilities.getWindowAncestor(beside);
 		if (owner == null)
 		{
-			for (java.awt.Frame open : java.awt.Frame.getFrames())
+			for (Frame open : Frame.getFrames())
 			{
 				if (open.isVisible())
 				{
@@ -223,7 +212,7 @@ class GolemPage
 				}
 			}
 		}
-		javax.swing.JDialog window = new javax.swing.JDialog(owner, "Golem Info");
+		JDialog window = new JDialog(owner, "Golem Info");
 
 		// The client's own chrome, the way the client asks for it: undecorated, and the root pane
 		// told to draw a frame. Asking the look and feel first whether it supports decorations
@@ -231,7 +220,7 @@ class GolemPage
 		try
 		{
 			window.setUndecorated(true);
-			window.getRootPane().setWindowDecorationStyle(javax.swing.JRootPane.FRAME);
+			window.getRootPane().setWindowDecorationStyle(JRootPane.FRAME);
 		}
 		catch (RuntimeException e)
 		{
@@ -240,7 +229,7 @@ class GolemPage
 			window.dispose();
 			window.setUndecorated(false);
 		}
-		java.awt.image.BufferedImage icon = net.runelite.client.util.ImageUtil.loadImageResource(
+		BufferedImage icon = ImageUtil.loadImageResource(
 			GolemPage.class, "/golem-icon.png");
 		if (icon != null)
 		{
@@ -251,7 +240,7 @@ class GolemPage
 		window.setMinimumSize(new Dimension(320, 260));
 		window.setSize(new Dimension(380, 420));
 		// Closing the window keeps the golem: a page is a thing a player glances at and dismisses.
-		window.setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
+		window.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
 		window.addWindowListener(new WindowAdapter()
 		{
 			@Override
@@ -320,11 +309,11 @@ class GolemPage
 	 *
 	 * @param of the golem it is of, ignored if the page has moved on to another
 	 */
-	void showPicture(Golem of, java.awt.image.BufferedImage drawn)
+	void showPicture(Golem of, BufferedImage drawn)
 	{
 		if (of == showing && drawn != null)
 		{
-			picture.setIcon(new javax.swing.ImageIcon(drawn));
+			picture.setIcon(new ImageIcon(drawn));
 		}
 	}
 
@@ -355,7 +344,7 @@ class GolemPage
 
 		if (history.getFirstSeen() > 0)
 		{
-			line(record, "Alive since " + DAY.format(new java.util.Date(history.getFirstSeen())));
+			line(record, "Alive since " + DAY.format(new Date(history.getFirstSeen())));
 		}
 		line(record, "Walked about " + NUMBERS.format(history.getWalked()) + " tiles");
 		line(record, history.getTransports() == 1 ? "Used one shortcut"
@@ -402,9 +391,9 @@ class GolemPage
 		listRecord(showing);
 	}
 
-	private static final java.text.NumberFormat NUMBERS = java.text.NumberFormat.getIntegerInstance();
+	private static final NumberFormat NUMBERS = NumberFormat.getIntegerInstance();
 
-	private static final java.text.SimpleDateFormat DAY = new java.text.SimpleDateFormat("d MMM yyyy");
+	private static final SimpleDateFormat DAY = new SimpleDateFormat("d MMM yyyy");
 
 	/**
 	 * Where the golem has been lately: the last fifteen regions it arrived in, newest first, each

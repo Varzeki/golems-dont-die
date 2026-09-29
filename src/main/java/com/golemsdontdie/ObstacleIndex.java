@@ -1,15 +1,11 @@
 package com.golemsdontdie;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
+import java.util.zip.*;
+import javax.inject.*;
+import lombok.extern.slf4j.*;
 
 /**
  * Where every obstacle in the game is, read from the cache and shipped.
@@ -182,7 +178,7 @@ class ObstacleIndex
 		return known.contains(objectId);
 	}
 
-	private final java.util.Set<Integer> known = new java.util.HashSet<>();
+	private final Set<Integer> known = new HashSet<>();
 
 	/** The cache's traversal time for an object, in ticks, or 0: the same wherever it stands. */
 	int ticksFor(int objectId)

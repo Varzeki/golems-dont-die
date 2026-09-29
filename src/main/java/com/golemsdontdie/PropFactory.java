@@ -1,18 +1,13 @@
 package com.golemsdontdie;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
+import java.io.*;
+import java.util.*;
+import java.util.zip.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.Model;
-import net.runelite.api.ModelData;
+import lombok.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 
 /**
  * Builds the animated scenery drawn beside a golem that is using something.

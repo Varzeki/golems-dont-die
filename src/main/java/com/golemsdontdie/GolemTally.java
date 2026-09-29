@@ -1,12 +1,11 @@
 package com.golemsdontdie;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.config.ConfigManager;
+import lombok.*;
+import lombok.extern.slf4j.*;
+import net.runelite.client.config.*;
 
 /**
  * How many golems the player has ever crafted, read from the game's own count.

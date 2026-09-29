@@ -1,29 +1,22 @@
 package com.golemsdontdie;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.awt.*;
+import java.awt.image.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
 import net.runelite.api.Point;
-import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.coords.*;
 import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.widgets.Widget;
-import net.runelite.api.worldmap.WorldMap;
+import net.runelite.api.widgets.*;
+import net.runelite.api.worldmap.*;
 import net.runelite.api.worldmap.WorldMapData;
-import net.runelite.client.ui.FontManager;
-import net.runelite.client.ui.overlay.worldmap.WorldMapPoint;
-import net.runelite.client.ui.overlay.worldmap.WorldMapPointManager;
-import net.runelite.client.util.ImageUtil;
+import net.runelite.client.ui.*;
+import net.runelite.client.ui.overlay.worldmap.*;
+import net.runelite.client.util.*;
 
 /**
  * Golems on the world map: all of them, as faces that say who is there when hovered.
@@ -208,7 +201,7 @@ class GolemMapPoints
 		List<Golem> roster = golems;
 		if (only != null)
 		{
-			golems = java.util.Collections.singletonList(only);
+			golems = Collections.singletonList(only);
 			named = false;
 		}
 		this.pinned = only != null;

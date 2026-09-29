@@ -1,8 +1,8 @@
 package com.golemsdontdie;
 
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.coords.*;
 
 /**
  * Where a golem is, in words: "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".

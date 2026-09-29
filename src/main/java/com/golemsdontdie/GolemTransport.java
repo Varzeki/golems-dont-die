@@ -1,7 +1,7 @@
 package com.golemsdontdie;
 
-import lombok.Getter;
-import net.runelite.api.coords.WorldPoint;
+import lombok.*;
+import net.runelite.api.coords.*;
 
 /**
  * One way of getting from one tile to another that is not walking: a door, a ladder, a stile,

@@ -1,11 +1,11 @@
 package com.golemsdontdie;
 
-import java.awt.Color;
-import java.awt.image.BufferedImage;
-import net.runelite.api.MenuAction;
-import net.runelite.client.plugins.Plugin;
-import net.runelite.client.ui.overlay.OverlayMenuEntry;
-import net.runelite.client.ui.overlay.infobox.InfoBox;
+import java.awt.*;
+import java.awt.image.*;
+import net.runelite.api.*;
+import net.runelite.client.plugins.*;
+import net.runelite.client.ui.overlay.*;
+import net.runelite.client.ui.overlay.infobox.*;
 
 /**
  * The golem being looked for, as an infobox: how far off it is, and who and where on hover.

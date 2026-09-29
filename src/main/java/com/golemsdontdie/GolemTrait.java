@@ -1,9 +1,8 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Random;
-import lombok.Getter;
+import lombok.*;
 
 /**
  * What a golem is like: a handful of traits it keeps for life.
@@ -134,7 +133,7 @@ enum GolemTrait
 
 		int traits = 0;
 		List<GolemTrait> left = new ArrayList<>(ALL.length);
-		java.util.Collections.addAll(left, ALL);
+		Collections.addAll(left, ALL);
 		for (int i = 0; i < count && !left.isEmpty(); i++)
 		{
 			int roll = random.nextInt(total);
@@ -154,7 +153,7 @@ enum GolemTrait
 			// Nothing that pulls against what it just drew: see clash.
 			if (drawn.clash != 0)
 			{
-				for (java.util.Iterator<GolemTrait> rest = left.iterator(); rest.hasNext(); )
+				for (Iterator<GolemTrait> rest = left.iterator(); rest.hasNext(); )
 				{
 					GolemTrait trait = rest.next();
 					if (trait.clash == drawn.clash)

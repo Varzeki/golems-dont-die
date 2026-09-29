@@ -1,10 +1,8 @@
 package com.golemsdontdie.telemetry;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import lombok.extern.slf4j.Slf4j;
+import java.io.*;
+import java.util.*;
+import lombok.extern.slf4j.*;
 
 /**
  * The obstacle data file: {@value #FILE_NAME} in the plugin's own folder.

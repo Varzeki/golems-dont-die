@@ -1,20 +1,15 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
+import java.util.function.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
-import net.runelite.api.MenuAction;
-import net.runelite.api.ObjectComposition;
-import net.runelite.api.Player;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.events.AnimationChanged;
-import net.runelite.api.events.MenuOptionClicked;
+import lombok.*;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
+import net.runelite.api.events.*;
 
 /**
  * Watches the player use obstacles, and teaches the plugin what it sees.
@@ -66,7 +61,7 @@ class ObstacleObserver
 
 	/** Called when a sighting completes, so the plugin can persist and announce it. */
 	@Setter
-	private java.util.function.Consumer<ObstacleSighting> onSighting;
+	private Consumer<ObstacleSighting> onSighting;
 
 	// ------------------------------------------------------------- what was clicked
 
@@ -906,7 +901,7 @@ class ObstacleObserver
 	private boolean hurt;
 
 	/** The player's own standing, walking, running and turning poses, as they were at the click. */
-	private java.util.Set<Integer> ordinaryPoses;
+	private Set<Integer> ordinaryPoses;
 
 	/** A pose being recorded as the traversal's clip, or -1. */
 	private int posing = -1;
@@ -954,9 +949,9 @@ class ObstacleObserver
 		return local != null && local.getWorldView() != null && !local.getWorldView().isTopLevel();
 	}
 
-	private static java.util.Set<Integer> ordinaryPosesOf(Player local)
+	private static Set<Integer> ordinaryPosesOf(Player local)
 	{
-		java.util.Set<Integer> poses = new java.util.HashSet<>();
+		Set<Integer> poses = new HashSet<>();
 		poses.add(-1);
 		poses.add(local.getIdlePoseAnimation());
 		poses.add(local.getIdleRotateLeft());
@@ -1089,7 +1084,7 @@ class ObstacleObserver
 		// first — so the approach is trimmed at the end. A rolling window; a cap left it unsampled.
 		if (clickedTick >= 0 && local != null)
 		{
-			net.runelite.api.WorldView view = client.getTopLevelWorldView();
+			WorldView view = client.getTopLevelWorldView();
 			LocalPoint fineNow = local.getLocalLocation();
 			if (view != null && fineNow != null)
 			{

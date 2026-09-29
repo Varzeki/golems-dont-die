@@ -1,14 +1,9 @@
 package com.golemsdontdie;
 
-import java.util.ArrayDeque;
+import java.util.*;
 import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.Random;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
 
 /**
  * Picks somewhere for a golem to go, and works out how to walk there.

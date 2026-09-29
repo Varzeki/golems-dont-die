@@ -1,21 +1,13 @@
 package com.golemsdontdie;
 
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.*;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
+import javax.inject.*;
 import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.CollisionData;
-import net.runelite.api.CollisionDataFlag;
-import net.runelite.api.Player;
-import net.runelite.api.WorldEntity;
-import net.runelite.api.WorldView;
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
+import lombok.extern.slf4j.*;
+import net.runelite.api.*;
+import net.runelite.api.coords.*;
 
 /**
  * Golems that come aboard the player's own ship.
@@ -205,8 +197,8 @@ class GolemShipmates
 		int sizeY = flags.length == 0 ? 0 : Math.min(deck.getSizeY(), flags[0].length);
 		// A tile the ship's scene has nothing on is not deck, whatever its flags say: water inside
 		// the square a ship's world is drawn in must not take a golem because nothing blocks it.
-		net.runelite.api.Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
-		net.runelite.api.Tile[][] floor = tiles == null || plane >= tiles.length ? null : tiles[plane];
+		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
+		Tile[][] floor = tiles == null || plane >= tiles.length ? null : tiles[plane];
 
 		List<int[]> rail = new ArrayList<>();
 		for (int x = 0; x < sizeX; x++)
