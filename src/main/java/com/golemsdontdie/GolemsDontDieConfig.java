@@ -320,47 +320,6 @@ public interface GolemsDontDieConfig extends Config
 		return false;
 	}
 
-	// Developer settings, not shipped. Golems always learn from the player's play, so that is
-	// not an option. Obstacle data is kept on disk for a later update to offer to send; see the
-	// telemetry package. The two below are always off in a release: on a dev client, uncomment
-	// the section and the item and read the setting in place of the matching DevOptions constant
-	// (GolemsDontDiePlugin.applyObstacleSettings, ObstacleHighlightOverlay.render).
-	// @ConfigSection(
-	// 	name = "Obstacles",
-	// 	description = "How golems learn to use shortcuts",
-	// 	position = 1,
-	// 	closedByDefault = true
-	// )
-	// String obstaclesSection = "obstacles";
-
-	// @ConfigItem(
-	// 	keyName = "highlightObstacles",
-	// 	name = "Highlight nearby obstacles",
-	// 	description = "Outlines shortcuts around you by how well golems know them. "
-	// 		+ "Green: seen you use this one. Orange: golems will use it, inferred from "
-	// 		+ "similar objects elsewhere — using it once confirms it. Red: no animation "
-	// 		+ "data, so golems route around it.",
-	// 	section = obstaclesSection,
-	// 	position = 3
-	// )
-	// default boolean highlightObstacles()
-	// {
-	// 	return false;
-	// }
-
-	// @ConfigItem(
-	// 	keyName = "logGolemState",
-	// 	name = "Log golem state (developer)",
-	// 	description = "Logs what every visible golem is doing, every tick, at debug level. "
-	// 		+ "Very verbose; for diagnosing a specific problem, not for ordinary play.",
-	// 	section = obstaclesSection,
-	// 	position = 4
-	// )
-	// default boolean logGolemState()
-	// {
-	// 	return false;
-	// }
-
 	/**
 	 * Not a setting: a note at the bottom of the panel, so people know the sidebar tab exists.
 	 * The panel draws an item it has no widget for as its name alone, and HTML in a label

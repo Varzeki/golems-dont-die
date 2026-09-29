@@ -36,9 +36,6 @@ class TransportNetwork
 	/** Origin tile (x, y packed) to the transports starting there. Immutable once built. */
 	private final Map<Long, List<GolemTransport>> byOrigin = new HashMap<>();
 
-	/** Archetype per object id, built once with the rest of the index. */
-	private final Map<Integer, Integer> archetypeByObject = new HashMap<>();
-
 	/** Quest display name to enum, built once — the tables name quests as players do. */
 	private static Map<String, Quest> questsByName;
 
@@ -171,7 +168,6 @@ class TransportNetwork
 		}
 
 		byOrigin.clear();
-		archetypeByObject.clear();
 		for (GolemTransport t : transports)
 		{
 			if (suppressed.contains(t))
@@ -180,10 +176,6 @@ class TransportNetwork
 			}
 			byOrigin.computeIfAbsent(pack(t.getFromX(), t.getFromY()),
 				k -> new ArrayList<>()).add(t);
-			if (t.getObjectId() > 0)
-			{
-				archetypeByObject.merge(t.getObjectId(), t.getArchetype(), Math::max);
-			}
 		}
 		byOrigin.replaceAll((k, v) -> Collections.unmodifiableList(v));
 		indexChunks();
@@ -211,9 +203,8 @@ class TransportNetwork
 	private static final int[] NO_REQUIREMENT = new int[0];
 
 	/**
-	 * True if the shipped tables have a row for this object. Shipped rows only:
-	 * {@link #archetypeFor} counts learned rows too, so a tree that slipped through once passed
-	 * the obstacle test for good.
+	 * True if the shipped tables have a row for this object. Shipped rows only: counting learned
+	 * rows too, a tree that slipped through once passed the obstacle test for good.
 	 */
 	boolean isShippedObstacle(int objectId)
 	{
@@ -221,17 +212,6 @@ class TransportNetwork
 	}
 
 	private final Set<Integer> shippedObjects = new HashSet<>();
-
-	/**
-	 * The archetype this object is given wherever it appears, or -1. Keyed by object rather than
-	 * tile because the highlight overlay works from the obstacle index, which knows where
-	 * obstacles stand but not where they lead.
-	 */
-	int archetypeFor(int objectId)
-	{
-		Integer found = archetypeByObject.get(objectId);
-		return found == null ? -1 : found;
-	}
 
 	/**
 	 * Every transport, for callers that sweep the whole table. Immutable and shared, like
@@ -303,13 +283,6 @@ class TransportNetwork
 			t.setIndex(i);
 			byOrigin.computeIfAbsent(pack(t.getFromX(), t.getFromY()),
 				k -> new ArrayList<>()).add(t);
-
-			// Highest archetype wins where an object appears under several: they normally agree, and
-			// the classified one is more informative, ARCHETYPE_NONE being zero.
-			if (t.getObjectId() > 0)
-			{
-				archetypeByObject.merge(t.getObjectId(), t.getArchetype(), Math::max);
-			}
 		}
 
 		// Made immutable once built: these lists are handed straight out to every golem that

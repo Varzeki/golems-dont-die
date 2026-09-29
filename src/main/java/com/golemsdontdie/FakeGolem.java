@@ -35,26 +35,11 @@ class FakeGolem extends RuneLiteObjectController
 	/** Which animation ID the controller currently holds, to avoid resetting it every frame. */
 	private int loadedAnimationId = Integer.MIN_VALUE;
 
-	/**
-	 * Where each drawn frame of a traversal is reported, or null. Here rather than in the
-	 * simulation because this is what is on screen: the position after the renderer copied it.
-	 */
-	private Consumer<String> trace;
-
-	/**
-	 * Whether anyone is recording. A golem mid-obstacle otherwise built a dozen strings every
-	 * frame for nothing to read.
-	 */
-	private BooleanSupplier tracing = () -> true;
-
 	/** How tall the golem is drawn, in the client's height units, for putting things above its head. */
 	int getModelHeight()
 	{
 		return baseModel.getModelHeight();
 	}
-
-	/** Whether the last traced frame was mid-traversal. */
-	private boolean wasTraversing;
 
 	FakeGolem(Client client, Golem golem, Model baseModel, GolemModelFactory shared)
 	{
@@ -75,12 +60,6 @@ class FakeGolem extends RuneLiteObjectController
 		applyPose();
 	}
 
-	void setTrace(Consumer<String> trace, BooleanSupplier tracing)
-	{
-		this.trace = trace;
-		this.tracing = tracing;
-	}
-
 	/**
 	 * Called by the client once per frame while registered. Only the animation is advanced here;
 	 * position is advanced centrally for every golem, including those off screen, or one would
@@ -98,39 +77,11 @@ class FakeGolem extends RuneLiteObjectController
 		{
 			animation.tick(ticksSinceLastFrame);
 		}
-
-		// One frame past the end too: a door teleports on the frame its transition ends, so
-		// stopping there logged its last position halfway across.
-		boolean traversing = golem.inTransition();
-		boolean landed = wasTraversing && !traversing;
-		wasTraversing = traversing;
-		if (trace != null && (traversing || landed) && tracing.getAsBoolean())
-		{
-			Animation playing = animation.getAnimation();
-			trace.accept("fine=" + golem.getFineX() + "," + golem.getFineY()
-				+ " drawn=" + getX() + "," + getY()
-				+ " orient=" + golem.getOrientation()
-				+ " anim=" + loadedAnimationId
-				+ " keyframe=" + (playing == null ? -1 : animation.getFrame())
-				+ " keyframes=" + (playing == null ? -1 : playing.getNumFrames())
-				+ " motionFrame=" + golem.getMotionFrame());
-		}
-	}
-
-	/** The client cycle this golem was last asked for a model, which is when it was drawn. */
-	private int lastDrawnCycle = -1;
-
-	int getLastDrawnCycle()
-	{
-		return lastDrawnCycle;
 	}
 
 	@Override
 	public Model getModel()
 	{
-		// Only asked for when the client actually draws the object, so a golem registered but
-		// not drawn shows in the debug log.
-		lastDrawnCycle = client.getGameCycle();
 		if (animation.getAnimation() == null)
 		{
 			return baseModel;

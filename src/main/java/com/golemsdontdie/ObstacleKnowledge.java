@@ -51,22 +51,6 @@ class ObstacleKnowledge
 	private static final int CONFIRM_TOLERANCE = 3;
 
 	/**
-	 * How sure we are about one particular obstacle. Three states because an obstacle golems
-	 * already use on inferred data is exactly the one worth walking over to and using once.
-	 */
-	enum Status
-	{
-		/** Seen being used, here, on this object. Golems copy what was observed. */
-		CONFIRMED,
-
-		/** Golems will use it, on data generalised from elsewhere. Worth confirming. */
-		INFERRED,
-
-		/** No usable animation, so golems route around it entirely. */
-		UNUSABLE
-	}
-
-	/**
 	 * What the player has been seen doing, by object id. Outranks everything shipped: the live
 	 * game on this client beats anything measured elsewhere months ago.
 	 */
@@ -130,14 +114,6 @@ class ObstacleKnowledge
 	 * stone mid-line leads two ways and those must stay apart.
 	 */
 	private static final int DESTINATION_TOLERANCE = 2;
-
-	/**
-	 * Bumped whenever anything here changes, for the highlight overlay: using an obstacle leaves
-	 * you standing next to it, so its cache, keyed on the player moving, never refreshes when an
-	 * obstacle changes colour.
-	 */
-	@lombok.Getter
-	private int version;
 
 	/** One obstacle as observed here, and how sure of it we are. */
 	static final class Learned
@@ -258,101 +234,6 @@ class ObstacleKnowledge
 
 			default:
 				return false;
-		}
-	}
-
-	/**
-	 * How sure we are about an obstacle known only by what and where it is. The overlay works from
-	 * the obstacle index, which knows nothing about where obstacles lead, so there may be no row
-	 * at all — itself the answer.
-	 */
-	Status statusAt(int objectId, int x, int y, int plane, int sizeX, int sizeY,
-		int archetype)
-	{
-		// Knowing the animation is not enough: something also has to say where an obstacle comes
-		// out, and for many nothing does. First, because the colour has to mean "will a golem use
-		// this", which it did not.
-		boolean routed = archetype >= 0 || hasRoute(objectId, x, y, plane, sizeX, sizeY);
-		if (!routed)
-		{
-			return Status.UNUSABLE;
-		}
-
-		if (!usableArchetype(archetype) && !isLearned(objectId)
-			&& MeasuredShortcuts.animationFor(objectId) == -1)
-		{
-			return Status.UNUSABLE;
-		}
-
-		// Confirmed means the whole thing is known here: what it looks like, and where it
-		// goes. Either half missing is "will use it, on generalised data".
-		if (isLearned(objectId)
-			&& isConfirmedAt(objectId, x, y, plane, sizeX, sizeY)
-			&& hasRoute(objectId, x, y, plane, sizeX, sizeY))
-		{
-			return Status.CONFIRMED;
-		}
-		return Status.INFERRED;
-	}
-
-	/**
-	 * Everything known about one obstacle, in one line, for reading in game. Four things decide
-	 * the colour: the animation, the confirmation that it was this obstacle, the route, and
-	 * whether the table describes it at all.
-	 */
-	String explain(int objectId, int x, int y, int plane, int sizeX, int sizeY, int archetype)
-	{
-		Learned known = learned.get(objectId);
-		StringBuilder sb = new StringBuilder();
-		sb.append(statusAt(objectId, x, y, plane, sizeX, sizeY, archetype)).append(" | ");
-
-		if (known == null)
-		{
-			sb.append("anim: never seen");
-		}
-		else
-		{
-			sb.append("anim: ");
-			if (known.clips.length == 0)
-			{
-				sb.append("none(silent)");
-			}
-			else
-			{
-				for (int i = 0; i < known.clips.length; i++)
-				{
-					sb.append(i == 0 ? "" : ",").append(known.clips[i]);
-				}
-			}
-			sb.append(" ").append(known.ticks).append("t x").append(known.sightings)
-				.append(known.unlocked() ? "" : " (needs another)");
-		}
-
-		sb.append(" | route: ")
-			.append(hasRoute(objectId, x, y, plane, sizeX, sizeY) ? "known" : "unknown");
-		sb.append(" | here: ")
-			.append(isConfirmedAt(objectId, x, y, plane, sizeX, sizeY) ? "yes" : "no");
-		sb.append(" | table: ").append(archetype < 0 ? "no rows" : "arch " + archetype);
-		return sb.toString();
-	}
-
-	/**
-	 * Whether golems will take this kind of obstacle on shipped data alone: the set
-	 * {@link #shippedConfidence} locks, minus the parts needing a transport row. A ladder is
-	 * usable both ways, simply playing nothing going down.
-	 */
-	private boolean usableArchetype(int archetype)
-	{
-		switch (archetype)
-		{
-			case GolemTransport.ARCHETYPE_BALANCE:
-			case GolemTransport.ARCHETYPE_TIGHTROPE:
-			case GolemTransport.ARCHETYPE_SQUEEZE:
-			case GolemTransport.ARCHETYPE_STILE:
-			case GolemTransport.ARCHETYPE_DOOR:
-				return false;
-			default:
-				return true;
 		}
 	}
 
@@ -486,20 +367,6 @@ class ObstacleKnowledge
 		return flags;
 	}
 
-	/** Every obstacle the player has used and where, as {objectId, x, y, plane}. */
-	List<int[]> confirmedPlaces()
-	{
-		List<int[]> out = new ArrayList<>();
-		for (Map.Entry<Integer, List<int[]>> e : confirmed.entrySet())
-		{
-			for (int[] at : e.getValue())
-			{
-				out.add(new int[]{e.getKey(), at[0], at[1], at[2]});
-			}
-		}
-		return out;
-	}
-
 	private static String routeKey(int objectId, int x, int y, int plane)
 	{
 		return objectId + "," + x + "," + y + "," + plane;
@@ -604,42 +471,6 @@ class ObstacleKnowledge
 		return false;
 	}
 
-	/** True if the player has shown us where this obstacle goes from near this tile. */
-	boolean hasRoute(int objectId, int x, int y, int plane, int sizeX, int sizeY)
-	{
-		for (Map.Entry<String, List<int[]>> e : routes.entrySet())
-		{
-			String[] from = e.getKey().split(",");
-			// Which obstacle first, because it is cheap and nearly always no: the overlay asks this
-			// of every obstacle in range, and counting a route's sightings is not free.
-			if (Integer.parseInt(from[0]) != objectId
-				|| Integer.parseInt(from[3]) != plane)
-			{
-				continue;
-			}
-			int fx = Integer.parseInt(from[1]);
-			int fy = Integer.parseInt(from[2]);
-			int dx = Math.max(Math.max(x - fx, fx - (x + sizeX - 1)), 0);
-			int dy = Math.max(Math.max(y - fy, fy - (y + sizeY - 1)), 0);
-			if (dx > CONFIRM_TOLERANCE || dy > CONFIRM_TOLERANCE)
-			{
-				continue;
-			}
-			for (int[] to : e.getValue())
-			{
-				if ((to[3] >= SIGHTINGS_TO_UNLOCK
-						|| sightingsFor(objectId, fx, fy, plane, to) >= SIGHTINGS_TO_UNLOCK)
-					&& followsObjectLine(objectId, fx, fy, plane, to)
-					&& (routeFilter == null || routeFilter.test(new int[]{
-						objectId, fx, fy, plane, to[0], to[1], to[2]})))
-				{
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
 	private void noteLine(ObstacleSighting sighting)
 	{
 		if (sighting.fromPlane != sighting.toPlane || !RouteGeometry.local(sighting.lineX, sighting.lineY))
@@ -718,7 +549,6 @@ class ObstacleKnowledge
 	void deserialiseLines(String saved)
 	{
 		lines.clear();
-		version++;
 		if (saved == null || saved.isEmpty())
 		{
 			return;
@@ -766,7 +596,6 @@ class ObstacleKnowledge
 	{
 		curves.clear();
 		chosenCurves.clear();
-		version++;
 		if (saved == null || saved.isEmpty())
 		{
 			return;
@@ -897,7 +726,6 @@ class ObstacleKnowledge
 	void deserialiseRoutes(String saved)
 	{
 		routes.clear();
-		version++;
 		if (saved == null || saved.isEmpty())
 		{
 			return;
@@ -1029,7 +857,6 @@ class ObstacleKnowledge
 	{
 		// An empty clip set is not a failed observation but the observation that this obstacle
 		// animates nobody, as a staircase and fifteen hundred other rows do.
-		version++;
 		noteConfirmed(sighting);
 		noteLine(sighting);
 
@@ -1225,7 +1052,6 @@ class ObstacleKnowledge
 	/** Restores what was learned in previous sessions. Bad rows are skipped, not fatal. */
 	void deserialise(String saved)
 	{
-		version++;
 		learned.clear();
 		if (saved == null || saved.isEmpty())
 		{

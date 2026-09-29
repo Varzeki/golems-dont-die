@@ -179,9 +179,6 @@ public class GolemsDontDiePlugin extends Plugin
 	private GolemMinimapOverlay minimapOverlay;
 
 	@Inject
-	private ObstacleHighlightOverlay obstacleHighlightOverlay;
-
-	@Inject
 	private GolemNameplateOverlay nameplateOverlay;
 
 	@Inject
@@ -411,37 +408,6 @@ public class GolemsDontDiePlugin extends Plugin
 		setSetting(ObstacleKnowledge.LINES_KEY, obstacleKnowledge.serialiseLines());
 	}
 
-	/**
-	 * Logs what every golem near the player is doing, at debug level, for chasing a bug. Confined
-	 * to the scene: a line per tick for four hundred and fifty golems would be megabytes a minute.
-	 */
-	private void logGolemState()
-	{
-		if (!DevOptions.LOG_GOLEM_STATE)
-		{
-			return;
-		}
-
-		for (Golem golem : golems)
-		{
-			if (golem.getTier() != GolemTier.SCENE)
-			{
-				continue;
-			}
-			FakeGolem drawn = golem.getRenderer();
-			log.debug("Golem {} {}", golem.getId(), golem.debugState()
-				+ (drawn == null ? " undrawn" : " drawnAgo=" + (client.getGameCycle() - drawn.getLastDrawnCycle())));
-			checkStep(golem);
-			checkStanding(golem);
-		}
-	}
-
-	/** Pushes the obstacle settings into the pieces that act on them. */
-	private void applyObstacleSettings()
-	{
-		obstacleObserver.setExplaining(DevOptions.HIGHLIGHT_OBSTACLES);
-	}
-
 	@Provides
 	GolemsDontDieConfig provideConfig(ConfigManager configManager)
 	{
@@ -478,7 +444,6 @@ public class GolemsDontDiePlugin extends Plugin
 			setting(ObstacleKnowledge.CURVES_KEY));
 		obstacleKnowledge.deserialiseLines(
 			setting(ObstacleKnowledge.LINES_KEY));
-		applyObstacleSettings();
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
 		obstacleObserver.startUp();
@@ -527,13 +492,6 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext = new RoamContext(islandMemory, pathfinder, transports, abilities);
 		roamContext.setKnowledge(obstacleKnowledge);
 		roamContext.setObstacles(obstacleIndex);
-		roamContext.setDecisions((golem, what) ->
-		{
-			if (DevOptions.LOG_GOLEM_STATE)
-			{
-				log.debug("Golem {} {}", golem.getId(), what);
-			}
-		});
 		roamContext.setPlanner(roamPlanner);
 		roamContext.setCensus(census);
 		roamContext.setClimates(climates);
@@ -612,7 +570,6 @@ public class GolemsDontDiePlugin extends Plugin
 			.build();
 		showSidebar(config.showSidebar());
 		overlayManager.add(minimapOverlay);
-		overlayManager.add(obstacleHighlightOverlay);
 		overlayManager.add(nameplateOverlay);
 
 		renderCallbacks.register(drawCallback);
@@ -688,7 +645,6 @@ public class GolemsDontDiePlugin extends Plugin
 		voyage.shutDown();
 
 		overlayManager.remove(minimapOverlay);
-		overlayManager.remove(obstacleHighlightOverlay);
 		overlayManager.remove(nameplateOverlay);
 
 		if (navButton != null)
@@ -1742,7 +1698,6 @@ public class GolemsDontDiePlugin extends Plugin
 				{
 					log.debug("Golem {} was on unwalkable ground at {}; moved to {}",
 						golem.getId(), on, safe);
-					noteRescue(golem, on, safe, "unwalkable");
 					golem.relocate(safe);
 					golem.noteUnstuck(tick);
 					return;
@@ -1774,7 +1729,6 @@ public class GolemsDontDiePlugin extends Plugin
 
 		log.debug("Rescuing stuck golem {} from {} to {} (tier {})",
 			golem.getId(), at, safe, tier);
-		noteRescue(golem, at, safe, "stuck");
 		golem.relocate(safe);
 		golem.noteUnstuck(tick);
 	}
@@ -1793,147 +1747,6 @@ public class GolemsDontDiePlugin extends Plugin
 	public void onWallObjectDespawned(WallObjectDespawned event)
 	{
 		islandMemory.passabilityChanged(event.getWallObject().getWorldLocation());
-	}
-
-	/** The last step of each golem already checked, by its step count. */
-	private final Map<Long, Integer> loggedSteps = new HashMap<>();
-
-	/**
-	 * Logs a golem that has just walked across an edge the live game says is blocked, judged by
-	 * the game's own collision at the moment of the step rather than the island memory the golem
-	 * planned with, which is the thing that might be stale. A golem through a shut door is
-	 * invisible to every other check: its path was valid when planned.
-	 */
-	private void checkStep(Golem golem)
-	{
-		// The step the golem actually began, not the tile it was logged on a tick ago:
-		// comparing logged tiles called stepping-stone landings and half-finished diagonals
-		// steps through walls, which was most of the first 169 reports.
-		int serial = golem.getStepSerial();
-		Integer checked = loggedSteps.put(golem.getId(), serial);
-		if (checked == null || checked == serial || golem.lastStepClimbing())
-		{
-			return;
-		}
-		int[] step = golem.lastStep();
-		WorldPoint before = new WorldPoint(step[0], step[1], golem.getPlane());
-		WorldPoint now = new WorldPoint(step[2], step[3], golem.getPlane());
-		int dx = now.getX() - before.getX();
-		int dy = now.getY() - before.getY();
-		if ((dx == 0 && dy == 0) || Math.abs(dx) > 1 || Math.abs(dy) > 1)
-		{
-			return;
-		}
-		WorldView wv = client.getTopLevelWorldView();
-		// Not inside an instance: golems there are in template coordinates, which the loaded
-		// scene's collision does not describe.
-		if (wv == null || wv.isInstance() || wv.getCollisionMaps() == null
-			|| now.getPlane() >= wv.getCollisionMaps().length
-			|| wv.getCollisionMaps()[now.getPlane()] == null)
-		{
-			return;
-		}
-		int[][] flags = wv.getCollisionMaps()[now.getPlane()].getFlags();
-		int sx = before.getX() - wv.getBaseX();
-		int sy = before.getY() - wv.getBaseY();
-		// Not near the scene edge, where the client marks a border blocked whatever is really
-		// there; steps along it were reported as walls.
-		int margin = 6;
-		if (sx < margin || sy < margin || sx >= wv.getSizeX() - margin || sy >= wv.getSizeY() - margin
-			|| sx + dx < margin || sy + dy < margin
-			|| sx + dx >= wv.getSizeX() - margin || sy + dy >= wv.getSizeY() - margin)
-		{
-			return;
-		}
-		if (!liveStepBlocked(flags, sx, sy, dx, dy))
-		{
-			return;
-		}
-		log.debug("Golem {} {}", golem.getId(), "crossed blocked edge from "
-			+ before.getX() + "," + before.getY() + "," + before.getPlane() + " to "
-			+ now.getX() + "," + now.getY() + "," + now.getPlane()
-			+ " flags=" + Integer.toHexString(flags[sx][sy]) + "," + Integer.toHexString(flags[sx + dx][sy + dy]));
-	}
-
-	/**
-	 * Logs a golem standing on a tile the live game says nothing can stand on — water, or inside
-	 * scenery — outside a traversal and off any transport's starting tile. Judged by the game's
-	 * own collision, because the golems' map is the thing that can be wrong: false walls and
-	 * holes both look fine from inside the plugin.
-	 */
-	private void checkStanding(Golem golem)
-	{
-		if (golem.inTransition())
-		{
-			return;
-		}
-		WorldView wv = client.getTopLevelWorldView();
-		WorldPoint at = golem.currentTile();
-		if (wv == null || wv.isInstance() || wv.getCollisionMaps() == null
-			|| at.getPlane() >= wv.getCollisionMaps().length || wv.getCollisionMaps()[at.getPlane()] == null)
-		{
-			return;
-		}
-		int sx = at.getX() - wv.getBaseX();
-		int sy = at.getY() - wv.getBaseY();
-		int margin = 6;
-		if (sx < margin || sy < margin || sx >= wv.getSizeX() - margin || sy >= wv.getSizeY() - margin)
-		{
-			return;
-		}
-		int flags = wv.getCollisionMaps()[at.getPlane()].getFlags()[sx][sy];
-		if ((flags & LIVE_UNWALKABLE) == 0 || transports.hasOrigin(at.getX(), at.getY()))
-		{
-			return;
-		}
-		log.debug("Golem {} {}", golem.getId(), "standing on blocked tile "
-			+ at.getX() + "," + at.getY() + "," + at.getPlane() + " flags=" + Integer.toHexString(flags)
-			+ (golem.debugState().contains(" itinerary") ? " route" : ""));
-	}
-
-	private static final int LIVE_UNWALKABLE = CollisionDataFlag.BLOCK_MOVEMENT_FULL
-		| CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
-		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
-		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
-
-	/** The game's rule for one step, on raw scene flags: both ways round a corner clear. */
-	private static boolean liveStepBlocked(int[][] flags, int x, int y, int dx, int dy)
-	{
-		if (dx != 0 && dy != 0)
-		{
-			return liveStepBlocked(flags, x, y, dx, 0) || liveStepBlocked(flags, x, y, 0, dy)
-				|| liveStepBlocked(flags, x + dx, y, 0, dy) || liveStepBlocked(flags, x, y + dy, dx, 0);
-		}
-		int nx = x + dx;
-		int ny = y + dy;
-		if (x < 0 || y < 0 || nx < 0 || ny < 0 || x >= flags.length || nx >= flags.length
-			|| y >= flags[x].length || ny >= flags[nx].length)
-		{
-			return false;
-		}
-		int out;
-		int in;
-		if (dy == 1)
-		{
-			out = CollisionDataFlag.BLOCK_MOVEMENT_NORTH;
-			in = CollisionDataFlag.BLOCK_MOVEMENT_SOUTH;
-		}
-		else if (dy == -1)
-		{
-			out = CollisionDataFlag.BLOCK_MOVEMENT_SOUTH;
-			in = CollisionDataFlag.BLOCK_MOVEMENT_NORTH;
-		}
-		else if (dx == 1)
-		{
-			out = CollisionDataFlag.BLOCK_MOVEMENT_EAST;
-			in = CollisionDataFlag.BLOCK_MOVEMENT_WEST;
-		}
-		else
-		{
-			out = CollisionDataFlag.BLOCK_MOVEMENT_WEST;
-			in = CollisionDataFlag.BLOCK_MOVEMENT_EAST;
-		}
-		return (flags[x][y] & out) != 0 || (flags[nx][ny] & (in | LIVE_UNWALKABLE)) != 0;
 	}
 
 	/**
@@ -2067,7 +1880,6 @@ public class GolemsDontDiePlugin extends Plugin
 		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		log.debug("Golem {} was {} at {}; brought home", golem.getId(),
 			pocket ? "shut in a pocket" : "cut off", at);
-		noteRescue(golem, at, plinth, pocket ? "pocket" : "cut off");
 		golem.relocate(plinth);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
@@ -2090,7 +1902,6 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		WorldPoint at = golem.currentTile();
 		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
-		noteRescue(golem, at, plinth, "ambition");
 		golem.relocate(plinth);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
@@ -2146,21 +1957,6 @@ public class GolemsDontDiePlugin extends Plugin
 		announcementPending = false;
 		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>The Golems have learned to sail...</col>", null);
 		setSetting(ANNOUNCED_KEY, true);
-	}
-
-	/**
-	 * Logs a rescue, which is otherwise invisible: the golem simply reappears at the plinth. Ninety
-	 * came off one ladder in a single session.
-	 */
-	private void noteRescue(Golem golem, WorldPoint from, WorldPoint to, String reason)
-	{
-		if (DevOptions.LOG_GOLEM_STATE)
-		{
-			log.debug("Golem {} {}", golem.getId(), "rescued " + reason
-				+ " from " + from.getX() + "," + from.getY() + "," + from.getPlane()
-				+ " to " + to.getX() + "," + to.getY() + "," + to.getPlane()
-				+ " tier=" + golem.getTier());
-		}
 	}
 
 	/** Animated scenery currently on screen. Short-lived: each plays once and goes. */
@@ -2707,8 +2503,6 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			FakeGolem renderer = new FakeGolem(client, golem, model, modelFactory);
-			long traceId = golem.getId();
-			renderer.setTrace(line -> log.debug("Golem {} frame {}", traceId, line), () -> DevOptions.LOG_GOLEM_STATE);
 			golem.setRenderer(renderer);
 			client.registerRuneLiteObject(renderer);
 		}
@@ -2819,7 +2613,6 @@ public class GolemsDontDiePlugin extends Plugin
 		announceUpdate();
 		readDiaries();
 		obstacleObserver.onGameTick();
-		logGolemState();
 		// Refreshed continuously rather than read once at spawn: a golem steps off its
 		// plinth and starts walking, and its pose animations need not be the ones it had
 		// while standing on it.
@@ -3074,13 +2867,6 @@ public class GolemsDontDiePlugin extends Plugin
 				saveGolems();
 			});
 		}
-
-		// The obstacle settings are developer options for now, not in the panel: see
-		// DevOptions. They must take effect the moment they change, so this returns with them.
-		// if ("highlightObstacles".equals(event.getKey()) || "logGolemState".equals(event.getKey()))
-		// {
-		// 	applyObstacleSettings();
-		// }
 	}
 
 	// ---- persistence ----

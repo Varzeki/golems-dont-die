@@ -40,22 +40,9 @@ class ObstacleObserver
 	@Inject
 	private Client client;
 
-	@Inject
-	private ObstacleKnowledge knowledge;
-
-	@Inject
-	private ObstacleIndex index;
-
-	@Inject
-	private TransportNetwork transports;
-
 	/** What golems can walk on, which decides where a traversal is learned to start and end. */
 	@Inject
 	private IslandMemory memory;
-
-	/** Whether to report the plugin's verdict on each obstacle clicked. */
-	@Setter
-	private boolean explaining;
 
 	/** Called when a sighting completes, so the plugin can persist and announce it. */
 	@Setter
@@ -216,54 +203,6 @@ class ObstacleObserver
 		clips.clear();
 		startedAt = null;
 
-
-		if (explaining)
-		{
-			explain(clickedObject);
-		}
-	}
-
-	/**
-	 * Says what the plugin currently believes about the obstacle just clicked. Tied to the
-	 * highlight setting: it answers which of the four things the colour depends on is missing.
-	 */
-	private void explain(int objectId)
-	{
-		int sizeX = 1;
-		int sizeY = 1;
-		int x = -1;
-		int y = -1;
-		int plane = 0;
-
-		Player local = client.getLocalPlayer();
-		WorldPoint at = local == null ? null : local.getWorldLocation();
-		if (at != null)
-		{
-			// The index entry nearest the player, so the footprint and position match the overlay's.
-			for (ObstacleIndex.Obstacle o : index.near(at.getX(), at.getY(), at.getPlane(), 12))
-			{
-				if (o.objectId == objectId)
-				{
-					x = o.x;
-					y = o.y;
-					plane = o.plane;
-					sizeX = o.sizeX;
-					sizeY = o.sizeY;
-					break;
-				}
-			}
-		}
-
-		if (x < 0)
-		{
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-				"[golem] " + objectId + " is not in the obstacle index", null);
-			return;
-		}
-
-		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "[golem] " + objectId + " "
-			+ knowledge.explain(objectId, x, y, plane, sizeX, sizeY,
-				transports.archetypeFor(objectId)), null);
 	}
 
 	/**

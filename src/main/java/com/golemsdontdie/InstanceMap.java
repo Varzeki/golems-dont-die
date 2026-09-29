@@ -88,21 +88,6 @@ final class InstanceMap
 		return out;
 	}
 
-	/**
-	 * Where a template tile appears in the loaded instance, given {@link #sceneChunks}; null if
-	 * its chunk is not part of it.
-	 */
-	static WorldPoint instanceTileOf(WorldView wv, Map<Long, int[]> sceneChunks, int x, int y, int plane)
-	{
-		int[] scene = sceneChunks.get(chunkKey(x >> 3, y >> 3, plane));
-		if (scene == null)
-		{
-			return null;
-		}
-		return new WorldPoint(wv.getBaseX() + (scene[0] << 3) + (x & (CHUNK - 1)),
-			wv.getBaseY() + (scene[1] << 3) + (y & (CHUNK - 1)), scene[2]);
-	}
-
 	static long chunkKey(int chunkX, int chunkY, int plane)
 	{
 		return ((long) plane << 40) | ((long) chunkX << 20) | chunkY;

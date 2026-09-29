@@ -1308,7 +1308,6 @@ class Golem
 		{
 			return false;
 		}
-		note(context, "dead end: taking the way back");
 		take(back, context);
 		return true;
 	}
@@ -1458,7 +1457,6 @@ class Golem
 		{
 			return false;
 		}
-		note(context, "no known way out: back the way it came");
 		if (tileX == home.getFromX() && tileY == home.getFromY())
 		{
 			take(home, context);
@@ -1554,14 +1552,6 @@ class Golem
 		// On landing, not now: a golem climbing into the pew is still in the cathedral.
 		landingInstance = transport.entersInstance() ? 1 : transport.leavesInstance() ? 0 : -1;
 
-		// Logged before anything else can return: a row with no animation used to relocate
-		// the golem above this line, so staircases left no trace in the log.
-		note(context, "transport obj=" + transport.getObjectId()
-			+ " to=" + transport.getToX() + "," + transport.getToY() + ","
-			+ transport.getToPlane()
-			+ " arch=" + transport.getArchetype()
-			+ " dur=" + transport.getDuration());
-
 		// A recording beats anything reconstructed, the silent case included: a staircase
 		// plays nothing but still has a shape. A plane change may be performed from one
 		// only if it barely moves, since a travelling recording would slide the golem
@@ -1573,14 +1563,12 @@ class Golem
 		{
 			beginTrace(transport, context);
 			beginRecordedMotion(transport, recorded);
-			note(context, "performing " + recorded);
 			return;
 		}
 
 		int animation = transport.animation();
 		if (animation < 0 || animation == snapshot.getWalkAnimation())
 		{
-			note(context, "relocated without animation");
 			relocate(transport.destination());
 			landInInstance();
 			return;
@@ -1654,24 +1642,14 @@ class Golem
 		}
 		wanted = Math.max(TRANSITION_MIN_CYCLES, wanted);
 
-		note(context, "clips=" + Arrays.toString(clips) + " total=" + total
-			+ " wanted=" + wanted + " measured=" + measuredTicks + " authored=" + authored
-			+ " obstacleTicks=" + obstacleTicks + " stretchable=" + stretchable
-			+ " delay=" + (context.getKnowledge() == null ? -1
-				: context.getKnowledge().moveDelayFor(transport))
-			+ " span=" + (context.getKnowledge() == null ? -1
-				: context.getKnowledge().moveSpanFor(transport))
-			+ " at=" + (fineX / TILE) + "," + (fineY / TILE));
 
 		// Several ticks over several tiles is a walk, whatever the clip does.
 		if (obstacleTicks >= WALKED_TICKS && total > 0)
 		{
 			if (beginClimb(transport, clips, context))
 			{
-				note(context, "climbing as a walk");
 				return;
 			}
-			note(context, "walk refused: plane or span");
 		}
 
 		if (phaseCycles.length > 0 && total != wanted)
@@ -2043,32 +2021,8 @@ class Golem
 	{
 		return drawPlane >= 0 ? drawPlane : plane;
 	}
-
-	/** Steps begun so far, so each can be checked exactly once from outside. */
-	private int stepSerial;
-	private boolean stepClimbing;
-
-	int getStepSerial()
-	{
-		return stepSerial;
-	}
-
-	/** The most recent step as {fromX, fromY, toX, toY} in tiles. */
-	int[] lastStep()
-	{
-		return new int[]{stepFromX / TILE, stepFromY / TILE, stepToX / TILE, stepToY / TILE};
-	}
-
-	/** True if the most recent step was part of a climb, which crosses unwalkable ground. */
-	boolean lastStepClimbing()
-	{
-		return stepClimbing;
-	}
-
 	private void beginStep(int[] tile)
 	{
-		stepSerial++;
-		stepClimbing = gaitWalk != -1;
 		stepFromX = fineX;
 		stepFromY = fineY;
 		stepToX = tile[0] * TILE + TILE / 2;
@@ -2209,38 +2163,6 @@ class Golem
 	 */
 	@Getter
 	private int motionFrame = -1;
-
-	/** Reports a decision to the debug log, if one is listening. */
-	private void note(RoamContext context, String what)
-	{
-		if (context != null && context.getDecisions() != null)
-		{
-			context.getDecisions().accept(this, what);
-		}
-	}
-
-	/**
-	 * Everything about this golem's current state, for the debug log. One flat line
-	 * per golem per tick: working out why a golem did something means reading its position,
-	 * animation, path and intention together.
-	 */
-	String debugState()
-	{
-		return "tile=" + (fineX / TILE) + "," + (fineY / TILE) + "," + plane
-			+ " fine=" + fineX + "," + fineY
-			+ " orient=" + orientation + "/" + targetOrientation
-			+ " anim=" + currentPoseAnimation()
-			+ " tier=" + tier
-			+ (walking ? " walking" : "")
-			+ (stepping ? " stepping" : "")
-			+ (transitionCycles > 0 ? " transit=" + transitionCycles + "/" + transitionTotal
-				+ (transitionGlide ? " glide=" + transitionGlideCycles : "") : "")
-			+ (gaitWalk != -1 ? " climbing gait=" + gaitWalk + "/" + gaitIdle : "")
-			+ (motion != null ? " performing" : "")
-			+ " path=" + path.size()
-			+ (itinerary != null ? " itinerary" : "")
-			+ (dwellRemaining > 0 ? " dwell=" + dwellRemaining : "");
-	}
 
 	/**
 	 * Starts this golem dancing where it stands, for its own reasons rather than a celebration:

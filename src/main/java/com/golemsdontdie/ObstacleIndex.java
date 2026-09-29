@@ -12,7 +12,8 @@ import lombok.extern.slf4j.*;
  * <p>Separate from {@link TransportNetwork} because only one of the two questions is easy. Where
  * the obstacles are is a fact out of the map index; where each one leads is derived from collision
  * components, and was wrong by one to three tiles on every Wyrmscraig shortcut until somebody
- * measured them. So this index, claiming nothing about destinations, is what the overlay draws.
+ * measured them. So this index claims nothing about destinations: only which objects are
+ * obstacles, where they stand, and how long the cache says each takes.
  *
  * <p>Doors and gates are not here, excluded on the game's own wall-versus-scenery split: a golem
  * cannot open a door, because that changes an object every other player can see.
@@ -27,8 +28,8 @@ class ObstacleIndex
 	private static final int VERSION = 4;
 
 	/**
-	 * Obstacles by the region they stand in, because the overlay asks "what is near me" every time
-	 * the player moves and all but a handful are hundreds of tiles off.
+	 * Obstacles by the region they stand in, because "what is near here" concerns a few regions and
+	 * all but a handful of obstacles are hundreds of tiles off.
 	 */
 	private final Map<Integer, List<Obstacle> > byRegion = new HashMap<>();
 
@@ -51,7 +52,7 @@ class ObstacleIndex
 		/**
 		 * True if this is mounted in a wall — a door or a gate. Kept rather than dropped, because a
 		 * handful are not doors at all: the Wyrmscraig cathedral door does not swing open, it puts you
-		 * on the other side. Drawn only once something is known about it.
+		 * on the other side.
 		 */
 		final boolean wall;
 
@@ -86,7 +87,7 @@ class ObstacleIndex
 		{
 			if (raw == null)
 			{
-				log.warn("No obstacle index on the classpath; highlighting will be empty");
+				log.warn("No obstacle index on the classpath; obstacles are known from the transport tables alone");
 				return;
 			}
 
@@ -129,7 +130,7 @@ class ObstacleIndex
 		}
 		catch (IOException e)
 		{
-			// Cosmetic data: a failure here costs the highlight overlay and nothing else.
+			// Not fatal: obstacles are then known from the transport tables alone.
 			log.warn("Could not read the obstacle index", e);
 		}
 	}
