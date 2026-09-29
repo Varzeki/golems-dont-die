@@ -369,16 +369,22 @@ class GolemPage
 	}
 
 	/**
-	 * How tall the traits tab is with as many traits as a golem can have, a line apiece: laid out
-	 * and measured, so it is the page's own fonts and spacing that decide it.
+	 * How tall the traits tab is with as many traits as a golem can have, a line apiece, and a
+	 * little over: laid out and measured, so it is the page's own fonts and spacing that decide it.
 	 */
 	private static int fullTraitsHeight()
 	{
 		JPanel sample = traitList();
 		GolemTrait[] all = GolemTrait.values();
 		fillTraits(sample, java.util.Arrays.asList(all).subList(0, Math.min(GolemTrait.MOST_TRAITS, all.length)), false);
-		return sample.getPreferredSize().height;
+		// With room for a couple of lines to wrap: exactly five, one line apiece, was a window that
+		// looked a touch short, and any trait that wrapped at a narrower width tipped it into a scroll.
+		int line = sample.getFontMetrics(FontManager.getRunescapeSmallFont()).getHeight();
+		return sample.getPreferredSize().height + WRAP_ROOM_LINES * line;
 	}
+
+	/** Lines of room the traits tab keeps beyond five traits, for ones that wrap. */
+	private static final int WRAP_ROOM_LINES = 2;
 
 	private int usableHeight()
 	{
