@@ -191,10 +191,8 @@ class Golem
 	}
 
 	/**
-	 * Where to write this golem down in a save: the end of whatever route it is on. On a crossing,
-	 * since a golem restored onto water is moved to whatever land is nearest; out of view on foot,
-	 * since a route there is drawn straight without looking at the map, and partway along one a
-	 * golem can be inside a wall or a sealed room beside it. The end is ground the planner chose.
+	 * Where to write this golem down in a save: the end of its route, ground the planner chose. Partway
+	 * along a crossing it is on water, and out of view on foot it can be inside a wall beside the route.
 	 */
 	WorldPoint saveTile()
 	{
@@ -1509,9 +1507,8 @@ class Golem
 			note(context, "walk refused: plane or span");
 		}
 
-		// Nothing to play: a ladder down, whose shipped clip is not trusted, or an obstacle the
-		// player was seen to cross without one. The golem stands for as long as it takes. A
-		// transition of no cycles never finished, and the golem stayed at the top of the ladder.
+		// Nothing to play, as on a ladder down: the golem stands for the obstacle's time. With no
+		// cycles the transition never finished, and the golem stayed at the top of the ladder.
 		if (clips.length == 0)
 		{
 			clips = new int[]{snapshot.getIdlePoseAnimation()};

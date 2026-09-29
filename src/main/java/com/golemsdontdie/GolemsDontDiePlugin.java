@@ -728,13 +728,10 @@ public class GolemsDontDiePlugin extends Plugin
 	private boolean rosterOwned;
 
 	/**
-	 * Decides whether the logged-in account owns the saved roster. The roster is kept once per
-	 * RuneLite profile, so logging into an alt or a seasonal world with fewer golems crafted
-	 * trimmed the main account's unnamed golems down to the smaller count, and saved that. The
-	 * roster now belongs to the first account and kind of world to log in with a count that
-	 * covers its unnamed golems, which for anyone already playing is their main; any other only
-	 * watches the golems, never trimming or saving them. Unnamed, because named golems are kept
-	 * whatever the count says, so a main's roster can outnumber its count by them.
+	 * Decides whether the logged-in account owns the roster, which is kept once per RuneLite profile:
+	 * an alt or seasonal world with fewer golems crafted trimmed a main's golems to its count. The
+	 * owner is the first account and world type whose count covers the unnamed golems (named ones
+	 * are kept whatever the count); any other never trims or saves.
 	 */
 	private void claimRoster(int count)
 	{
@@ -968,11 +965,7 @@ public class GolemsDontDiePlugin extends Plugin
 		saveGolems();
 	}
 
-	/**
-	 * How many golems reviving would bring back: the gap between golems crafted and golems here,
-	 * but never past the limit when there is one. Offering the whole gap under a limit of 25
-	 * revived four hundred golems, and the next craft culled the oldest of them to pay.
-	 */
+	/** How many golems reviving would bring back: the gap to golems crafted, but never past the limit. */
 	private int missingGolems(int living)
 	{
 		int missing = tally.getTotal() - living;
@@ -1354,8 +1347,7 @@ public class GolemsDontDiePlugin extends Plugin
 						golem.getId(), on, safe);
 					noteRescue(golem, on, safe, "unwalkable");
 					golem.relocate(safe);
-					// Snapped out of a room is out of its instance: left flagged, it was out of view
-					// for good.
+					// Out of a room is out of its instance: left flagged, it was out of view for good.
 					golem.setInInstance(false);
 					golem.noteUnstuck(tick);
 					return;

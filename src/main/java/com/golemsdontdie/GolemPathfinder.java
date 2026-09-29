@@ -78,13 +78,7 @@ class GolemPathfinder
 	/** The most tiles a floor may have for its every tile to be worth listing when sampling misses. */
 	private static final int SMALL_FLOOR = 200;
 
-	/**
-	 * A walk to somewhere on the floor the golem is standing on, chosen from the tiles it can
-	 * actually reach. Sampling the window around a golem on a lookout of a dozen tiles mostly lands
-	 * on walls, on other floors it cannot reach, and on tiles golems are standing on: every search
-	 * failed, and after a dozen the watchdog carried the golem off to the plinth. Only when
-	 * sampling has found nothing, so open ground keeps its unbiased choice.
-	 */
+	/** A walk to a reachable tile when sampling found none, as on a lookout of a dozen tiles. */
 	private Deque<int[]> smallFloorPath(int startX, int startY, int plane, RoamBounds bounds, Random random)
 	{
 		TileMap reach = flood(startX, startY, plane, SMALL_FLOOR);

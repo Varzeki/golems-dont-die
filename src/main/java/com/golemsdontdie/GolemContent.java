@@ -86,11 +86,7 @@ final class GolemContent
 	static final int PLINTH_X = 2596;
 	static final int PLINTH_Y = 2256;
 
-	/**
-	 * Where a golem that had to be fetched is put down: in front of the tent south of the plinth.
-	 * Not the plinth itself, where a golem appearing looks like one just crafted to a player who
-	 * crafted nothing; a golem stepping out by a tent is one that was only ever resting.
-	 */
+	/** Where a fetched golem is put: by the tent south of the plinth, where it will not look just crafted. */
 	static final WorldPoint RECOVERY = new WorldPoint(2597, 2224, 0);
 
 	/**
