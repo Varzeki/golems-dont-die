@@ -393,6 +393,30 @@ class Golem
 	private GolemDance danceMove;
 
 	/**
+	 * Set while a dance move is being played and has not reached its end. A celebration or a party
+	 * ends on a tick, and the golem walked off that moment, cut off halfway through a spin: it
+	 * finishes the move first. Cleared by the renderer when the move ends, and whenever there is
+	 * no renderer to end it.
+	 */
+	private boolean midMove;
+
+	/** The tick the move began, and the longest one may take before it is taken as over. */
+	private int midMoveTick;
+	private static final int MOVE_MOST_TICKS = 20;
+
+	/** True while a dance move is still playing out: nothing should break into it. */
+	boolean isMidMove()
+	{
+		return midMove;
+	}
+
+	/** The move being played has reached its end. See midMove. */
+	void danceMoveEnded()
+	{
+		midMove = false;
+	}
+
+	/**
 	 * The moves' own generator, seeded from the golem but separate from it: drawn from the golem's
 	 * own, dancing would change where it walked afterwards, and two golems that danced the same
 	 * number of moves would then walk in step.
@@ -931,6 +955,8 @@ class Golem
 		{
 			return false;
 		}
+		// Out of view no move is being played, so none is left to finish.
+		midMove = false;
 
 		int tick = context.getTick();
 
@@ -1069,6 +1095,14 @@ class Golem
 			return false;
 		}
 
+		// Nothing drawn, nothing to finish: only the renderer can say a move has ended. Nor one
+		// that has run far past any move's length, whose end was never heard.
+		int now = context.getTick();
+		if (renderer == null || now < midMoveTick || now - midMoveTick > MOVE_MOST_TICKS)
+		{
+			midMove = false;
+		}
+
 		sampleTrace(cycles);
 
 		// Mid-obstacle: playing a climb or a squeeze, so it must not walk, turn or path
@@ -1131,7 +1165,7 @@ class Golem
 				// end of one would still be walking when the celebration was over. Never partway up
 				// a climb, though: dropping the rest of that left the golem on the cliff face, in its
 				// climbing gait, with no step left to finish the climb on.
-				boolean stopping = (dancing || isGreeting(context.getTick())) && gaitWalk == -1;
+				boolean stopping = (dancing || midMove || isGreeting(context.getTick())) && gaitWalk == -1;
 				if (stopping && !path.isEmpty())
 				{
 					path.clear();
@@ -2733,6 +2767,8 @@ class Golem
 		}
 		danceMove = GolemDance.random(danceRandom);
 		propPending = danceMove.getSpotanim() != -1;
+		midMove = true;
+		midMoveTick = tickNow;
 	}
 
 	/**
@@ -2788,7 +2824,7 @@ class Golem
 		// Last of all, and never over anything else: a golem climbing, crossing or at the helm has
 		// a pose already, and one halfway through a recorded motion is having its frames set by
 		// hand. Dancing is what a golem does when it is doing nothing.
-		if ((dancing || isPartying(tickNow)) && !walking)
+		if ((dancing || isPartying(tickNow) || midMove) && !walking)
 		{
 			if (danceMove == null)
 			{

@@ -191,14 +191,25 @@ class FakeGolem extends RuneLiteObjectController
 	 * stop on its last frame.
 	 *
 	 * <p>Only when what finished was the move itself. A golem dancing when it starts to crumble
-	 * is playing its death animation, and that ending is not a cue to dance again.
+	 * is playing its death animation, and that ending is not a cue to dance again. When the dance
+	 * is over, the move's end is where the golem stops dancing: see Golem.danceMoveEnded.
 	 */
 	private void poseFinished(AnimationController controller)
 	{
 		GolemDance move = golem.getDanceMove();
-		if (!golem.isDancing() || move == null || loadedAnimationId != move.getAnimationId())
+		if (move == null || loadedAnimationId != move.getAnimationId())
 		{
 			controller.loop();
+			return;
+		}
+
+		// The move has ended. The dance being over, the golem is free to go; until now it held
+		// still to finish what it had started.
+		if (!golem.isDancing())
+		{
+			golem.danceMoveEnded();
+			loadedAnimationId = golem.currentPoseAnimation();
+			controller.setAnimation(shared.animationFor(loadedAnimationId));
 			return;
 		}
 
