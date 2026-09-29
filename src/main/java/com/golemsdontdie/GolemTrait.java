@@ -98,7 +98,7 @@ enum GolemTrait
 	private static final GolemTrait[] ALL = values();
 
 	/** How many traits a golem may have. The draw leans hard on the low end. */
-	private static final int MOST_TRAITS = 5;
+	static final int MOST_TRAITS = 5;
 
 	/**
 	 * The traits belonging to a seed, as a bitmask.

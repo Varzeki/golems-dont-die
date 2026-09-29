@@ -5,6 +5,7 @@ import java.awt.event.*;
 import java.awt.image.*;
 import java.text.*;
 import java.util.*;
+import java.util.List;
 import java.util.function.*;
 import javax.swing.*;
 import net.runelite.client.ui.*;
@@ -37,7 +38,7 @@ class GolemPage
 	private final JPanel body = new JPanel(new BorderLayout());
 	private final JLabel title = new JLabel();
 	private final JLabel place = new JLabel();
-	private final JPanel traits = new JPanel();
+	private final JPanel traits = traitList();
 
 	/** Where the golem has been lately, one line each, newest first. */
 	private final JPanel journal = new JPanel();
@@ -122,10 +123,6 @@ class GolemPage
 		heading.add(mount, BorderLayout.WEST);
 		heading.add(words, BorderLayout.CENTER);
 
-		traits.setLayout(new BoxLayout(traits, BoxLayout.Y_AXIS));
-		traits.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		traits.setBorder(BorderFactory.createEmptyBorder(8, 12, 10, 12));
-
 		// The traits are pinned to the top of a panel of their own. In the scroll pane directly,
 		// the list is given the whole height of the window and shares the slack out between the
 		// traits, which put half a window between two of them.
@@ -140,7 +137,10 @@ class GolemPage
 		pinned.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		pinned.add(traits, BorderLayout.NORTH);
 
-		scroll = new JScrollPane(pinned);
+		// Both tabs as tall as five traits, whatever is in them: the window is the same height for
+		// every golem, where it had grown to the longest journal it had been shown and stayed there.
+		int tabHeight = fullTraitsHeight();
+		scroll = new FixedHeight(pinned, tabHeight);
 		scroll.setBorder(BorderFactory.createEmptyBorder());
 		// Never sideways: the lines wrap to the window, so there is nothing off to the right.
 		scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -153,7 +153,7 @@ class GolemPage
 		JPanel journalPinned = new JPanel(new BorderLayout());
 		journalPinned.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		journalPinned.add(journal, BorderLayout.NORTH);
-		travels = new JScrollPane(journalPinned);
+		travels = new FixedHeight(journalPinned, tabHeight);
 		travels.setBorder(BorderFactory.createEmptyBorder());
 		travels.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		travels.getVerticalScrollBar().setUnitIncrement(16);
@@ -299,22 +299,59 @@ class GolemPage
 	}
 
 	/**
-	 * Makes the window tall enough for everything on the traits tab, as far as the screen allows. A
-	 * golem with a long list of traits opened on a window that showed half of them, the rest below
-	 * a scroll bar nobody thought to look for. Never shrinks a window the player has made bigger.
+	 * Makes the window tall enough for a golem with every trait it could have, as far as the screen
+	 * allows, and the same height for every golem. The tabs ask for that height whatever is in them,
+	 * and the record for its longest, so this does not change from one golem to the next.
 	 */
 	private void fitHeight()
 	{
 		body.revalidate();
-		// The scroll panes ask for the whole of what is in them, so this is the height with nothing
-		// scrolled away, plus the window's own edges.
 		java.awt.Insets edges = frame.getInsets();
-		int whole = body.getPreferredSize().height + edges.top + edges.bottom;
-		int wanted = Math.max(frame.getHeight(), Math.min(whole, usableHeight()));
-		if (wanted > frame.getHeight())
+		int wanted = Math.min(body.getPreferredSize().height + edges.top + edges.bottom, usableHeight());
+		if (wanted != frame.getHeight())
 		{
 			frame.setSize(frame.getWidth(), wanted);
 		}
+	}
+
+	/** A scroll pane that asks for the same height whatever it holds. */
+	private static final class FixedHeight extends JScrollPane
+	{
+		private final int height;
+
+		FixedHeight(Component view, int height)
+		{
+			super(view);
+			this.height = height;
+		}
+
+		@Override
+		public Dimension getPreferredSize()
+		{
+			return new Dimension(super.getPreferredSize().width, height);
+		}
+	}
+
+	/** The panel the traits are listed in, the page's own or one only measured. */
+	private static JPanel traitList()
+	{
+		JPanel list = new JPanel();
+		list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+		list.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		list.setBorder(BorderFactory.createEmptyBorder(8, 12, 10, 12));
+		return list;
+	}
+
+	/**
+	 * How tall the traits tab is with as many traits as a golem can have, a line apiece: laid out
+	 * and measured, so it is the page's own fonts and spacing that decide it.
+	 */
+	private static int fullTraitsHeight()
+	{
+		JPanel sample = traitList();
+		GolemTrait[] all = GolemTrait.values();
+		fillTraits(sample, java.util.Arrays.asList(all).subList(0, Math.min(GolemTrait.MOST_TRAITS, all.length)), false);
+		return sample.getPreferredSize().height;
 	}
 
 	private int usableHeight()
@@ -416,9 +453,17 @@ class GolemPage
 			String where = furthest == null ? "" : " — " + furthest;
 			line(record, "Been " + NUMBERS.format(history.getFurthest()) + " tiles from home" + where);
 		}
+		// Blank lines to the most the record can have, so every golem's heading is the same height.
+		while (record.getComponentCount() < RECORD_LINES)
+		{
+			line(record, " ");
+		}
 		record.revalidate();
 		record.repaint();
 	}
+
+	/** The most lines the record can have: alive since, walked, shortcuts, sailed, furthest. */
+	private static final int RECORD_LINES = 5;
 
 	/** One line of the record. */
 	private static void line(JPanel into, String text)
@@ -562,15 +607,21 @@ class GolemPage
 
 	private void listTraits(Golem golem)
 	{
-		traits.removeAll();
+		fillTraits(traits, GolemTrait.list(golem.getTraits()), true);
+	}
+
+	/** Lists traits into a panel: a heading, then each trait's name over its line. */
+	private static void fillTraits(JPanel into, List<GolemTrait> list, boolean wrap)
+	{
+		into.removeAll();
 		JLabel heading = new JLabel("Traits");
 		heading.setFont(FontManager.getRunescapeBoldFont().deriveFont(16f));
 		heading.setForeground(Color.WHITE);
 		heading.setAlignmentX(Component.LEFT_ALIGNMENT);
 		heading.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
-		traits.add(heading);
+		into.add(heading);
 
-		for (GolemTrait trait : GolemTrait.list(golem.getTraits()))
+		for (GolemTrait trait : list)
 		{
 			JLabel label = new JLabel(trait.getLabel());
 			label.setFont(BODY);
@@ -582,7 +633,8 @@ class GolemPage
 			line.setFont(FontManager.getRunescapeSmallFont());
 			line.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			line.setBackground(ColorScheme.DARK_GRAY_COLOR);
-			line.setLineWrap(true);
+			// Measured unwrapped: a wrapping text area not yet given a width has no height to go by.
+			line.setLineWrap(wrap);
 			line.setWrapStyleWord(true);
 			line.setEditable(false);
 			line.setFocusable(false);
@@ -595,10 +647,10 @@ class GolemPage
 			one.setAlignmentX(Component.LEFT_ALIGNMENT);
 			one.add(label, BorderLayout.NORTH);
 			one.add(line, BorderLayout.CENTER);
-			traits.add(one);
+			into.add(one);
 		}
-		traits.revalidate();
-		traits.repaint();
+		into.revalidate();
+		into.repaint();
 	}
 
 }
