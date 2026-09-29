@@ -36,6 +36,7 @@ import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.callback.RenderCallback;
 import net.runelite.client.callback.RenderCallbackManager;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.config.RuneScapeProfileType;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
@@ -712,12 +713,39 @@ public class GolemsDontDiePlugin extends Plugin
 		if (count > 0)
 		{
 			gameCount = count;
+			claimRoster(count);
 			trimToGameCount();
 		}
 	}
 
 	/** Golems the game says have been crafted, as read this session, or -1 if unread. */
 	private int gameCount = -1;
+
+	/** Config key for the account and kind of world the saved roster belongs to. */
+	private static final String ROSTER_OWNER_KEY = "rosterOwner";
+
+	/** Whether the account last seen logged in is the one the saved roster belongs to. */
+	private boolean rosterOwned;
+
+	/**
+	 * Decides whether the logged-in account owns the saved roster. The roster is kept once per
+	 * RuneLite profile, so logging into an alt or a seasonal world with fewer golems crafted
+	 * trimmed the main account's unnamed golems down to the smaller count, and saved that. The
+	 * roster now belongs to the first account and kind of world to log in with a count that
+	 * covers it, which for anyone already playing is their main; any other only watches the
+	 * golems, never trimming or saving them.
+	 */
+	private void claimRoster(int count)
+	{
+		String here = client.getAccountHash() + ":" + RuneScapeProfileType.getCurrent(client);
+		String owner = configManager.getConfiguration(GolemsDontDieConfig.GROUP, ROSTER_OWNER_KEY);
+		if (owner == null && count >= (pendingRestore.isEmpty() ? countLiving() : pendingRestore.size()))
+		{
+			configManager.setConfiguration(GolemsDontDieConfig.GROUP, ROSTER_OWNER_KEY, here);
+			owner = here;
+		}
+		rosterOwned = here.equals(owner);
+	}
 
 	/**
 	 * Removes unnamed golems beyond the number the game says were ever crafted. Any beyond it
@@ -728,7 +756,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void trimToGameCount()
 	{
-		if (gameCount <= 0 || !pendingRestore.isEmpty())
+		if (gameCount <= 0 || !pendingRestore.isEmpty() || !rosterOwned)
 		{
 			return;
 		}
@@ -2208,6 +2236,11 @@ public class GolemsDontDiePlugin extends Plugin
 		if (!pendingRestore.isEmpty())
 		{
 			log.debug("Not saving golems: {} saved golems are not restored yet", pendingRestore.size());
+			return;
+		}
+		if (!rosterOwned)
+		{
+			log.debug("Not saving golems: the roster belongs to another account or kind of world");
 			return;
 		}
 		configManager.setConfiguration(
