@@ -513,6 +513,9 @@ class Golem
 			&& (at.equals(quayside) || walkTo(quayside.getX(), quayside.getY(), context)))
 		{
 			walking = !path.isEmpty();
+			// Whatever it was walking to use is given up with the crossing.
+			queuedTransport = null;
+			queuedDock = null;
 			itinerary = RoamPlanner.stayPut(quayside, tick, ticks);
 			waiting = itinerary;
 			return;
@@ -1086,9 +1089,11 @@ class Golem
 				// A tile has just been entered, the one moment a transport roll may happen:
 				// rolling per frame would tie the behaviour to framerate, and a golem
 				// loitering near a ladder would eventually always take it. A shortcut it
-				// walked here to use comes first, having already decided.
-				if (takeQueuedTransport(context) || takeQueuedDock(context) || considerBoarding(context)
-					|| considerTransport(context))
+				// walked here to use comes first, having already decided. Never on the way to a place
+				// at a quayside, or about it: a ladder taken there left a crew waiting on a golem
+				// that had wandered off.
+				if (!isWaiting(context.getTick()) && (takeQueuedTransport(context) || takeQueuedDock(context)
+					|| considerBoarding(context) || considerTransport(context)))
 				{
 					return searched;
 				}
