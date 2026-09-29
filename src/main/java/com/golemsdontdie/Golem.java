@@ -184,6 +184,18 @@ class Golem
 		return afloat ? DECK_HEIGHT : 0;
 	}
 
+	/**
+	 * True while the golem is out of view partway along a route, where its position is only an
+	 * estimate: a point on a straight line between two of the route's tiles, drawn without looking
+	 * at the map. Nothing should judge where the golem is from it. The cut-off sweep did, and carried
+	 * a golem home from the middle of a sealed room its line merely passed over; the journal did, and
+	 * wrote that a golem walking from the Wilderness had explored the Castle Wars tunnels.
+	 */
+	boolean isEstimated(int tick)
+	{
+		return tier == GolemTier.FAR && itinerary != null && !itinerary.isFinished(tick);
+	}
+
 	/** True while the golem is on a crossing: afloat, or waiting out a passage. */
 	boolean isSailing(int tick)
 	{

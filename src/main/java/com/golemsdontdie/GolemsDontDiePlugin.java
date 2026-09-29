@@ -2183,8 +2183,11 @@ public class GolemsDontDiePlugin extends Plugin
 
 	private void sendHomeIfCutOff(Golem golem)
 	{
+		// Nor one out of view partway along a route, whose position is only an estimate; it is
+		// judged when it gets where it was going.
 		if (golem.isDying() || golem.inTransition() || golem.isAboard()
-			|| golem.isSailing(roamContext.getTick()) || golem.isInInstance())
+			|| golem.isSailing(roamContext.getTick()) || golem.isInInstance()
+			|| golem.isEstimated(roamContext.getTick()))
 		{
 			return;
 		}
@@ -3185,6 +3188,11 @@ public class GolemsDontDiePlugin extends Plugin
 					continue;
 				}
 				WorldPoint at = golem.currentTile();
+				if (golem.isEstimated(roamContext.getTick()))
+				{
+					golem.getHistory().passing(at.getX(), at.getY());
+					continue;
+				}
 				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome(), placeNames);
 			}
 		}

@@ -328,6 +328,25 @@ class GolemHistory
 	}
 
 	/**
+	 * Notes ground covered by a golem out of view partway along a route, whose position is only an
+	 * estimate: the distance counts, but nowhere is arrived at and nothing is the furthest from home.
+	 * See Golem.isEstimated.
+	 */
+	void passing(int x, int y)
+	{
+		if (lastX != 0)
+		{
+			int step = span(x - lastX, y - lastY);
+			if (step <= WALKED_AT_MOST)
+			{
+				walked += step;
+			}
+		}
+		lastX = x;
+		lastY = y;
+	}
+
+	/**
 	 * Notes where the golem is now. Called for every golem on the census pass, so it is a handful
 	 * of comparisons and nothing else.
 	 */
