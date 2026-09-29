@@ -87,6 +87,12 @@ class GolemHistory
 
 	private int[] journal;
 
+	/** When each entry was written, in minutes since the epoch: what "an hour ago" is worked out from. */
+	private int[] when;
+
+	/** The name of the place the last entry was written for, so walking about inside it writes nothing. */
+	private String lastPlace;
+
 	/** Where the last entry went, so the ring can be read back in order. */
 	private int written;
 
@@ -120,7 +126,7 @@ class GolemHistory
 	 * costs a comparison for the golems that have not moved region, which is nearly all of them
 	 * nearly always.
 	 */
-	private void note(int x, int y, int plane)
+	private void note(int x, int y, int plane, PlaceNames names)
 	{
 		int region = (x >> 6) << 8 | (y >> 6);
 		if (region == lastRegion)
@@ -141,18 +147,34 @@ class GolemHistory
 			? GolemTravel.EXPLORED : manner;
 		manner = GolemTravel.WALKED;
 
+		// By name, as the page shows it: a place is several regions, and walking from one into the
+		// next wrote "Walked to Wyrmscraig" over and over. A walk to where the last entry already
+		// is, or to somewhere with no name to write, is not a journey; a climb or a crossing is.
+		if (names != null)
+		{
+			String place = names.nameFor((region >> 8) * 64 + 32, (region & 0xff) * 64 + 32, plane);
+			boolean walked = how == GolemTravel.WALKED || how == GolemTravel.EXPLORED;
+			if (place == null || walked && place.equals(lastPlace))
+			{
+				return;
+			}
+			lastPlace = place;
+		}
+
 		if (journal == null)
 		{
 			journal = new int[KEPT];
+			when = new int[KEPT];
 			Arrays.fill(journal, -1);
 		}
 		journal[written % KEPT] = region << 6 | (plane & 3) << 4 | how.ordinal();
+		when[written % KEPT] = (int) (System.currentTimeMillis() / 60_000L);
 		written++;
 	}
 
 	/**
-	 * The journal, newest first: region, plane and manner, three to an entry. Empty for a golem
-	 * that has not been anywhere yet.
+	 * The journal, newest first: region, plane, manner and the minute it was written, four to an
+	 * entry. Empty for a golem that has not been anywhere yet.
 	 */
 	int[][] travels()
 	{
@@ -166,7 +188,8 @@ class GolemHistory
 			int packed = journal[Math.floorMod(written - i, KEPT)];
 			if (packed >= 0)
 			{
-				out.add(new int[]{packed >>> 6, packed >>> 4 & 3, packed & 15});
+				out.add(new int[]{packed >>> 6, packed >>> 4 & 3, packed & 15,
+					when[Math.floorMod(written - i, KEPT)]});
 			}
 		}
 		return out.toArray(new int[0][]);
@@ -187,7 +210,13 @@ class GolemHistory
 	 */
 	void sample(int x, int y, int plane, WorldPoint home)
 	{
-		note(x, y, plane);
+		sample(x, y, plane, home, null);
+	}
+
+	/** @param names what places are called, to keep walks about one place out of the journal */
+	void sample(int x, int y, int plane, WorldPoint home, PlaceNames names)
+	{
+		note(x, y, plane, names);
 		if (lastX != 0)
 		{
 			int step = span(x - lastX, y - lastY);

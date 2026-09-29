@@ -152,4 +152,25 @@ class PlaceNames
 		}
 		return nearest;
 	}
+
+	/**
+	 * The nearest map label however far off, for somewhere nothing names: "near" it is still an
+	 * answer, where "somewhere unmapped" was none. A label on the same floor is preferred.
+	 */
+	String nearest(int x, int y, int plane)
+	{
+		String nearest = null;
+		int best = Integer.MAX_VALUE;
+		for (int i = 0; i < labels.length; i++)
+		{
+			int[] label = labels[i];
+			int score = span(label[0] - x, label[1] - y) + (label[2] == plane ? 0 : LABEL_REACH);
+			if (score < best)
+			{
+				best = score;
+				nearest = labelNames[i];
+			}
+		}
+		return nearest;
+	}
 }

@@ -46,19 +46,32 @@ class GolemListPanel extends PluginPanel
 	 * blurred fourteen pixels. Painting into the graphics it is given puts the lines wherever the
 	 * scale asks for them.
 	 */
-	private static final Icon INFO = new Drawn(false);
-	private static final Icon TARGET = new Drawn(true);
+	private static final Icon INFO = new Drawn(Drawn.INFO);
+	private static final Icon TARGET = new Drawn(Drawn.TARGET);
+	private static final Icon REMOVE = new Drawn(Drawn.REMOVE);
 
-	/** An (i) in a ring, or a ring with a cross through it. */
+	/**
+	 * An (i) in a ring, a ring with a cross through it, or an X: the three buttons of a row.
+	 *
+	 * <p>Thirteen pixels, not fourteen, so there is a middle pixel to centre on: in fourteen the
+	 * middle is a line between two pixels, and a one-pixel stroke down it was pushed to one side.
+	 * Every shape here is centred on 6.5, the middle of pixel six, with strokes on pixel centres.
+	 * The X was a character of the font, at the font's size and on its baseline, and it is drawn
+	 * now like the others.
+	 */
 	private static final class Drawn implements Icon
 	{
-		private static final int SIZE = 14;
+		static final int INFO = 0;
+		static final int TARGET = 1;
+		static final int REMOVE = 2;
 
-		private final boolean target;
+		private static final int SIZE = 13;
 
-		private Drawn(boolean target)
+		private final int kind;
+
+		private Drawn(int kind)
 		{
-			this.target = target;
+			this.kind = kind;
 		}
 
 		@Override
@@ -81,21 +94,27 @@ class GolemListPanel extends PluginPanel
 			drawing.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 			drawing.translate(x, y);
 			drawing.setColor(ColorScheme.LIGHT_GRAY_COLOR);
-			drawing.setStroke(new BasicStroke(1.4f));
-			if (target)
+			drawing.setStroke(new BasicStroke(1f));
+			switch (kind)
 			{
-				// A ring with a cross through it: what the hint arrow does at the other end.
-				drawing.draw(new Ellipse2D.Float(3.5f, 3.5f, SIZE - 7f, SIZE - 7f));
-				drawing.draw(new Line2D.Float(SIZE / 2f, 0.5f, SIZE / 2f, 2.5f));
-				drawing.draw(new Line2D.Float(SIZE / 2f, SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f));
-				drawing.draw(new Line2D.Float(0.5f, SIZE / 2f, 2.5f, SIZE / 2f));
-				drawing.draw(new Line2D.Float(SIZE - 2.5f, SIZE / 2f, SIZE - 0.5f, SIZE / 2f));
-			}
-			else
-			{
-				drawing.draw(new Ellipse2D.Float(0.7f, 0.7f, SIZE - 2.4f, SIZE - 2.4f));
-				drawing.fill(new Ellipse2D.Float(SIZE / 2f - 0.9f, 3f, 1.8f, 1.8f));
-				drawing.fill(new Rectangle2D.Float(SIZE / 2f - 0.8f, 6f, 1.6f, 5f));
+				case TARGET:
+					// A ring with a cross through it: what the hint arrow does at the other end.
+					drawing.draw(new Ellipse2D.Float(3f, 3f, 7f, 7f));
+					drawing.draw(new Line2D.Float(6.5f, 0f, 6.5f, 2f));
+					drawing.draw(new Line2D.Float(6.5f, 11f, 6.5f, 13f));
+					drawing.draw(new Line2D.Float(0f, 6.5f, 2f, 6.5f));
+					drawing.draw(new Line2D.Float(11f, 6.5f, 13f, 6.5f));
+					break;
+				case REMOVE:
+					drawing.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+					drawing.draw(new Line2D.Float(3.5f, 3.5f, 9.5f, 9.5f));
+					drawing.draw(new Line2D.Float(9.5f, 3.5f, 3.5f, 9.5f));
+					break;
+				default:
+					drawing.draw(new Ellipse2D.Float(0.5f, 0.5f, 12f, 12f));
+					drawing.fill(new Rectangle2D.Float(6f, 3f, 1f, 1f));
+					drawing.fill(new Rectangle2D.Float(6f, 5f, 1f, 5f));
+					break;
 			}
 			drawing.dispose();
 		}
@@ -468,6 +487,7 @@ class GolemListPanel extends PluginPanel
 			}
 		}
 
+		boolean built = false;
 		for (int i = 0; i < wantedRows.size(); i++)
 		{
 			Golem golem = wantedRows.get(i);
@@ -476,6 +496,7 @@ class GolemListPanel extends PluginPanel
 			{
 				row = row(golem);
 				shown.put(golem, row);
+				built = true;
 				rows.add(row.component, Math.min(i, rows.getComponentCount()));
 			}
 			else if (i >= rows.getComponentCount() || rows.getComponent(i) != row.component)
@@ -483,6 +504,11 @@ class GolemListPanel extends PluginPanel
 				rows.remove(row.component);
 				rows.add(row.component, Math.min(i, rows.getComponentCount()));
 			}
+		}
+
+		if (built)
+		{
+			onPlacesWanted.run();
 		}
 
 		paging.setVisible(pages > 1);
@@ -531,6 +557,7 @@ class GolemListPanel extends PluginPanel
 				int away = i < distance.size() ? distance.get(i) : -1;
 				String said = away < 0 ? places.get(i)
 					: TILES.format(away) + " tiles away · " + places.get(i);
+				lastSaid.put(golems.get(i), said);
 				if (!row.place.getText().equals(said))
 				{
 					row.place.setText(said);
@@ -543,6 +570,16 @@ class GolemListPanel extends PluginPanel
 	}
 
 	private static final NumberFormat TILES = NumberFormat.getIntegerInstance();
+
+	/**
+	 * What each golem's place line last said, so a row built again, on turning the page or
+	 * searching, says it at once rather than standing blank until the next update.
+	 */
+	private final Map<Golem, String> lastSaid = new WeakHashMap<>();
+
+	/** Asked for when new rows appear, so their places are worked out on the next tick. */
+	@lombok.Setter
+	private Runnable onPlacesWanted = () -> { };
 
 	/** Shows or hides the bar offering to stop pointing at a golem. */
 	void setFinding(String name)
@@ -624,9 +661,10 @@ class GolemListPanel extends PluginPanel
 		panel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 6));
 		panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
 
-		// Where the golem is, under its name. Empty until the first update, so a row does not
-		// jump in height the moment the panel is opened.
-		JLabel place = new JLabel(" ");
+		// Where the golem is, under its name: what it last said, or blank until the first update,
+		// so a row does not jump in height the moment the panel is opened.
+		String before = lastSaid.get(golem);
+		JLabel place = new JLabel(before == null ? " " : before);
 		place.setFont(FontManager.getRunescapeSmallFont());
 		place.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		place.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 0));
@@ -691,13 +729,11 @@ class GolemListPanel extends PluginPanel
 		page.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
 		page.addActionListener(e -> onOpen.accept(golem));
 
-		JButton remove = new JButton("✕");
+		JButton remove = new JButton(REMOVE);
 		remove.setToolTipText("Remove this golem");
-		remove.setFont(ROW);
 		remove.setFocusPainted(false);
 		remove.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		remove.setForeground(Color.LIGHT_GRAY);
-		remove.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+		remove.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
 		remove.addActionListener(e -> onRemove.accept(golem));
 		JPanel buttons = new JPanel(new BorderLayout(2, 0));
 		buttons.setBackground(ColorScheme.DARKER_GRAY_COLOR);

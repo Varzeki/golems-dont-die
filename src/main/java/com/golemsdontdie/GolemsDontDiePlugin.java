@@ -348,6 +348,9 @@ public class GolemsDontDiePlugin extends Plugin
 
 	private int ticksSincePlaces;
 
+	/** Set from the Swing thread when the list has built rows with no place yet. */
+	private volatile boolean placesWanted;
+
 	private int placesSinceOrder;
 
 	/**
@@ -573,6 +576,7 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext.setCensus(census);
 		roamContext.setClimates(climates);
 		roamContext.setTraversals(obstacleData::golemCrossed);
+		roamContext.setMuster(crews::offer);
 		roamContext.setModels(modelFactory);
 
 		pendingRestore.addAll(store.deserialise(
@@ -614,6 +618,7 @@ public class GolemsDontDiePlugin extends Plugin
 					clientThread.invoke(() -> dressPage(open, golem));
 				}
 			});
+		panel.setOnPlacesWanted(() -> placesWanted = true);
 		// Swing throughout, and it only reads the golem it is given: see GolemPage.
 		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), names, placeNames);
 		menu.setOnInfo(golem ->
@@ -1014,7 +1019,9 @@ public class GolemsDontDiePlugin extends Plugin
 		routedTo = at;
 		routedAt = tick;
 		Map<String, Object> data = new HashMap<>();
-		data.put("target", at);
+		// Onto ground: a golem a tile out on the water, or on the rocks at its edge, is a target
+		// Shortest Path can only reach by way of the sea.
+		data.put("target", roamPlanner.snapToMesh(at));
 		eventBus.post(new PluginMessage(SHORTEST_PATH, SHORTEST_PATH_ROUTE, data));
 	}
 
@@ -1077,6 +1084,12 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			panel.setFinding(finding == null ? null
 				: names.of(finding) != null ? names.of(finding) : "that golem");
+		}
+		GolemPage open = page;
+		Golem target = finding;
+		if (open != null)
+		{
+			SwingUtilities.invokeLater(() -> open.setFinding(target));
 		}
 		pointAtGolem();
 	}
@@ -2256,6 +2269,9 @@ public class GolemsDontDiePlugin extends Plugin
 	private static final float GREET_CHANCE = 0.05f;
 	private static final int GREET_TICKS = 4;
 
+	/** Ticks after a friendly golem's wave before it may wave again: six seconds. */
+	private static final int GREET_GAP_TICKS = 10;
+
 	/** The last tick the golems were asked whether they felt sociable. */
 	private int lastSocialTick = -1;
 
@@ -2393,7 +2409,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		if (playerAt != null && GolemTrait.FRIENDLY.in(golem.getTraits())
-			&& moods.nextFloat() < GREET_CHANCE)
+			&& golem.mayGreetAgain(tick, GREET_GAP_TICKS) && moods.nextFloat() < GREET_CHANCE)
 		{
 			WorldPoint at = golem.currentTile();
 			if (at.getPlane() == playerAt.getPlane() && at.distanceTo2D(playerAt) <= GREET_TILES)
@@ -2794,9 +2810,10 @@ public class GolemsDontDiePlugin extends Plugin
 		GolemPage open = page;
 		boolean listing = list != null && list.isOnScreen();
 		boolean pageOpen = open != null && open.isOpen();
-		if ((listing || pageOpen) && ++ticksSincePlaces >= PLACES_TICKS)
+		if ((listing || pageOpen) && (++ticksSincePlaces >= PLACES_TICKS || placesWanted))
 		{
 			ticksSincePlaces = 0;
+			placesWanted = false;
 			if (listing)
 			{
 				placeListed(list);
@@ -2830,7 +2847,7 @@ public class GolemsDontDiePlugin extends Plugin
 					continue;
 				}
 				WorldPoint at = golem.currentTile();
-				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome());
+				golem.getHistory().sample(at.getX(), at.getY(), at.getPlane(), golem.getHome(), placeNames);
 			}
 		}
 

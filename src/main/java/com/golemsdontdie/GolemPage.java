@@ -43,6 +43,9 @@ class GolemPage
 	private final JPanel journal = new JPanel();
 	private final JButton find = new JButton("Find");
 
+	/** The golem the plugin is pointing at, if any: its page's button stops rather than starts. */
+	private Golem finding;
+
 	/** The scrolling part, so a page opened on another golem starts at the top of it. */
 	private final JScrollPane scroll;
 
@@ -121,7 +124,7 @@ class GolemPage
 
 		traits.setLayout(new BoxLayout(traits, BoxLayout.Y_AXIS));
 		traits.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		traits.setBorder(BorderFactory.createEmptyBorder(0, 12, 10, 12));
+		traits.setBorder(BorderFactory.createEmptyBorder(8, 12, 10, 12));
 
 		// The traits are pinned to the top of a panel of their own. In the scroll pane directly,
 		// the list is given the whole height of the window and shares the slack out between the
@@ -273,6 +276,7 @@ class GolemPage
 			: suggested != null ? suggested : "Unnamed golem");
 		place.setText(" ");
 		find.setEnabled(true);
+		labelFind();
 		picture.setIcon(null);
 		listRecord(golem);
 		listTraits(golem);
@@ -286,11 +290,56 @@ class GolemPage
 		{
 			frame = window(beside);
 		}
+		fitHeight();
 		if (!frame.isVisible())
 		{
 			frame.setLocationRelativeTo(frame.getOwner());
 		}
 		frame.setVisible(true);
+	}
+
+	/**
+	 * Makes the window tall enough for everything on the traits tab, as far as the screen allows. A
+	 * golem with a long list of traits opened on a window that showed half of them, the rest below
+	 * a scroll bar nobody thought to look for. Never shrinks a window the player has made bigger.
+	 */
+	private void fitHeight()
+	{
+		body.revalidate();
+		// The scroll panes ask for the whole of what is in them, so this is the height with nothing
+		// scrolled away, plus the window's own edges.
+		java.awt.Insets edges = frame.getInsets();
+		int whole = body.getPreferredSize().height + edges.top + edges.bottom;
+		int wanted = Math.max(frame.getHeight(), Math.min(whole, usableHeight()));
+		if (wanted > frame.getHeight())
+		{
+			frame.setSize(frame.getWidth(), wanted);
+		}
+	}
+
+	private int usableHeight()
+	{
+		java.awt.GraphicsConfiguration screen = frame.getGraphicsConfiguration();
+		if (screen == null)
+		{
+			return 700;
+		}
+		java.awt.Insets taskbar = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(screen);
+		return screen.getBounds().height - taskbar.top - taskbar.bottom - 40;
+	}
+
+	/** Tells the page which golem is being found, so its button reads Find or Stop finding. */
+	void setFinding(Golem target)
+	{
+		finding = target;
+		labelFind();
+	}
+
+	private void labelFind()
+	{
+		boolean stopping = finding != null && finding == showing;
+		find.setText(stopping ? "Stop finding" : "Find");
+		find.setToolTipText(stopping ? "Stop pointing at this golem" : "Point at this golem until you reach it");
 	}
 
 	/** Whether the page is open, so the plugin only works out a whereabouts line when it is. */
@@ -434,6 +483,14 @@ class GolemPage
 			return;
 		}
 
+		JLabel order = new JLabel("Newest first");
+		order.setFont(FontManager.getRunescapeSmallFont());
+		order.setForeground(ColorScheme.LIGHT_GRAY_COLOR.darker());
+		order.setAlignmentX(Component.LEFT_ALIGNMENT);
+		order.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+		journal.add(order);
+
+		int now = (int) (System.currentTimeMillis() / 60_000L);
 		for (int[] entry : entries)
 		{
 			int region = entry[0];
@@ -473,10 +530,34 @@ class GolemPage
 			row.setBackground(ColorScheme.DARK_GRAY_COLOR);
 			row.setAlignmentX(Component.LEFT_ALIGNMENT);
 			row.add(line, BorderLayout.CENTER);
+			JLabel ago = new JLabel(ago(now - entry[3]));
+			ago.setFont(FontManager.getRunescapeSmallFont());
+			ago.setForeground(ColorScheme.LIGHT_GRAY_COLOR.darker());
+			ago.setVerticalAlignment(JLabel.TOP);
+			ago.setBorder(BorderFactory.createEmptyBorder(2, 8, 0, 0));
+			row.add(ago, BorderLayout.EAST);
 			journal.add(row);
 		}
 		journal.revalidate();
 		journal.repaint();
+	}
+
+	/** How long ago, for a journal entry, from minutes. */
+	private static String ago(int minutes)
+	{
+		if (minutes < 1)
+		{
+			return "just now";
+		}
+		if (minutes < 60)
+		{
+			return minutes + "m ago";
+		}
+		if (minutes < 60 * 24)
+		{
+			return minutes / 60 + "h ago";
+		}
+		return minutes / (60 * 24) + "d ago";
 	}
 
 	private void listTraits(Golem golem)

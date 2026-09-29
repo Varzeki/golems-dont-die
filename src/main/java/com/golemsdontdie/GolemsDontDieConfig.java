@@ -74,9 +74,11 @@ public interface GolemsDontDieConfig extends Config
 	/** Which golems are drawn on the world map. */
 	enum MapGolems
 	{
-		NONE("None"),
-		NAMED("Named and starred golems"),
-		ALL("All golems");
+		// Short, because the settings panel sizes the box to its longest choice and takes the room
+		// out of the setting's name: "Named and starred golems" left the name reading "On t...".
+		NONE("Off"),
+		NAMED("Named"),
+		ALL("All");
 
 		private final String label;
 
@@ -94,9 +96,10 @@ public interface GolemsDontDieConfig extends Config
 
 	@ConfigItem(
 		keyName = "mapGolems",
-		name = "On the world map",
-		description = "Shows golems on the world map. A named golem wears its name; hover any of them "
-			+ "to see where it is. Golems close together on the map are drawn as one face with a count.",
+		name = "World map",
+		description = "Shows golems on the world map. Named: golems you have named or starred. All: "
+			+ "every golem. A named golem wears its name; hover any of them to see where it is. Golems "
+			+ "close together on the map are drawn as one face with a count.",
 		section = golemsSection,
 		position = 5
 	)

@@ -28,6 +28,13 @@ final class RoamContext
 	@Setter
 	private ObstacleIndex obstacles;
 
+	/**
+	 * Asked about a golem that is about to cast off alone: true if it has been kept at the quayside
+	 * to wait for a crew instead. See GolemCrews.offer. Null in tools with no crews.
+	 */
+	@Setter
+	private BiPredicate<Golem, RoamContext> muster;
+
 	/** Where every golem is, by region, so golems spread out. Null in tools that do not count. */
 	@Setter
 	private GolemCensus census;

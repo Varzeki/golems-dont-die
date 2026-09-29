@@ -45,12 +45,37 @@ class Whereabouts
 		String place = places.nameFor(at);
 		if (place == null)
 		{
-			return golem.getPlane() > 0 ? "Somewhere upstairs" : "Somewhere unmapped";
+			return unnamed(at);
 		}
 		if (golem.isInInstance())
 		{
 			return "Inside " + place;
 		}
 		return golem.getPlane() > 0 ? place + ", upstairs" : place;
+	}
+
+	/**
+	 * Somewhere no place name reaches: near the nearest one, or beneath the ground above a cave.
+	 * "Somewhere unmapped" said nothing a player could go looking with.
+	 */
+	private String unnamed(WorldPoint at)
+	{
+		String upstairs = at.getPlane() > 0 ? ", upstairs" : "";
+		if (WorldLayout.isCave(at.getY()))
+		{
+			int above = WorldLayout.groundAbove(at.getY());
+			String over = above < 0 ? null : places.nameFor(at.getX(), above, 0);
+			if (over == null && above >= 0)
+			{
+				over = places.nearest(at.getX(), above, 0);
+			}
+			if (over != null)
+			{
+				return "Beneath " + over;
+			}
+		}
+		String near = places.nearest(at.getX(), at.getY(), at.getPlane());
+		return near != null ? "Near " + near + upstairs
+			: at.getPlane() > 0 ? "Somewhere upstairs" : "Somewhere unmapped";
 	}
 }

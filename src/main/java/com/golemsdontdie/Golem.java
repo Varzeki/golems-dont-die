@@ -502,6 +502,35 @@ class Golem
 	}
 
 	/**
+	 * As {@link #waitAshore(int, int, WorldPoint)}, but a golem in view already on the quay walks
+	 * the few tiles to its place there rather than being put on it, which was a jump of a tile.
+	 */
+	void waitAshore(int tick, int ticks, WorldPoint quayside, RoamContext context)
+	{
+		WorldPoint at = currentTile();
+		if (context != null && renderer != null && !inTransition() && at.getPlane() == quayside.getPlane()
+			&& span(quayside.getX() - at.getX(), quayside.getY() - at.getY()) <= WALK_TO_WAIT
+			&& (at.equals(quayside) || walkTo(quayside.getX(), quayside.getY(), context)))
+		{
+			walking = !path.isEmpty();
+			itinerary = RoamPlanner.stayPut(quayside, tick, ticks);
+			waiting = itinerary;
+			return;
+		}
+		waitAshore(tick, ticks, quayside);
+	}
+
+	/** True while the golem is on a wait at a quayside, for a crew to make up around it. */
+	private boolean isWaiting(int tick)
+	{
+		return itinerary != null && itinerary == waiting && tick >= itinerary.getStartTick()
+			&& !itinerary.isFinished(tick);
+	}
+
+	/** How far a golem walks to its place at a quayside rather than being put there. */
+	private static final int WALK_TO_WAIT = 4;
+
+	/**
 	 * The wait at a quayside this golem is on, if any. In view a route that is not a crossing is
 	 * dropped, and a wait is not one, so without this a golem in sight wandered off the quay the
 	 * frame after it was stood there, and never sailed while anyone watched.
@@ -542,6 +571,21 @@ class Golem
 	 * Takes on a plan, and keeps the tally with it: a voyage is only ever known about here, the
 	 * planner having worked it out for a golem it was handed the memory of and not the golem.
 	 */
+	/**
+	 * Takes a route, unless it is a crossing and the crews want the golem waiting at the quayside
+	 * for company first. Asked before casting off rather than after: held once it had, a golem in
+	 * view got into its raft and was pulled back out of it onto the quay.
+	 */
+	private void embark(Itinerary plan, RoamContext context)
+	{
+		if (plan != null && plan.isVoyage() && !crewed && context != null && context.getMuster() != null
+			&& context.getMuster().test(this, context))
+		{
+			return;
+		}
+		adopt(plan);
+	}
+
 	private void adopt(Itinerary plan)
 	{
 		itinerary = plan;
@@ -633,7 +677,7 @@ class Golem
 			{
 				return true;
 			}
-			adopt(planner.plan(currentTile(), context.getTick(), random, transportMemory, context));
+			embark(planner.plan(currentTile(), context.getTick(), random, transportMemory, context), context);
 			return true;
 		}
 
@@ -780,7 +824,7 @@ class Golem
 			return false;
 		}
 
-		adopt(planner.plan(at, tick, random, transportMemory, context));
+		embark(planner.plan(at, tick, random, transportMemory, context), context);
 		if (itinerary == null)
 		{
 			// Nowhere found: stand a moment before looking again. See RoamPlanner.idle.
@@ -876,14 +920,16 @@ class Golem
 				followItinerary(cycles, context);
 				return false;
 			}
-			if (itinerary == waiting && context.getTick() >= itinerary.getStartTick()
-				&& !itinerary.isFinished(context.getTick()))
+			if (!isWaiting(context.getTick()))
+			{
+				itinerary = null;
+			}
+			else if (path.isEmpty())
 			{
 				walking = false;
 				turnToward(cycles);
 				return false;
 			}
-			itinerary = null;
 		}
 
 		turnToward(cycles);
@@ -910,7 +956,8 @@ class Golem
 				{
 					walking = false;
 					// And it goes nowhere else until it is done: not even a shortcut under its nose.
-					if (stopping)
+					// Nor does a golem that has walked to its place at a quayside to wait for a crew.
+					if (stopping || isWaiting(context.getTick()))
 					{
 						return searched;
 					}
@@ -1096,7 +1143,7 @@ class Golem
 
 		path.clear();
 		stepping = false;
-		adopt(crossing);
+		embark(crossing, context);
 		return true;
 	}
 
@@ -1434,7 +1481,7 @@ class Golem
 		}
 		path.clear();
 		stepping = false;
-		adopt(crossing);
+		embark(crossing, context);
 		return true;
 	}
 
@@ -2282,6 +2329,16 @@ class Golem
 	boolean isGreeting(int tick)
 	{
 		return tick < greetUntil && greetUntil - tick <= MOST_MOMENT_TICKS;
+	}
+
+	/**
+	 * True if the last wave ended at least {@code gap} ticks ago, or there was none. A friendly
+	 * golem rolls to wave every tick the player is near, and without a gap it waved, stopped for a
+	 * tick and waved again. Read against a clock that went backwards, the gap is simply over.
+	 */
+	boolean mayGreetAgain(int tick, int gap)
+	{
+		return greetUntil == 0 || tick < greetUntil - MOST_MOMENT_TICKS || tick - greetUntil >= gap;
 	}
 
 	void nextDanceMove()

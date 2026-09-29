@@ -141,8 +141,53 @@ class GolemCrews
 		}
 		// Put back on the quayside rather than left where it stands. Crossings begin between game
 		// ticks and this runs on one, so by now the golem is a tile or two out on the water, and
-		// standing it there would leave it on the sea until the watchdog fetched it back. On a tile
-		// of its own: the whole crew stood on the one quayside tile, one inside another.
+		// standing it there would leave it on the sea until the watchdog fetched it back.
+		golem.waitAshore(tick, MUSTER_TICKS, placeFor(golem, muster));
+		// The crossing it gave up booked shore leave for its whole length; without this the golem
+		// could not sail again for as long as the voyage it is not taking would have lasted.
+		golem.getTransportMemory().clearShoreLeave();
+		sailing.put(golem, false);
+	}
+
+	/**
+	 * A golem about to cast off alone, asked first: kept at the quayside to wait for company
+	 * instead, unless it has only just waited here and nobody came. Asked before it sails rather
+	 * than caught after, when a golem in view was already in its raft and was pulled out of it.
+	 * {@link #hold} still catches a crossing begun some way this does not see.
+	 *
+	 * @return true if the golem is waiting now, its own crossing given up
+	 */
+	boolean offer(Golem golem, RoamContext context)
+	{
+		int tick = context.getTick();
+		Integer let = released.get(golem);
+		if (golem.isAboard() || let != null && tick >= let && tick - let < MUSTER_TICKS)
+		{
+			return false;
+		}
+		SailingDocks.Dock dock = voyage == null ? null : voyage.dockAt(golem.currentTile(), QUAYSIDE);
+		if (dock == null || dock.getShore() == null)
+		{
+			return false;
+		}
+		Muster muster = mustering.computeIfAbsent(dock.getRowId(), id -> new Muster(dock, tick));
+		if (!muster.waiting.contains(golem))
+		{
+			muster.waiting.add(golem);
+		}
+		golem.waitAshore(tick, MUSTER_TICKS, placeFor(golem, muster), context);
+		// Planning the crossing booked shore leave for its whole length.
+		golem.getTransportMemory().clearShoreLeave();
+		sailing.put(golem, false);
+		return true;
+	}
+
+	/**
+	 * Where on the quayside a golem waits: a tile of its own, near the dock's. The whole crew stood
+	 * on the one quayside tile, one inside another.
+	 */
+	private WorldPoint placeFor(Golem golem, Muster muster)
+	{
 		Set<Long> taken = new HashSet<>();
 		for (Golem other : muster.waiting)
 		{
@@ -152,11 +197,7 @@ class GolemCrews
 				taken.add(RoamContext.tileKey(there.getX(), there.getY(), there.getPlane()));
 			}
 		}
-		golem.waitAshore(tick, MUSTER_TICKS, planner.freeTileNear(dock.getShore(), taken));
-		// The crossing it gave up booked shore leave for its whole length; without this the golem
-		// could not sail again for as long as the voyage it is not taking would have lasted.
-		golem.getTransportMemory().clearShoreLeave();
-		sailing.put(golem, false);
+		return planner.freeTileNear(muster.dock.getShore(), taken);
 	}
 
 	/** Makes up the crews that are ready, and lets go of the ones nobody joined. */
