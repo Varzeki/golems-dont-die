@@ -1372,10 +1372,12 @@ public class GolemsDontDiePlugin extends Plugin
 
 		for (int i = 0; i < missing; i++)
 		{
+			// Off one plinth or the other, where a crafted golem steps off; home is the same.
+			WorldPoint from = GolemContent.REVIVE_TILES[moods.nextInt(GolemContent.REVIVE_TILES.length)];
 			GolemSnapshot snapshot = GolemSnapshot.restore(
 				client, GolemContent.GOLEM_NPC_ID,
 				GolemContent.GOLEM_IDLE_ANIMATION, GolemContent.GOLEM_WALK_ANIMATION, -1,
-				plinth, 0);
+				from, 0);
 			if (snapshot == null)
 			{
 				log.debug("Cannot revive golems: npc {} not in cache", GolemContent.GOLEM_NPC_ID);
@@ -1384,9 +1386,9 @@ public class GolemsDontDiePlugin extends Plugin
 
 			// Seeded off a counter as well as the tile, so a batch revived onto one square
 			// does not walk away in lockstep.
-			long seed = uniqueSeed(((long) plinth.getX() << 32) ^ ((long) plinth.getY() << 8)
+			long seed = uniqueSeed(((long) from.getX() << 32) ^ ((long) from.getY() << 8)
 				^ ((golems.size() + i) * 0x9E3779B9L));
-			golems.add(Golem.onTile(snapshot, plinth, seed, plinth));
+			golems.add(Golem.onTile(snapshot, plinth, seed, from));
 			revived++;
 		}
 
@@ -1988,7 +1990,7 @@ public class GolemsDontDiePlugin extends Plugin
 	/**
 	 * Moves a golem that has stopped getting anywhere. The watchdog on {@link Golem} decides
 	 * <em>whether</em>; this decides <em>where</em>, because only the plugin has the mesh. The
-	 * golem goes to the nearest tile it could walk out of, or home to the plinth, which always
+	 * golem goes to the nearest tile it could walk out of, or home to the tent by the plinth, which always
 	 * exists and is always walkable. Moved, never replaced: same name, id, seed and gait.
 	 * Allowed even on screen, since a golem frozen in scenery is worse than one that slides.
 	 */
@@ -2050,7 +2052,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			// The mesh says this tile is fine, so the golem is stuck for a reason the map
 			// cannot see; home is the fallback that cannot fail.
-			safe = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
+			safe = GolemContent.RECOVERY;
 		}
 
 		log.debug("Rescuing stuck golem {} from {} to {} (tier {})",
@@ -2123,7 +2125,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * missing piece can strand whole countries: measured against the shipped tables alone, with
 	 * no docks to sail between them, ninety-nine per cent of the world's standable ground came
 	 * out unreachable — Varrock and Falador included. A world that answers like that is a world
-	 * the plugin has misread, and emptying it into the plinth would be the worst of the two
+	 * the plugin has misread, and emptying it onto the island would be the worst of the two
 	 * mistakes. So the sweep counts first and moves nobody.
 	 */
 	private static final float MOST_CUT_OFF = 0.25f;
@@ -2203,16 +2205,15 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		WorldPoint at = golem.currentTile();
-		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		log.debug("Golem {} was {} at {}; brought home", golem.getId(),
 			pocket ? "shut in a pocket" : "cut off", at);
-		golem.relocate(plinth);
+		golem.relocate(GolemContent.RECOVERY);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
 	}
 
 	/**
-	 * Puts a golem back on the plinth if it is anywhere but home, for "Restrict Golem ambition".
+	 * Puts a golem back home if it is anywhere but home, for "Restrict Golem ambition".
 	 * By region, which is all home is: the island, its caves and its upper floors are regions,
 	 * and an instance is simulated at its template.
 	 */
@@ -2226,9 +2227,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		WorldPoint at = golem.currentTile();
-		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
-		golem.relocate(plinth);
+		golem.relocate(GolemContent.RECOVERY);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
 	}
@@ -2805,7 +2804,7 @@ public class GolemsDontDiePlugin extends Plugin
 	/** Whether a golem is doing nothing that a wave would interrupt. */
 	private static boolean freeToWave(Golem golem, int tick)
 	{
-		return !golem.isDying() && !golem.isDancing() && !golem.isGreeting(tick) && !golem.isPartying(tick)
+		return !golem.isDying() && !golem.isDancing() && !golem.isMidMove() && !golem.isGreeting(tick) && !golem.isPartying(tick)
 			&& !golem.inTransition() && !golem.isSailing(tick) && !golem.isAboard();
 	}
 

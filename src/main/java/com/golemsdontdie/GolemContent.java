@@ -1,5 +1,7 @@
 package com.golemsdontdie;
 
+import net.runelite.api.coords.WorldPoint;
+
 /**
  * Golem Crafting identifiers, harvested once from the game cache and fixed here.
  *
@@ -83,6 +85,22 @@ final class GolemContent
 	/** The plinth golems are made on, observed; the spawn point for golems never seen made. */
 	static final int PLINTH_X = 2596;
 	static final int PLINTH_Y = 2256;
+
+	/**
+	 * Where a golem that had to be fetched is put down: in front of the tent south of the plinth.
+	 * Not the plinth itself — a golem appearing there looks like one just crafted, to a player who
+	 * crafted nothing — and a golem stepping out by a tent is a golem that was only ever resting.
+	 */
+	static final WorldPoint RECOVERY = new WorldPoint(2597, 2224, 0);
+
+	/**
+	 * Where a revived golem appears: the tiles a golem steps off onto from each of the two
+	 * plinths, as a crafted one does. Each revived golem takes one at random.
+	 */
+	static final WorldPoint[] REVIVE_TILES = {
+		new WorldPoint(2595, 2254, 0),
+		new WorldPoint(2596, 2256, 0),
+	};
 
 	/**
 	 * The two plinths a golem is carved on, and the six states each one shows: Empty plinth,
