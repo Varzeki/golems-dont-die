@@ -216,24 +216,24 @@ class GolemShipmates
 	 */
 	static List<int[]> rails(WorldView deck, int plane, LocalPoint player)
 	{
-		CollisionData[] maps = deck.getCollisionMaps();
-		if (maps == null || plane < 0 || plane >= maps.length || maps[plane] == null)
+		int[][] flags = deckFlags(deck, plane);
+		if (flags == null)
 		{
 			return new ArrayList<>();
 		}
-		int[][] flags = maps[plane].getFlags();
 		int sizeX = Math.min(deck.getSizeX(), flags.length);
 		int sizeY = flags.length == 0 ? 0 : Math.min(deck.getSizeY(), flags[0].length);
 		// A tile the ship's scene has nothing on is not deck, whatever its flags say: water inside
 		// the square a ship's world is drawn in must not take a golem because nothing blocks it.
 		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
 		Tile[][] floor = tiles == null || plane >= tiles.length ? null : tiles[plane];
+		Tile[][] below = tiles == null || plane < 1 || plane > tiles.length ? null : tiles[plane - 1];
 
 		// Only over the hull. A sloop's floor runs a tile out past the hull on each side, under the
 		// trim round its edge, and nothing there blocks; golems took those tiles for the rail and
 		// stood out beside the ship, over the sea.
 		int[] hull = hullFootprint(deck);
-		Set<Long> helm = helmTiles(deck);
+		Set<Long> helm = helmTiles(deck, hull);
 		List<int[]> rail = new ArrayList<>();
 		for (int x = 0; x < sizeX; x++)
 		{
@@ -243,7 +243,7 @@ class GolemShipmates
 				// The helm is at the other end, the high one, on every hull the game lays out.
 				if (!onHull(hull, x, y) || hull != null && y == hull[1]
 					|| helm.contains((long) x << 32 | y) || !isDeck(flags, x, y, sizeX, sizeY)
-					|| floor != null && (x >= floor.length || y >= floor[x].length || floor[x][y] == null))
+					|| floor != null && !hasTile(floor, x, y) && !hasTile(below, x, y))
 				{
 					continue;
 				}
@@ -294,6 +294,49 @@ class GolemShipmates
 	}
 
 	/**
+	 * What stands in the way on each tile of a deck, taking bridges into account. A deck is laid out
+	 * a floor above the hull, and where a tile of it is marked a bridge the game keeps what blocks it
+	 * with the floor below: read from the deck's own floor alone, the middle of a skiff was solid
+	 * where it is open and its edges open where they are rail, and golems found three places on a
+	 * boat with five.
+	 */
+	static int[][] deckFlags(WorldView deck, int plane)
+	{
+		CollisionData[] maps = deck.getCollisionMaps();
+		if (maps == null || plane < 0 || plane >= maps.length || maps[plane] == null)
+		{
+			return null;
+		}
+		int[][] own = maps[plane].getFlags();
+		byte[][][] settings = deck.getTileSettings();
+		if (plane == 0 || settings == null || plane >= settings.length || maps[plane - 1] == null)
+		{
+			return own;
+		}
+		int[][] lower = maps[plane - 1].getFlags();
+		int[][] out = new int[own.length][];
+		for (int x = 0; x < own.length; x++)
+		{
+			out[x] = own[x].clone();
+			for (int y = 0; y < own[x].length; y++)
+			{
+				if (x < settings[plane].length && y < settings[plane][x].length
+					&& (settings[plane][x][y] & Constants.TILE_FLAG_BRIDGE) != 0
+					&& x < lower.length && y < lower[x].length)
+				{
+					out[x][y] = lower[x][y];
+				}
+			}
+		}
+		return out;
+	}
+
+	private static boolean hasTile(Tile[][] floor, int x, int y)
+	{
+		return floor != null && x < floor.length && y < floor[x].length && floor[x][y] != null;
+	}
+
+	/**
 	 * The tiles the hull covers, as {minX, minY, maxX, maxY} in the ship's scene, or null if no hull
 	 * is found, when every tile counts. Found by the hull objects' own ids: the largest object on a
 	 * ship is not its hull but the trim round the edge of it.
@@ -331,10 +374,12 @@ class GolemShipmates
 	}
 
 	/**
-	 * The helm's tile and the four beside it, as x << 32 | y: where the player stands to steer. A
-	 * golem was stood at the wheel, on the one place a player at the helm must be.
+	 * Where the player stands to steer, as x << 32 | y: the helm's own tile, or where the helm stands
+	 * off the end of the hull, as a sloop's does, the hull's tile beside it. Only that one: a golem
+	 * was stood at the wheel, but keeping clear of every tile round it left a skiff with five open
+	 * places taking two golems.
 	 */
-	static Set<Long> helmTiles(WorldView deck)
+	static Set<Long> helmTiles(WorldView deck, int[] hull)
 	{
 		Set<Long> out = new HashSet<>();
 		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
@@ -358,10 +403,12 @@ class GolemShipmates
 						{
 							int x = object.getSceneMinLocation().getX();
 							int y = object.getSceneMinLocation().getY();
-							for (int[] near : new int[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+							if (hull != null)
 							{
-								out.add((long) (x + near[0]) << 32 | (y + near[1]));
+								x = Math.max(hull[0], Math.min(hull[2], x));
+								y = Math.max(hull[1], Math.min(hull[3], y));
 							}
+							out.add((long) x << 32 | y);
 						}
 					}
 				}

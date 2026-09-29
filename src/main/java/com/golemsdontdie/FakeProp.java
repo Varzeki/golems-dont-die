@@ -29,6 +29,14 @@ class FakeProp extends RuneLiteObjectController
 	/** Cycles left before the prop is dropped. */
 	private int remaining;
 
+	/**
+	 * Which way the prop faces, asked each frame: the golem's way for one the game plays on an actor,
+	 * such as the air guitar's notes, which turned with the golem where the game plays them and
+	 * stood facing south here, behind or beside the golem by turns.
+	 */
+	@lombok.Setter
+	private java.util.function.IntSupplier facing = () -> 0;
+
 	@Getter
 	private final int animationId;
 
@@ -89,5 +97,6 @@ class FakeProp extends RuneLiteObjectController
 		setWorldView(wv.getId());
 		setLevel(plane);
 		setZ(height);
+		setOrientation(facing.getAsInt());
 	}
 }

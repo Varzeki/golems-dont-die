@@ -2315,8 +2315,9 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			return;
 		}
-		int localX = golem.getFineX() - wv.getBaseX() * Golem.TILE;
-		int localY = golem.getFineY() - wv.getBaseY() * Golem.TILE;
+		// Where the golem is drawn, which inside an instance is not where it is simulated.
+		int localX = golem.getDrawFineX() - wv.getBaseX() * Golem.TILE;
+		int localY = golem.getDrawFineY() - wv.getBaseY() * Golem.TILE;
 		if (!Golem.isInScene(wv, localX, localY))
 		{
 			return;
@@ -2329,7 +2330,8 @@ public class GolemsDontDiePlugin extends Plugin
 		int height = Perspective.getTileHeight(client,
 			new LocalPoint(localX, localY, wv), golem.getPlane());
 		FakeProp drawn = new FakeProp(client, model, modelFactory.animationFor(animationId),
-			animationId, golem.getFineX(), golem.getFineY(), golem.getPlane(), height, cycles);
+			animationId, golem.getDrawFineX(), golem.getDrawFineY(), golem.getPlane(), height, cycles);
+		drawn.setFacing(golem::drawOrientation);
 		client.registerRuneLiteObject(drawn);
 		props.add(drawn);
 	}
