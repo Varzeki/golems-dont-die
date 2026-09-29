@@ -1,5 +1,7 @@
 package com.golemsdontdie;
 
+import net.runelite.api.coords.WorldPoint;
+
 /**
  * Golem Crafting identifiers, harvested once from the game cache and fixed here.
  *
@@ -83,6 +85,13 @@ final class GolemContent
 	/** The plinth golems are made on, observed; the spawn point for golems never seen made. */
 	static final int PLINTH_X = 2596;
 	static final int PLINTH_Y = 2256;
+
+	/**
+	 * Where a golem that had to be fetched is put down: in front of the tent south of the plinth.
+	 * Not the plinth itself, where a golem appearing looks like one just crafted to a player who
+	 * crafted nothing; a golem stepping out by a tent is one that was only ever resting.
+	 */
+	static final WorldPoint RECOVERY = new WorldPoint(2597, 2224, 0);
 
 	/**
 	 * The regions the bundled island map covers: (39..41, 34..36) around the site.

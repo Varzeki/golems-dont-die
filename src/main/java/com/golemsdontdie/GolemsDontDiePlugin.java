@@ -1263,7 +1263,7 @@ public class GolemsDontDiePlugin extends Plugin
 	/**
 	 * Moves a golem that has stopped getting anywhere. The watchdog on {@link Golem} decides
 	 * <em>whether</em>; this decides <em>where</em>, because only the plugin has the mesh. The
-	 * golem goes to the nearest tile it could walk out of, or home to the plinth, which always
+	 * golem goes to the nearest tile it could walk out of, or home to the tent by the plinth, which always
 	 * exists and is always walkable. Moved, never replaced: same name, id, seed and gait.
 	 * Allowed even on screen, since a golem frozen in scenery is worse than one that slides.
 	 */
@@ -1329,7 +1329,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			// The mesh says this tile is fine, so the golem is stuck for a reason the map
 			// cannot see; home is the fallback that cannot fail.
-			safe = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
+			safe = GolemContent.RECOVERY;
 		}
 
 		log.debug("Rescuing stuck golem {} from {} to {} (tier {})",
@@ -1523,7 +1523,7 @@ public class GolemsDontDiePlugin extends Plugin
 	}
 
 	/**
-	 * Puts a golem back on the plinth if it is anywhere but home, for "Restrict Golem ambition".
+	 * Puts a golem back home if it is anywhere but home, for "Restrict Golem ambition".
 	 * By region, which is all home is: the island, its caves and its upper floors are regions,
 	 * and an instance is simulated at its template.
 	 */
@@ -1538,9 +1538,8 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 		WorldPoint at = golem.currentTile();
-		WorldPoint plinth = new WorldPoint(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
-		noteRescue(golem, at, plinth, "ambition");
-		golem.relocate(plinth);
+		noteRescue(golem, at, GolemContent.RECOVERY, "ambition");
+		golem.relocate(GolemContent.RECOVERY);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
 	}
