@@ -2325,6 +2325,19 @@ class Golem
 	}
 
 	/**
+	 * Done waiting at a quay, let go by the crew it was waiting for: it plans for itself from here,
+	 * finishing any step it is on rather than being stood on its tile.
+	 */
+	void endWait()
+	{
+		if (itinerary != null && itinerary == waiting)
+		{
+			itinerary = null;
+		}
+		waiting = null;
+	}
+
+	/**
 	 * Turns the golem to face something and waves at it, for as long as the wave takes.
 	 *
 	 * @param dx how far east the thing being waved at is

@@ -215,22 +215,33 @@ class GolemCrews
 				it.remove();
 				continue;
 			}
-			// However many are waiting: a crew no crossing can be planned for — no port that suits
-			// all of them — waited the same as one nobody joined, and then went its separate ways.
-			// Left to wait until one could be, it never could, and they stood at the quay for good.
+			// However many are waiting: a crew no crossing can be planned for waited the same as one
+			// nobody joined, and then went its separate ways. Left to wait until one could be, it
+			// never could, and they stood at the quay for good.
 			if (tick - muster.since >= MUSTER_TICKS || tick < muster.since)
 			{
-				for (Golem golem : muster.waiting)
-				{
-					released.put(golem, tick);
-				}
+				release(muster.waiting, tick);
 				it.remove();
 			}
 		}
 	}
 
 	/**
-	 * Picks the crew's port, plans the one crossing, and signs everyone on.
+	 * Lets golems waiting at a quay go, each to sail alone or not as it would have without company,
+	 * and not to be held again straight away.
+	 */
+	private void release(List<Golem> golems, int tick)
+	{
+		for (Golem golem : golems)
+		{
+			released.put(golem, tick);
+			golem.endWait();
+		}
+	}
+
+	/**
+	 * Picks the crew's port, plans the one crossing, and signs everyone on; or, if there is no port
+	 * all of them would go to, lets them go.
 	 *
 	 * @return false if the crossing could not be planned this tick, so the crew keeps waiting
 	 */
@@ -246,8 +257,16 @@ class GolemCrews
 			memories.add(golem.getTransportMemory());
 		}
 
+		SailingDocks.Dock port = voyage.crewPort(muster.dock, memories, random, context);
+		if (port == null)
+		{
+			// Nowhere all of them would go, and waiting longer changes nothing about that: they go
+			// their separate ways now rather than stand out the muster.
+			release(muster.waiting, tick);
+			return true;
+		}
 		WorldPoint at = crew.get(0).currentTile();
-		Itinerary crossing = voyage.crewCrossing(muster.dock, memories, at, tick, random, context);
+		Itinerary crossing = voyage.crossTo(muster.dock, port, at, tick, random, context);
 		if (crossing == null)
 		{
 			return false;
@@ -268,13 +287,9 @@ class GolemCrews
 		}
 		// More waiting than the boat has berths: the rest are let go rather than left standing at
 		// a quayside whose crew has sailed.
-		for (Golem left : muster.waiting)
-		{
-			if (crews.get(left) != made)
-			{
-				released.put(left, tick);
-			}
-		}
+		List<Golem> left = new ArrayList<>(muster.waiting);
+		left.removeIf(golem -> crews.get(golem) == made);
+		release(left, tick);
 		log.debug("{} golems crewed a {} from {}", made.size(), boat, muster.dock.getName());
 		return true;
 	}
