@@ -278,13 +278,31 @@ public class GolemsDontDiePlugin extends Plugin
 		clientThread.invoke(this::reloadProfile);
 	}
 
-	/** Drops everything read from the last profile, unsaved, and reads the new one's. */
+	/**
+	 * Drops everything read from the last profile, unsaved, and reads the new one's. The golems
+	 * are the account's rather than the profile's, so they are saved first and read back.
+	 */
 	private void reloadProfile()
 	{
 		if (!running)
 		{
 			return;
 		}
+		saveGolems();
+		dropRoster();
+		rosterAccount = null;
+
+		loadKnowledge();
+		islandMemory.deserialise(setting(IslandMemory.MAP_KEY));
+		islandMemory.loadBundled();
+		applyLearnedRoutes();
+		// Logged in, the golems come out now rather than at the next login.
+		loadAccount();
+	}
+
+	/** Takes every golem out of memory, unsaved, with everything drawn for them. */
+	private void dropRoster()
+	{
 		saveGolemsAt = -1;
 		shipmates.abandon(client.getTickCount());
 		for (Golem golem : golems)
@@ -299,18 +317,95 @@ public class GolemsDontDiePlugin extends Plugin
 		clearRafts();
 		findGolem(null);
 		mapPoints.clear();
-
-		loadKnowledge();
-		islandMemory.deserialise(setting(IslandMemory.MAP_KEY));
-		islandMemory.loadBundled();
-		applyLearnedRoutes();
-		pendingRestore.addAll(store.deserialise(setting(GolemsDontDieConfig.SAVED_GOLEMS_KEY)));
-		tally.load();
 		gameCount = -1;
 		rosterChanged = true;
-		// Logged in, the new profile's golems come out now rather than at the next login.
+	}
+
+	/**
+	 * The account whose golems are in memory, as its RuneScape profile key, or null before one is
+	 * loaded. Golems are kept per account and per kind of world, as the game keeps its count of
+	 * them: one roster for every account on a profile had an alt with five golems crafted cull a
+	 * main's four hundred down to five, and save that.
+	 */
+	private String rosterAccount;
+
+	/**
+	 * Names the account the golems saved before rosters were kept per account went to. Kept in
+	 * the profile, beside the old save, so they are handed over once.
+	 */
+	private static final String ADOPTED_KEY = "savedGolemsAdoptedBy";
+
+	/** How many golems the old, profile-wide save holds; -1 until counted. */
+	private int legacyGolems = -1;
+
+	@Subscribe
+	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
+	{
+		// Another account, or the same one on a seasonal world: another roster.
+		clientThread.invoke(this::loadAccount);
+	}
+
+	/**
+	 * Reads the logged-in account's golems, if they are not the ones in memory: at login, on a
+	 * hop to a different kind of world, and once when the plugin starts logged in.
+	 */
+	private void loadAccount()
+	{
+		if (!running || client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		String account = configManager.getRSProfileKey();
+		if (account == null || account.equals(rosterAccount))
+		{
+			return;
+		}
+		String saved = configManager.getConfiguration(GolemsDontDieConfig.GROUP, account,
+			GolemsDontDieConfig.SAVED_GOLEMS_KEY);
+		String total = configManager.getConfiguration(GolemsDontDieConfig.GROUP, account, GolemTally.TOTAL_KEY);
+		if (saved == null && setting(ADOPTED_KEY) == null)
+		{
+			// The roster saved before golems were kept per account goes to the first account that
+			// could have crafted every golem in it. An alt, or a seasonal world, has crafted fewer.
+			// The count is waited for: 0 is also what it reads before the server has sent it.
+			String legacy = setting(GolemsDontDieConfig.SAVED_GOLEMS_KEY);
+			if (legacyGolems < 0)
+			{
+				legacyGolems = store.deserialise(legacy).size();
+			}
+			if (legacyGolems > 0)
+			{
+				int count = client.getVarbitValue(GolemContent.GOLEM_COUNT_VARBIT);
+				if (count <= 0)
+				{
+					return;
+				}
+				if (count >= legacyGolems)
+				{
+					saved = legacy;
+					total = setting(GolemTally.TOTAL_KEY);
+					setSetting(ADOPTED_KEY, account);
+					log.debug("Handed the {} golems saved before accounts were told apart to {}", legacyGolems, account);
+				}
+			}
+		}
+
+		if (rosterAccount != null)
+		{
+			saveGolems();
+			dropRoster();
+		}
+		rosterAccount = account;
+		pendingRestore.addAll(store.deserialise(saved));
+		tally.load(account, total);
 		restorePending();
 		syncTally();
+	}
+
+	/** Whether the golems in memory are the logged-in account's, so its count may judge them. */
+	private boolean rosterIsLoggedIn()
+	{
+		return rosterAccount != null && rosterAccount.equals(configManager.getRSProfileKey());
 	}
 
 	/**
@@ -579,13 +674,8 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext.setMuster(crews::offer);
 		roamContext.setModels(modelFactory);
 
-		pendingRestore.addAll(store.deserialise(
-			setting(GolemsDontDieConfig.SAVED_GOLEMS_KEY)));
-
-		tally.load();
-
-		// Enabling mid-session skips the login the count would have arrived at.
-		clientThread.invokeLater(this::syncTally);
+		// Golems are the account's, so they are read at login; enabling mid-session skips the login.
+		clientThread.invokeLater(this::loadAccount);
 
 		// All three panel callbacks arrive on the Swing thread and touch the roster, which the
 		// client thread owns, so each hops across.
@@ -946,7 +1036,8 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void syncTally()
 	{
-		if (client.getGameState() != GameState.LOGGED_IN)
+		// Another account's count says nothing about the golems in memory.
+		if (client.getGameState() != GameState.LOGGED_IN || !rosterIsLoggedIn())
 		{
 			return;
 		}
@@ -1187,7 +1278,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void trimToGameCount()
 	{
-		if (gameCount <= 0 || !pendingRestore.isEmpty())
+		if (gameCount <= 0 || !pendingRestore.isEmpty() || !rosterIsLoggedIn())
 		{
 			return;
 		}
@@ -2736,6 +2827,8 @@ public class GolemsDontDiePlugin extends Plugin
 	public void onGameTick(GameTick event)
 	{
 		tickStartCycle = client.getGameCycle();
+		// Usually a comparison; the first tick a new account's count is known, its golems.
+		loadAccount();
 		announceUpdate();
 		readDiaries();
 		obstacleObserver.onGameTick();
@@ -2928,6 +3021,7 @@ public class GolemsDontDiePlugin extends Plugin
 			// client. Here rather than in startUp is what lets the plugin be enabled at the
 			// login screen.
 			sailingDocks.load();
+			loadAccount();
 			// Belt and braces next to onVarbitChanged: whichever of the two sees the
 			// count first, the other is a no-op.
 			syncTally();
@@ -3132,7 +3226,13 @@ public class GolemsDontDiePlugin extends Plugin
 			log.debug("Not saving golems: {} saved golems are not restored yet", pendingRestore.size());
 			return;
 		}
-		setSetting(GolemsDontDieConfig.SAVED_GOLEMS_KEY, store.serialise(livingGolems()));
+		// Named rather than the current account: a save can land after the account has changed.
+		if (rosterAccount == null)
+		{
+			return;
+		}
+		configManager.setConfiguration(GolemsDontDieConfig.GROUP, rosterAccount,
+			GolemsDontDieConfig.SAVED_GOLEMS_KEY, store.serialise(livingGolems()));
 	}
 
 	private void saveIslandMemory()

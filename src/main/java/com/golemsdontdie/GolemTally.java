@@ -45,10 +45,18 @@ class GolemTally
 	@Getter
 	private int total;
 
-	void load()
+	/** The account the total is kept for, as a RuneScape profile key; null before login. */
+	private String account;
+
+	/**
+	 * Takes up an account's total.
+	 *
+	 * @param stored the total as it was saved for that account, or null for none
+	 */
+	void load(String account, String stored)
 	{
+		this.account = account;
 		total = 0;
-		String stored = configManager.getConfiguration(GolemsDontDieConfig.GROUP, TOTAL_KEY);
 		if (stored == null || stored.trim().isEmpty())
 		{
 			return;
@@ -120,7 +128,10 @@ class GolemTally
 			return false;
 		}
 		total = candidate;
-		configManager.setConfiguration(GolemsDontDieConfig.GROUP, TOTAL_KEY, total);
+		if (account != null)
+		{
+			configManager.setConfiguration(GolemsDontDieConfig.GROUP, account, TOTAL_KEY, String.valueOf(total));
+		}
 		log.debug("Golems crafted total is now {}", total);
 		return true;
 	}
