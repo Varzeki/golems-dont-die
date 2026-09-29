@@ -59,7 +59,24 @@ class RaftFactory
 				GolemContent.RAFT_HELM_RECOLOUR_TO);
 			// Hull, mast and sail sit on the middle tile; the helm is its own tile at the stern.
 			helm = helm.translate(0, 0, boat.getHelmOffset());
-			ModelData merged = client.mergeModels(hull, mast.cloneVertices(), cloth.cloneVertices(), helm);
+			ModelData merged;
+			if (boat.getKeelModel() < 0)
+			{
+				merged = client.mergeModels(hull, mast.cloneVertices(), cloth.cloneVertices(), helm);
+			}
+			else
+			{
+				ModelData keel = client.loadModelData(boat.getKeelModel());
+				if (keel == null)
+				{
+					log.debug("{} keel not loaded yet", boat);
+					searched.remove(boat);
+					return null;
+				}
+				keel = recolour(keel.cloneVertices().cloneColors(), GolemBoat.keelFrom(), GolemBoat.keelTo())
+					.translate(boat.getKeelX(), 0, boat.getKeelZ());
+				merged = client.mergeModels(hull, keel, mast.cloneVertices(), cloth.cloneVertices(), helm);
+			}
 			Model made = merged.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
 			models.put(boat, made);
 			log.debug("{} built from hull, sail and helm", boat);

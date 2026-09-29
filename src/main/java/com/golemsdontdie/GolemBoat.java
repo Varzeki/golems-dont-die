@@ -22,14 +22,14 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
 	 * rest along a deck 324 units across and 714 long.
 	 */
 	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
-		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}),
+		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
@@ -37,7 +37,7 @@ enum GolemBoat
 	 */
 	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, -240, 240, -554, 536, 8,
 		new int[][]{{0, 0}, {-120, 180}, {120, 180}, {-120, 400}, {120, 400}, {-120, 620},
-			{120, 620}, {0, 830}});
+			{120, 620}, {0, 830}}, 58228, -256, -448);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -50,6 +50,10 @@ enum GolemBoat
 	{
 		static final short[] LARGE_FROM = {-11372, -11362, -11353, -11343, -11333, -11322};
 		static final short[] LARGE_TO = {6558, 6563, 6565, 6569, 6573, 6577};
+
+		/** The bronze keel's own swap, from its object: the lowest keel a boat is built with. */
+		static final short[] KEEL_FROM = {21435, 21464};
+		static final short[] KEEL_TO = {5652, 5656};
 	}
 
 	/** The hull, the mast, and the sail's cloth, which is a separate object from the mast. */
@@ -86,6 +90,28 @@ enum GolemBoat
 	 * rather than beside it.
 	 */
 	private final int[][] deck;
+
+	/**
+	 * The keel under the larger hulls, with the bowsprit at its front, or -1 for the raft, which has
+	 * none: without it a skiff and a sloop sailed with no spar at the bow. The bronze keel's model.
+	 *
+	 * <p>A keel is an object of its own on the boat, a tile off the hull, so its model is moved by
+	 * that much to sit under the hull. The sloop's is as a sloop's world lays its parts out (keel
+	 * on tile 1,3, the 3x8 hull from 2,3); the skiff's is its keel's length centred on its hull.
+	 */
+	private final int keelModel;
+	private final int keelX;
+	private final int keelZ;
+
+	static short[] keelFrom()
+	{
+		return Palette.KEEL_FROM;
+	}
+
+	static short[] keelTo()
+	{
+		return Palette.KEEL_TO;
+	}
 
 	/**
 	 * How far the boat reaches from its middle, in model units, which is what the client culls and

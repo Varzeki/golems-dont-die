@@ -139,8 +139,13 @@ class GolemShipmates
 	private void board(List<Golem> golems, WorldView deck, Player me, int tick)
 	{
 		LocalPoint standing = me.getLocalLocation();
-		int plane = deck.getPlane();
+		int plane = deckPlane(deck, standing);
 		List<int[]> rails = rails(deck, plane, standing);
+		if (rails.isEmpty() && plane != deck.getPlane())
+		{
+			plane = deck.getPlane();
+			rails = rails(deck, plane, standing);
+		}
 		if (rails.isEmpty())
 		{
 			return;
@@ -176,6 +181,31 @@ class GolemShipmates
 		{
 			log.debug("{} golems came aboard", aboard.size());
 		}
+	}
+
+	/**
+	 * The floor the player is standing on: the highest plane of the ship's scene with a tile under
+	 * them. Not the world view's own plane, which on a sloop is the hull's, a floor below the deck:
+	 * golems were stood at the hull's level on tiles out beside it, in the sea, instead of on deck.
+	 */
+	static int deckPlane(WorldView deck, LocalPoint standing)
+	{
+		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
+		if (tiles == null || standing == null)
+		{
+			return deck.getPlane();
+		}
+		int x = standing.getSceneX();
+		int y = standing.getSceneY();
+		for (int plane = tiles.length - 1; plane >= 0; plane--)
+		{
+			if (x >= 0 && x < tiles[plane].length && y >= 0 && y < tiles[plane][x].length
+				&& tiles[plane][x][y] != null)
+			{
+				return plane;
+			}
+		}
+		return deck.getPlane();
 	}
 
 	/**
