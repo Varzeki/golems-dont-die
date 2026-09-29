@@ -732,14 +732,24 @@ public class GolemsDontDiePlugin extends Plugin
 	 * RuneLite profile, so logging into an alt or a seasonal world with fewer golems crafted
 	 * trimmed the main account's unnamed golems down to the smaller count, and saved that. The
 	 * roster now belongs to the first account and kind of world to log in with a count that
-	 * covers it, which for anyone already playing is their main; any other only watches the
-	 * golems, never trimming or saving them.
+	 * covers its unnamed golems, which for anyone already playing is their main; any other only
+	 * watches the golems, never trimming or saving them. Unnamed, because named golems are kept
+	 * whatever the count says, so a main's roster can outnumber its count by them.
 	 */
 	private void claimRoster(int count)
 	{
 		String here = client.getAccountHash() + ":" + RuneScapeProfileType.getCurrent(client);
 		String owner = configManager.getConfiguration(GolemsDontDieConfig.GROUP, ROSTER_OWNER_KEY);
-		if (owner == null && count >= (pendingRestore.isEmpty() ? countLiving() : pendingRestore.size()))
+		int unnamed = 0;
+		for (GolemStore.SavedGolem saved : pendingRestore)
+		{
+			unnamed += saved.nickname == null ? 1 : 0;
+		}
+		for (Golem golem : golems)
+		{
+			unnamed += golem.isDying() || isNamed(golem) ? 0 : 1;
+		}
+		if (owner == null && count >= unnamed)
 		{
 			configManager.setConfiguration(GolemsDontDieConfig.GROUP, ROSTER_OWNER_KEY, here);
 			owner = here;
