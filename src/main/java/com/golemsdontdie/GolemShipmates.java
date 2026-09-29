@@ -84,7 +84,7 @@ class GolemShipmates
 	 *
 	 * @param snap puts a tile onto ground a golem can stand on; see RoamPlanner.snapToMesh
 	 */
-	void update(List<Golem> golems, int tick, UnaryOperator<WorldPoint> snap)
+	void update(List<Golem> golems, int tick, BiFunction<WorldPoint, Set<Long>, WorldPoint> snap)
 	{
 		// A golem removed from the roster while aboard is not aboard any more.
 		aboard.removeIf(golem -> !golems.contains(golem) || !golem.isAboard());
@@ -233,12 +233,13 @@ class GolemShipmates
 		// trim round its edge, and nothing there blocks; golems took those tiles for the rail and
 		// stood out beside the ship, over the sea.
 		int[] hull = hullFootprint(deck);
+		Set<Long> helm = helmTiles(deck);
 		List<int[]> rail = new ArrayList<>();
 		for (int x = 0; x < sizeX; x++)
 		{
 			for (int y = 0; y < sizeY; y++)
 			{
-				if (!onHull(hull, x, y) || !isDeck(flags, x, y, sizeX, sizeY)
+				if (!onHull(hull, x, y) || helm.contains((long) x << 32 | y) || !isDeck(flags, x, y, sizeX, sizeY)
 					|| floor != null && (x >= floor.length || y >= floor[x].length || floor[x][y] == null))
 				{
 					continue;
@@ -326,6 +327,52 @@ class GolemShipmates
 		return null;
 	}
 
+	/**
+	 * The helm's tile and the four beside it, as x << 32 | y: where the player stands to steer. A
+	 * golem was stood at the wheel, on the one place a player at the helm must be.
+	 */
+	static Set<Long> helmTiles(WorldView deck)
+	{
+		Set<Long> out = new HashSet<>();
+		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
+		if (tiles == null)
+		{
+			return out;
+		}
+		for (Tile[][] plane : tiles)
+		{
+			for (Tile[] column : plane == null ? new Tile[0][] : plane)
+			{
+				for (Tile tile : column == null ? new Tile[0] : column)
+				{
+					if (tile == null || tile.getGameObjects() == null)
+					{
+						continue;
+					}
+					for (GameObject object : tile.getGameObjects())
+					{
+						if (object != null && isHelm(object.getId()))
+						{
+							int x = object.getSceneMinLocation().getX();
+							int y = object.getSceneMinLocation().getY();
+							for (int[] near : new int[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+							{
+								out.add((long) (x + near[0]) << 32 | (y + near[1]));
+							}
+						}
+					}
+				}
+			}
+		}
+		return out;
+	}
+
+	/** Every Kandarin helm, the wheel and the tutorial's, and the pirates'. */
+	private static boolean isHelm(int objectId)
+	{
+		return objectId >= 59554 && objectId <= 59623 || objectId == 29536;
+	}
+
 	/** The Kandarin hulls in every wood, raft to sloop, the colossal one and the pirates'. */
 	private static boolean isHull(int objectId)
 	{
@@ -370,33 +417,34 @@ class GolemShipmates
 	 * The player is off the ship. Near where it was, and the golems step off around them; anywhere
 	 * else, and each goes back to the quay it boarded from.
 	 */
-	private void landed(WorldPoint ashore, int tick, UnaryOperator<WorldPoint> snap)
+	private void landed(WorldPoint ashore, int tick, BiFunction<WorldPoint, Set<Long>, WorldPoint> place)
 	{
 		boolean withPlayer = ashore != null && shipAt != null && ashore.getPlane() == shipAt.getPlane()
 			&& ashore.distanceTo2D(shipAt) <= LANDING_TILES;
-		int i = 0;
+		// A tile each, on land, around where the player stepped off; not the player's own.
+		Set<Long> taken = new HashSet<>();
+		if (ashore != null)
+		{
+			taken.add(RoamContext.tileKey(ashore.getX(), ashore.getY(), ashore.getPlane()));
+		}
 		for (Golem golem : aboard)
 		{
-			WorldPoint to = withPlayer ? besideLanding(ashore, i++, snap) : golem.getAboardFrom();
+			WorldPoint to = golem.getAboardFrom();
+			if (withPlayer && place != null)
+			{
+				WorldPoint ground = place.apply(ashore, taken);
+				if (ground != null && !ground.equals(ashore))
+				{
+					to = ground;
+					taken.add(RoamContext.tileKey(ground.getX(), ground.getY(), ground.getPlane()));
+				}
+			}
 			golem.leaveShip(to, tick);
 			onMoved.accept(golem);
 		}
 		aboard.clear();
 		ship = -1;
 		shipAt = null;
-	}
-
-	/** The places around a landing, in the order golems take them: the player's own tile last. */
-	private static final int[][] AROUND = {
-		{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, -1}, {1, -1}, {-1, 1}, {2, 0}, {-2, 0}, {0, 2}, {0, -2},
-	};
-
-	private static WorldPoint besideLanding(WorldPoint ashore, int index, UnaryOperator<WorldPoint> snap)
-	{
-		int[] step = AROUND[index % AROUND.length];
-		WorldPoint beside = ashore.dx(step[0]).dy(step[1]);
-		WorldPoint ground = snap == null ? null : snap.apply(beside);
-		return ground != null ? ground : ashore;
 	}
 
 	/**

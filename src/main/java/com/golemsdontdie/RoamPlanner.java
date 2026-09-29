@@ -489,6 +489,22 @@ class RoamPlanner
 	 */
 	WorldPoint freeTileNear(WorldPoint at, Set<Long> taken)
 	{
+		return freeTileNear(at, taken, false);
+	}
+
+	/**
+	 * As {@link #freeTileNear(WorldPoint, Set)}, for golems stepping off the player's ship: never
+	 * the sea, and never the start of a transport. What the island memory has seen walked on reaches
+	 * out along a pier and over its gangplank, and golems were set down on the water, afloat on
+	 * rafts, and on the gangplank itself.
+	 */
+	WorldPoint landingTileNear(WorldPoint at, Set<Long> taken)
+	{
+		return freeTileNear(at, taken, true);
+	}
+
+	private WorldPoint freeTileNear(WorldPoint at, Set<Long> taken, boolean landing)
+	{
 		int plane = at.getPlane();
 		for (int ring = 0; ring <= SPREAD_TILES; ring++)
 		{
@@ -503,7 +519,8 @@ class RoamPlanner
 					int x = at.getX() + dx;
 					int y = at.getY() + dy;
 					if (!taken.contains(RoamContext.tileKey(x, y, plane)) && isSafe(x, y, plane)
-						&& (ring == 0 || mesh.sameComponent(at.getX(), at.getY(), x, y, plane)))
+						&& (ring == 0 || mesh.sameComponent(at.getX(), at.getY(), x, y, plane))
+						&& (!landing || !mesh.isOcean(x, y, plane) && !transports.hasOrigin(x, y)))
 					{
 						return new WorldPoint(x, y, plane);
 					}

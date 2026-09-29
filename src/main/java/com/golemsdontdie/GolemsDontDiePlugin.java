@@ -2117,7 +2117,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			if (raft != null)
 			{
-				client.removeRuneLiteObject(raft);
+				raft.detach();
 				rafts.remove(golem);
 			}
 			return;
@@ -2133,7 +2133,9 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 			raft = new FakeRaft(client, hull, modelFactory,
 				golem.getFineX(), golem.getFineY(), golem.getOrientation(), kind.drawRadius());
-			client.registerRuneLiteObject(raft);
+			raft.addPart(raftFactory.rigModel(kind, false), kind.getMastAnimation(), kind.getMastX(), kind.getMastZ());
+			raft.addPart(raftFactory.rigModel(kind, true), kind.getClothAnimation(), kind.getClothX(), kind.getClothZ());
+			raft.attach();
 			rafts.put(golem, raft);
 		}
 
@@ -2163,7 +2165,7 @@ public class GolemsDontDiePlugin extends Plugin
 	{
 		for (FakeRaft raft : rafts.values())
 		{
-			client.removeRuneLiteObject(raft);
+			raft.detach();
 		}
 		rafts.clear();
 	}
@@ -2650,7 +2652,7 @@ public class GolemsDontDiePlugin extends Plugin
 		FakeRaft raft = rafts.remove(golem);
 		if (raft != null)
 		{
-			client.removeRuneLiteObject(raft);
+			raft.detach();
 		}
 	}
 
@@ -2782,7 +2784,7 @@ public class GolemsDontDiePlugin extends Plugin
 		crews.update(golems, roamContext.getTick(), roamContext);
 
 		// Whether the player has just stepped aboard their ship, or off it, with golems following.
-		shipmates.update(golems, client.getTickCount(), roamPlanner::snapToMesh);
+		shipmates.update(golems, client.getTickCount(), roamPlanner::landingTileNear);
 
 		// A few golems a tick, asked whether the ground they are on joins up with home.
 		sweepForCutOff();

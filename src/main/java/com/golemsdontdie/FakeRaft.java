@@ -1,5 +1,6 @@
 package com.golemsdontdie;
 
+import java.util.*;
 import net.runelite.api.*;
 import net.runelite.api.coords.*;
 
@@ -36,6 +37,19 @@ class FakeRaft extends RuneLiteObjectController
 	 */
 	private int groundZ = Integer.MIN_VALUE;
 
+	/** The mast and the sail, drawn apart so each can play its own animation; see FakeRigPart. */
+	private final List<FakeRigPart> parts = new ArrayList<>();
+
+	/** How far the boat rises and falls on the swell, in height units, and how long a swell takes. */
+	private static final int BOB_HEIGHT = 4;
+	private static final int BOB_CYCLES = 160;
+
+	/** Where on the swell this boat is, so a fleet does not rise and fall as one. */
+	private final int bobPhase;
+
+	/** The radius the parts share with the hull; see GolemBoat.drawRadius. */
+	private final int radius;
+
 	FakeRaft(Client client, Model model, GolemModelFactory shared, int fineX, int fineY,
 		int orientation, int radius)
 	{
@@ -45,6 +59,8 @@ class FakeRaft extends RuneLiteObjectController
 		this.fineY = fineY;
 		this.orientation = orientation;
 		this.targetOrientation = orientation;
+		this.radius = radius;
+		this.bobPhase = Math.floorMod(fineX * 31 + fineY * 17, BOB_CYCLES);
 
 		// The raft's models carry no rig, so it plays nothing; the golem at the helm does.
 		this.animation = new AnimationController(client, -1);
@@ -55,6 +71,43 @@ class FakeRaft extends RuneLiteObjectController
 		setRadius(radius);
 		setDrawFrontTilesFirst(true);
 		syncTransform();
+	}
+
+	/**
+	 * Adds a part of the rig: a model drawn at an offset from the middle of the hull, across then
+	 * along, turning with the boat and playing an animation of its own.
+	 */
+	void addPart(Model model, int animation, int acrossOffset, int alongOffset)
+	{
+		if (model != null)
+		{
+			parts.add(new FakeRigPart(client, this, model, animation, acrossOffset, alongOffset, radius));
+		}
+	}
+
+	/** Puts the boat and its rig in the scene. */
+	void attach()
+	{
+		client.registerRuneLiteObject(this);
+		for (FakeRigPart part : parts)
+		{
+			client.registerRuneLiteObject(part);
+		}
+	}
+
+	/** Takes the boat and its rig out of the scene. */
+	void detach()
+	{
+		client.removeRuneLiteObject(this);
+		for (FakeRigPart part : parts)
+		{
+			client.removeRuneLiteObject(part);
+		}
+	}
+
+	int getBoatOrientation()
+	{
+		return orientation;
 	}
 
 	/** Moves the boat to a world position, easing the heading round. */
@@ -118,13 +171,15 @@ class FakeRaft extends RuneLiteObjectController
 		setWorldView(wv.getId());
 		setLevel(0);
 		setOrientation(orientation);
+		// A little up and down on the swell, as the game's own boats sit on the water.
+		int bob = (int) Math.round(Math.sin((client.getGameCycle() + bobPhase) * 2 * Math.PI / BOB_CYCLES) * BOB_HEIGHT);
 		if (groundZ != Integer.MIN_VALUE)
 		{
-			setZ(groundZ);
+			setZ(groundZ + bob);
 		}
 		else if (Golem.isInScene(wv, localX, localY))
 		{
-			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), 0));
+			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), 0) + bob);
 		}
 	}
 }

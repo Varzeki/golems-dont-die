@@ -57,16 +57,13 @@ class RaftFactory
 			hull = recolour(hull.cloneVertices().cloneColors(), boat.getHullFrom(), boat.getHullTo());
 			helm = recolour(helm.cloneVertices().cloneColors(), GolemContent.RAFT_HELM_RECOLOUR_FROM,
 				GolemContent.RAFT_HELM_RECOLOUR_TO);
-			// The helm is its own tile at the stern, and the rig stands where the boat's own does.
+			// The helm is its own tile at the stern. The rig is not in here: a sail plays an animation
+			// of its own, which would fold a hull merged with it, so it is drawn apart; see rigModel.
 			helm = helm.translate(0, 0, boat.getHelmOffset());
-			mast = mast.cloneVertices().translate(boat.getMastX(), 0, boat.getMastZ());
-			cloth = cloth.cloneVertices().translate(boat.getClothX(), 0, boat.getClothZ());
-			ModelData merged;
-			if (boat.getKeelModel() < 0)
-			{
-				merged = client.mergeModels(hull, mast, cloth, helm);
-			}
-			else
+			List<ModelData> parts = new ArrayList<>();
+			parts.add(hull);
+			parts.add(helm);
+			if (boat.getKeelModel() >= 0)
 			{
 				ModelData keel = client.loadModelData(boat.getKeelModel());
 				if (keel == null)
@@ -75,10 +72,21 @@ class RaftFactory
 					searched.remove(boat);
 					return null;
 				}
-				keel = recolour(keel.cloneVertices().cloneColors(), GolemBoat.keelFrom(), GolemBoat.keelTo())
-					.translate(boat.getKeelX(), 0, boat.getKeelZ());
-				merged = client.mergeModels(hull, keel, mast, cloth, helm);
+				parts.add(recolour(keel.cloneVertices().cloneColors(), GolemBoat.keelFrom(), GolemBoat.keelTo())
+					.translate(boat.getKeelX(), 0, boat.getKeelZ()));
 			}
+			if (boat.getTrimModel() >= 0)
+			{
+				ModelData trim = client.loadModelData(boat.getTrimModel());
+				if (trim == null)
+				{
+					log.debug("{} trim not loaded yet", boat);
+					searched.remove(boat);
+					return null;
+				}
+				parts.add(recolour(trim.cloneVertices().cloneColors(), GolemBoat.trimFrom(), GolemBoat.trimTo()));
+			}
+			ModelData merged = client.mergeModels(parts.toArray(new ModelData[0]));
 			Model made = merged.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
 			models.put(boat, made);
 			log.debug("{} built from hull, sail and helm", boat);
@@ -90,6 +98,28 @@ class RaftFactory
 			return null;
 		}
 	}
+
+	/** Mast or cloth, lit and whole: drawn apart from the hull so its sail can play. See FakeRaft. */
+	Model rigModel(GolemBoat boat, boolean cloth)
+	{
+		Map<GolemBoat, Model> cache = cloth ? cloths : masts;
+		Model built = cache.get(boat);
+		if (built != null)
+		{
+			return built;
+		}
+		ModelData data = client.loadModelData(cloth ? boat.getClothModel() : boat.getMastModel());
+		if (data == null)
+		{
+			return null;
+		}
+		built = data.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
+		cache.put(boat, built);
+		return built;
+	}
+
+	private final Map<GolemBoat, Model> masts = new EnumMap<>(GolemBoat.class);
+	private final Map<GolemBoat, Model> cloths = new EnumMap<>(GolemBoat.class);
 
 	private static ModelData recolour(ModelData model, short[] from, short[] to)
 	{
@@ -104,5 +134,7 @@ class RaftFactory
 	{
 		models.clear();
 		searched.clear();
+		masts.clear();
+		cloths.clear();
 	}
 }

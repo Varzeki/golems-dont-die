@@ -22,14 +22,14 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 0),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 0, -1, 13373, 13881),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
 	 * rest along a deck 324 units across and 714 long.
 	 */
 	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
-		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320, 0, 0, 0, 0),
+		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320, 0, 0, 0, 0, 58209, 13382, 13890),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
@@ -37,7 +37,7 @@ enum GolemBoat
 	 */
 	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, -240, 240, -554, 536, 8,
 		new int[][]{{0, 0}, {-120, 180}, {120, 180}, {-120, 400}, {120, 400}, {-120, 620},
-			{120, 620}, {0, 830}}, 58228, -256, -448, 128, 448, 128, 576);
+			{120, 620}, {0, 830}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -54,6 +54,10 @@ enum GolemBoat
 		/** The bronze keel's own swap, from its object: the lowest keel a boat is built with. */
 		static final short[] KEEL_FROM = {21435, 21464};
 		static final short[] KEEL_TO = {5652, 5656};
+
+		/** The Merchants' trim, the gold one: the same model as the wooden trim, painted gold. */
+		static final short[] TRIM_FROM = {-31833, -31813, -31784};
+		static final short[] TRIM_TO = {7104, 7104, 7114};
 	}
 
 	/** The hull, the mast, and the sail's cloth, which is a separate object from the mast. */
@@ -113,6 +117,30 @@ enum GolemBoat
 	private final int mastZ;
 	private final int clothX;
 	private final int clothZ;
+
+	/**
+	 * The trim round the edge of the hull, or -1 for the raft, which has none: the Merchants'
+	 * trim, which golem boats wear. A player's own boat wears whichever they chose.
+	 */
+	private final int trimModel;
+
+	/**
+	 * What the mast and the cloth play while the boat is under way: the sail full. Unanimated, a
+	 * sail stood in its bind pose, which is neither up nor down and in the wrong place, and a skiff's
+	 * foresail was not there at all.
+	 */
+	private final int mastAnimation;
+	private final int clothAnimation;
+
+	static short[] trimFrom()
+	{
+		return Palette.TRIM_FROM;
+	}
+
+	static short[] trimTo()
+	{
+		return Palette.TRIM_TO;
+	}
 
 	static short[] keelFrom()
 	{
