@@ -2,6 +2,7 @@ package com.golemsdontdie;
 
 import net.runelite.api.coords.WorldPoint;
 import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -44,5 +45,41 @@ public class GolemCrewTest
 		assertFalse(alone.isAtHelm());
 		crew.payOff();
 		assertTrue(alone.isAtHelm());
+	}
+
+	private static final WorldPoint FAR_QUAY = new WorldPoint(3029, 3217, 0);
+
+	private static Itinerary crossingFrom(int dock)
+	{
+		Itinerary crossing = Itinerary.passage(QUAY, FAR_QUAY, 100, 50);
+		crossing.setLeftPort(dock);
+		return crossing;
+	}
+
+	/** Every one of a crew is kept from sailing straight back, not only the one at the helm. */
+	@Test
+	public void everyMemberIsKeptFromSailingBack()
+	{
+		Itinerary crossing = crossingFrom(3);
+		GolemCrew crew = new GolemCrew(GolemBoat.SKIFF, crossing);
+		for (long seed = 1; seed <= 3; seed++)
+		{
+			Golem golem = golem(seed);
+			crew.sign(golem);
+			golem.boardCrossing(crossing);
+			assertEquals(3, golem.getTransportMemory().getBlockedPort());
+		}
+	}
+
+	/** A crossing given up at the quay to wait for a crew leaves the golem blocked as it was. */
+	@Test
+	public void aCrossingGivenUpLeavesTheBlockAsItWas()
+	{
+		Golem golem = golem(6L);
+		golem.getTransportMemory().setBlockedPort(7);
+		golem.boardCrossing(crossingFrom(3));
+		assertEquals(3, golem.getTransportMemory().getBlockedPort());
+		golem.waitAshore(101, 30, QUAY);
+		assertEquals(7, golem.getTransportMemory().getBlockedPort());
 	}
 }

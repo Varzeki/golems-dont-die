@@ -85,7 +85,7 @@ class Voyage
 	 * Plans a crossing from a dock, or returns null if the golem should stay ashore.
 	 *
 	 * @param from   the dock the golem is leaving
-	 * @param memory the golem's own memory, consulted and updated for the blocked port
+	 * @param memory the golem's own memory, consulted for the blocked port and the port it is waiting on
 	 */
 	Itinerary depart(SailingDocks.Dock from, WorldPoint at, TransportMemory memory, int tick, Random random,
 		RoamContext context)
@@ -167,7 +167,7 @@ class Voyage
 		}
 
 		notReady = false;
-		Itinerary crossing = crossTo(from, chosen, at, memory, tick, random, context);
+		Itinerary crossing = crossTo(from, chosen, at, tick, random, context);
 		// Waiting on this crossing's field, or its one search this frame: hold the choice.
 		if (crossing == null && notReady)
 		{
@@ -241,7 +241,7 @@ class Voyage
 		{
 			return null;
 		}
-		return crossTo(from, best, at, crew.get(0), tick, random, context);
+		return crossTo(from, best, at, tick, random, context);
 	}
 
 	/** How much a golem likes the look of a dock's own shore; 0 for a dock with no shore. */
@@ -257,8 +257,22 @@ class Voyage
 	 */
 	private boolean notReady;
 
-	/** Plans the crossing from one dock to a chosen other, or null if it cannot be sailed now. */
-	Itinerary crossTo(SailingDocks.Dock from, SailingDocks.Dock to, WorldPoint at, TransportMemory memory, int tick,
+	/**
+	 * Plans the crossing from one dock to a chosen other, or null if it cannot be sailed now. The
+	 * crossing carries the dock it leaves, for whoever takes it to be kept from sailing back to.
+	 */
+	Itinerary crossTo(SailingDocks.Dock from, SailingDocks.Dock to, WorldPoint at, int tick, Random random,
+		RoamContext context)
+	{
+		Itinerary crossing = plotCrossing(from, to, at, tick, random, context);
+		if (crossing != null)
+		{
+			crossing.setLeftPort(from.getRowId());
+		}
+		return crossing;
+	}
+
+	private Itinerary plotCrossing(SailingDocks.Dock from, SailingDocks.Dock to, WorldPoint at, int tick,
 		Random random, RoamContext context)
 	{
 		// A crossing that starts or ends off the open sea cannot cross the ocean mesh, the two ends
@@ -269,11 +283,10 @@ class Voyage
 		if (fromCave != toCave)
 		{
 			// Wyrmscraig's cave: across its lake, out through its mouth onto the sea, and on.
-			return throughCave(from, to, fromCave, memory, tick, random, context);
+			return throughCave(from, to, fromCave, tick, random, context);
 		}
 		if (!from.isOnOpenSea() || !to.isOnOpenSea())
 		{
-			memory.setBlockedPort(from.getRowId());
 			log.debug("Golem taking the passage {} -> {}", from.getName(), to.getName());
 			return passage(from, to, at, tick);
 		}
@@ -321,7 +334,6 @@ class Voyage
 			return null;
 		}
 
-		memory.setBlockedPort(from.getRowId());
 		log.debug("Golem sailing {} -> {}", from.getName(), to.getName());
 
 		// Gangplank to gangplank: the golem steps onto the raft on the water and off at the far
@@ -859,8 +871,8 @@ class Voyage
 	 * The sea leg joins the shipped routes at Wyrmscraig's own dock, the nearest port to the
 	 * mouth; only the short way between the two is searched live, once.
 	 */
-	private Itinerary throughCave(SailingDocks.Dock from, SailingDocks.Dock to, boolean fromCave, TransportMemory memory,
-		int tick, Random random, RoamContext context)
+	private Itinerary throughCave(SailingDocks.Dock from, SailingDocks.Dock to, boolean fromCave, int tick,
+		Random random, RoamContext context)
 	{
 		SailingDocks.Dock caveDock = fromCave ? from : to;
 		SailingDocks.Dock seaDock = fromCave ? to : from;
@@ -936,7 +948,6 @@ class Voyage
 			}
 		}
 
-		memory.setBlockedPort(from.getRowId());
 		log.debug("Golem sailing {} -> {} through the cave", from.getName(), to.getName());
 		return Itinerary.steered(wake.xs.toArray(), wake.ys.toArray(), wake.facings.toArray(), 0, tick, to.getShore());
 	}

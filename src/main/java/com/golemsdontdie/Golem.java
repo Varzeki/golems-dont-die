@@ -281,6 +281,10 @@ class Golem
 			if (replanned != null)
 			{
 				itinerary = replanned;
+				if (replanned.isVoyage())
+				{
+					leave(replanned);
+				}
 				noteUnstuck(tick);
 				return true;
 			}
@@ -490,9 +494,15 @@ class Golem
 	 */
 	void waitAshore(int tick, int ticks, WorldPoint quayside)
 	{
-		if (itinerary != null && itinerary.isVoyage())
+		// Only a crossing under way is being given up. One already sailed is still the plan of a
+		// golem out of view that has just come ashore here, and it was sailed.
+		if (itinerary != null && itinerary.isVoyage() && !itinerary.isFinished(tick))
 		{
 			history.unsailed();
+			if (itinerary.getLeftPort() >= 0)
+			{
+				transportMemory.setBlockedPort(blockedBefore);
+			}
 		}
 		path.clear();
 		walking = false;
@@ -595,8 +605,26 @@ class Golem
 		if (plan != null && plan.isVoyage())
 		{
 			history.sailed();
+			leave(plan);
 		}
 	}
+
+	/**
+	 * Keeps the golem from sailing straight back to the port a crossing it is taking leaves. Done
+	 * as it takes the crossing rather than as it is planned: one held for a crew's muster instead
+	 * had moved the block to a port the golem never left.
+	 */
+	private void leave(Itinerary crossing)
+	{
+		if (crossing.getLeftPort() >= 0)
+		{
+			blockedBefore = transportMemory.getBlockedPort();
+			transportMemory.setBlockedPort(crossing.getLeftPort());
+		}
+	}
+
+	/** The port blocked before the crossing it is on, put back if that crossing is given up at the quay. */
+	private int blockedBefore = -1;
 
 	/** The tile the golem is standing on or walking out of. */
 	WorldPoint currentTile()
