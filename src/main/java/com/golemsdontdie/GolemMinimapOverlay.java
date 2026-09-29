@@ -35,8 +35,11 @@ class GolemMinimapOverlay extends Overlay
 		InterfaceID.ToplevelOsm.MINIMAP,
 	};
 
-	/** How far the minimap reaches, in tiles, with a margin. Beyond this, skip the projection. */
-	private static final int MINIMAP_RANGE_TILES = 20;
+	/**
+	 * How far the minimap reaches, in tiles, zoomed all the way out. Beyond this, skip the
+	 * projection; within it, the projection says whether the dot is on the minimap at this zoom.
+	 */
+	private static final int MINIMAP_RANGE_TILES = 40;
 
 	private final Client client;
 	private final GolemsDontDiePlugin plugin;
@@ -106,20 +109,24 @@ class GolemMinimapOverlay extends Overlay
 			for (Golem golem : golems)
 			{
 				// Only golems in the scene: one that has wandered out is off the minimap
-				// anyway, and its local coordinates would be meaningless.
-				if (golem.getRenderer() == null || golem.getPlane() != wv.getPlane())
+				// anyway, and its local coordinates would be meaningless. Where it is drawn, not
+				// where it is simulated: inside an instance the two are rooms apart, and a crew's
+				// golems stand about the deck rather than all on the helm.
+				if (golem.getRenderer() == null || golem.getDrawPlane() != wv.getPlane())
+				{
+					continue;
+				}
+				int fineX = golem.getDrawFineX();
+				int fineY = golem.getDrawFineY();
+
+				if (Math.abs(fineX / Golem.TILE - playerX) > MINIMAP_RANGE_TILES
+					|| Math.abs(fineY / Golem.TILE - playerY) > MINIMAP_RANGE_TILES)
 				{
 					continue;
 				}
 
-				if (Math.abs(golem.getFineX() / Golem.TILE - playerX) > MINIMAP_RANGE_TILES
-					|| Math.abs(golem.getFineY() / Golem.TILE - playerY) > MINIMAP_RANGE_TILES)
-				{
-					continue;
-				}
-
-				int localX = golem.getFineX() - wv.getBaseX() * Golem.TILE;
-				int localY = golem.getFineY() - wv.getBaseY() * Golem.TILE;
+				int localX = fineX - wv.getBaseX() * Golem.TILE;
+				int localY = fineY - wv.getBaseY() * Golem.TILE;
 				if (!Golem.isInScene(wv, localX, localY))
 				{
 					continue;
