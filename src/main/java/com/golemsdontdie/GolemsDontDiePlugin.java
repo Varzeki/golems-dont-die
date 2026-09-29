@@ -1227,7 +1227,14 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		if (me != null && me.getPlane() == at.getPlane() && me.distanceTo2D(at) <= FOUND_TILES)
 		{
-			// Found. An arrow over a golem standing beside you is noise.
+			// Found, and the golem sees who came looking: it turns to the player and waves, unless it
+			// is in the middle of something a wave would break into. An arrow over a golem standing
+			// beside you is noise, so it goes.
+			int tick = roamContext.getTick();
+			if (finding.getRenderer() != null && freeToWave(finding, tick))
+			{
+				finding.greet(tick + GREET_TICKS, me.getX() - at.getX(), me.getY() - at.getY());
+			}
 			findGolem(null);
 			return;
 		}
@@ -2489,8 +2496,18 @@ public class GolemsDontDiePlugin extends Plugin
 	private static final float GREET_CHANCE = 0.05f;
 	private static final int GREET_TICKS = 4;
 
-	/** Ticks after a friendly golem's wave before it may wave again: six seconds. */
+	/**
+	 * Ticks after a friendly golem's first wave before it may wave again: six seconds, doubling
+	 * with each wave after it. At a steady six seconds a golem stood beside waved at the player
+	 * every few seconds for as long as they stood there.
+	 */
 	private static final int GREET_GAP_TICKS = 10;
+
+	/** The chance a friendly golem waves each tick when it first sees the player: likely, soon. */
+	private static final float FIRST_GREET_CHANCE = 0.35f;
+
+	/** How long the player must have been away before a friendly golem greets them afresh: 30s. */
+	private static final int AWAY_TICKS = 50;
 
 	/** The last tick the golems were asked whether they felt sociable. */
 	private int lastSocialTick = -1;
@@ -2632,15 +2649,20 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 		}
 
-		if (playerAt != null && GolemTrait.FRIENDLY.in(golem.getTraits())
-			&& golem.mayGreetAgain(tick, GREET_GAP_TICKS) && moods.nextFloat() < GREET_CHANCE)
+		if (playerAt != null && GolemTrait.FRIENDLY.in(golem.getTraits()))
 		{
 			WorldPoint at = golem.currentTile();
 			if (at.getPlane() == playerAt.getPlane() && at.distanceTo2D(playerAt) <= GREET_TILES)
 			{
-				// Turned to face the player: a wave over its shoulder is not a greeting.
-				golem.greet(tick + GREET_TICKS, playerAt.getX() - at.getX(), playerAt.getY() - at.getY());
-				return;
+				// A wave soon after the player comes by, then fewer and fewer while they stay.
+				int gap = golem.playerWaveGap(tick, GREET_GAP_TICKS, AWAY_TICKS);
+				float chance = golem.hasWavedAtPlayer() ? GREET_CHANCE : FIRST_GREET_CHANCE;
+				if (golem.mayGreetAgain(tick, gap) && moods.nextFloat() < chance)
+				{
+					// Turned to face the player: a wave over its shoulder is not a greeting.
+					golem.greetPlayer(tick + GREET_TICKS, playerAt.getX() - at.getX(), playerAt.getY() - at.getY());
+					return;
+				}
 			}
 		}
 

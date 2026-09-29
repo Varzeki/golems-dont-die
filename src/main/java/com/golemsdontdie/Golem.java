@@ -2327,6 +2327,39 @@ class Golem
 		greetUntil = 0;
 		partyUntil = 0;
 		wavedAtGolem = -1;
+		playerWaves = 0;
+		nearPlayerTick = Integer.MIN_VALUE;
+	}
+
+	/** Waves at the player since they last came by, and the last tick they were near. */
+	private int playerWaves;
+	private int nearPlayerTick = Integer.MIN_VALUE;
+
+	/**
+	 * Notes the player is near, and says how long this golem leaves between waves at them: the
+	 * gap given after the first wave, doubling with each one after, up to sixteen times as long.
+	 * Counted afresh once the player has been away, or the tick has gone backwards after a hop.
+	 */
+	int playerWaveGap(int tick, int gap, int awayTicks)
+	{
+		if (tick < nearPlayerTick || tick - nearPlayerTick > awayTicks)
+		{
+			playerWaves = 0;
+		}
+		nearPlayerTick = tick;
+		return gap << Math.min(Math.max(0, playerWaves - 1), 4);
+	}
+
+	boolean hasWavedAtPlayer()
+	{
+		return playerWaves > 0;
+	}
+
+	/** Waves at the player, and counts it. See playerWaveGap. */
+	void greetPlayer(int untilTick, int dx, int dy)
+	{
+		greet(untilTick, dx, dy);
+		playerWaves++;
 	}
 
 	/** Gives up waiting at a quay for a crew, and plans for itself again. */
