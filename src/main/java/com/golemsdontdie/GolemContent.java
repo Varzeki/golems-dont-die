@@ -200,6 +200,13 @@ final class GolemContent
 
 	/** Climbing over a wall, stile or broken fence. */
 	static final int ANIM_WALL_JUMP = 2583;
+
+	/**
+	 * Going through a door without opening it: the Stronghold of Security's door drag, pushed
+	 * through on the spot and out the far side. What the player was seen playing at Wyrmscraig's
+	 * cathedral doors, and what every door a golem passes plays.
+	 */
+	static final int ANIM_DOOR_THROUGH = 4282;
 	static final int ANIM_STILE = 14235;
 
 	/** Squeezing through a pipe or crevice. Mount, loop, dismount, as with the climb. */

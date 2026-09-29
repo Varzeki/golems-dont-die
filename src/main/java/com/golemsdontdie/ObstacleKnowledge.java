@@ -189,10 +189,11 @@ class ObstacleKnowledge
 				return false;
 
 			case GolemTransport.ARCHETYPE_DOOR:
-				// A golem cannot open a door: that changes a real object every other player can see.
-				// The tables carry door rows because a *player* can open them; walking through an
-				// open doorway needs no row at all.
-				return false;
+				// A golem cannot open or shut a door: that changes a real object every other player
+				// sees, and where a door stands decides where anyone can walk. It goes through a shut
+				// one instead, as at Wyrmscraig's cathedral doors: pushed through, then out the far
+				// side. An open one is only ground, and needs no row.
+				return true;
 
 			default:
 				// Gangplanks, ditches, climbs, ladders and the great mass of unclassified rows:

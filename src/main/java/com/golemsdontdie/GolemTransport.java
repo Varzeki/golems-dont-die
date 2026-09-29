@@ -326,6 +326,10 @@ final class GolemTransport
 				// reads from the geometry.
 				return new int[]{GolemContent.GOLEM_WALK_ANIMATION};
 
+			case ARCHETYPE_DOOR:
+				// Through the door, not by opening it, as at Wyrmscraig's cathedral doors.
+				return new int[]{GolemContent.ANIM_DOOR_THROUGH};
+
 			default:
 				return new int[0];
 		}

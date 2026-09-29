@@ -2096,7 +2096,9 @@ class Golem
 		// interpolating would slide the golem across the world.
 		int span = Math.abs(transport.getToX() - transport.getFromX())
 			+ Math.abs(transport.getToY() - transport.getFromY());
-		transitionGlide = transport.getFromPlane() == transport.getToPlane() && span <= 8;
+		// Not a door, which the golem is pushed through on the spot and comes out beyond.
+		transitionGlide = transport.getFromPlane() == transport.getToPlane() && span <= 8
+			&& transport.getArchetype() != GolemTransport.ARCHETYPE_DOOR;
 
 		// Movement is whole game ticks while the clip is whatever length it was drawn at:
 		// the measured hop covers its gap in one tick under a clip of nearly one and a
