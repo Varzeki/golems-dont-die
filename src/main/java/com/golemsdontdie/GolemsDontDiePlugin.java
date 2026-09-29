@@ -2317,24 +2317,115 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
-		int fineX = transport.getFromX() * Golem.TILE + Golem.TILE / 2;
-		int fineY = transport.getFromY() * Golem.TILE + Golem.TILE / 2;
-		int localX = fineX - wv.getBaseX() * Golem.TILE;
-		int localY = fineY - wv.getBaseY() * Golem.TILE;
-		if (!Golem.isInScene(wv, localX, localY))
+		// Drawn over the real object, where it stands and turned as it is turned: at the golem's
+		// tile and facing south, a gate swung open beside the gate, at right angles to it. The
+		// object is found rather than worked out, since only the scene knows its size and turn.
+		TileObject real = sceneObject(wv, transport.getObjectId(), transport.getFromX(),
+			transport.getFromY(), transport.getFromPlane());
+		if (real == null)
 		{
 			return;
 		}
-
-		int height = Perspective.getTileHeight(client,
-			new LocalPoint(localX, localY, wv), transport.getFromPlane());
+		LocalPoint at = real.getLocalLocation();
+		int localX = at.getX();
+		int localY = at.getY();
+		if (real instanceof DecorativeObject)
+		{
+			localX += ((DecorativeObject) real).getXOffset();
+			localY += ((DecorativeObject) real).getYOffset();
+		}
+		int fineX = localX + wv.getBaseX() * Golem.TILE;
+		int fineY = localY + wv.getBaseY() * Golem.TILE;
+		int height = Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), transport.getFromPlane());
+		// Scenery is turned in quarter turns as the scene loads; the copy is turned by the same.
+		int turn = (configOf(real) >> 6 & 3) * 512;
 
 		FakeProp drawn = new FakeProp(client, model,
 			modelFactory.animationFor(prop.getAnimation()), prop.getAnimation(),
 			fineX, fineY, transport.getFromPlane(), height, GolemContent.PROP_CYCLES);
+		drawn.setFacing(() -> turn);
 
 		client.registerRuneLiteObject(drawn);
 		props.add(drawn);
+	}
+
+	/** How far from where a golem uses an object the object itself may be, in tiles. */
+	private static final int OBJECT_REACH = 2;
+
+	/** The object with this id nearest a tile, on that floor of the scene, or null if none is loaded. */
+	private static TileObject sceneObject(WorldView wv, int objectId, int worldX, int worldY, int plane)
+	{
+		Scene scene = wv.getScene();
+		Tile[][][] tiles = scene == null ? null : scene.getTiles();
+		if (tiles == null || plane < 0 || plane >= tiles.length)
+		{
+			return null;
+		}
+		int sceneX = worldX - wv.getBaseX();
+		int sceneY = worldY - wv.getBaseY();
+		TileObject best = null;
+		int bestSpan = Integer.MAX_VALUE;
+		for (int x = sceneX - OBJECT_REACH; x <= sceneX + OBJECT_REACH; x++)
+		{
+			for (int y = sceneY - OBJECT_REACH; y <= sceneY + OBJECT_REACH; y++)
+			{
+				if (x < 0 || y < 0 || x >= tiles[plane].length || y >= tiles[plane][x].length || tiles[plane][x][y] == null)
+				{
+					continue;
+				}
+				Tile tile = tiles[plane][x][y];
+				int span = Math.max(Math.abs(x - sceneX), Math.abs(y - sceneY));
+				if (span >= bestSpan)
+				{
+					continue;
+				}
+				TileObject found = objectOn(tile, objectId);
+				if (found != null)
+				{
+					best = found;
+					bestSpan = span;
+				}
+			}
+		}
+		return best;
+	}
+
+	private static TileObject objectOn(Tile tile, int objectId)
+	{
+		if (tile.getWallObject() != null && tile.getWallObject().getId() == objectId)
+		{
+			return tile.getWallObject();
+		}
+		if (tile.getDecorativeObject() != null && tile.getDecorativeObject().getId() == objectId)
+		{
+			return tile.getDecorativeObject();
+		}
+		if (tile.getGroundObject() != null && tile.getGroundObject().getId() == objectId)
+		{
+			return tile.getGroundObject();
+		}
+		GameObject[] objects = tile.getGameObjects();
+		if (objects != null)
+		{
+			for (GameObject object : objects)
+			{
+				if (object != null && object.getId() == objectId)
+				{
+					return object;
+				}
+			}
+		}
+		return null;
+	}
+
+	/** An object's placement bits: its type, and in bits 6 and 7 its turn. */
+	private static int configOf(TileObject object)
+	{
+		return object instanceof GameObject ? ((GameObject) object).getConfig()
+			: object instanceof WallObject ? ((WallObject) object).getConfig()
+			: object instanceof DecorativeObject ? ((DecorativeObject) object).getConfig()
+			: object instanceof GroundObject ? ((GroundObject) object).getConfig()
+			: 0;
 	}
 
 	/**
