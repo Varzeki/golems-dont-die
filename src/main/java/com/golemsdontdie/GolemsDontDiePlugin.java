@@ -686,6 +686,7 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				golem.setNickname(name);
 				saveGolemsSoon();
+				pageRenamed(golem);
 			}),
 			() -> clientThread.invoke(this::reviveMissing),
 			golem -> clientThread.invoke(() -> findGolem(golem)),
@@ -731,6 +732,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			saveGolemsSoon();
+			pageRenamed(golem);
 			List<Golem> living = nearestFirst();
 			panel.refresh(living, missingGolems(living.size()), true);
 		});
@@ -831,6 +833,16 @@ public class GolemsDontDiePlugin extends Plugin
 			SwingUtilities.invokeLater(closing::close);
 		}
 		panel = null;
+	}
+
+	/** Tells an open golem page that a golem has a new name, in case it is that golem's page. */
+	private void pageRenamed(Golem golem)
+	{
+		GolemPage open = page;
+		if (open != null)
+		{
+			open.renamed(golem);
+		}
 	}
 
 	/**
@@ -1174,7 +1186,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (panel != null)
 		{
 			panel.setFinding(finding == null ? null
-				: names.of(finding) != null ? names.of(finding) : "that golem");
+				: names.of(finding) != null ? names.of(finding) : "an unnamed golem");
 		}
 		GolemPage open = page;
 		Golem target = finding;
@@ -1207,7 +1219,7 @@ public class GolemsDontDiePlugin extends Plugin
 			boolean comparable = me != null && me.getPlane() == at.getPlane()
 				&& WorldLayout.sameLayer(me.getY(), at.getY());
 			String name = names.of(finding);
-			findBox.show(name == null ? "a golem" : name, whereabouts.of(finding, roamContext.getTick()),
+			findBox.show(name == null ? "an unnamed golem" : name, whereabouts.of(finding, roamContext.getTick()),
 				comparable ? me.distanceTo2D(at) : -1);
 		}
 		if (me != null && me.getPlane() == at.getPlane() && me.distanceTo2D(at) <= FOUND_TILES)
@@ -3100,6 +3112,8 @@ public class GolemsDontDiePlugin extends Plugin
 		if (("autoName".equals(event.getKey()) || "nameStyle".equals(event.getKey())) && panel != null)
 		{
 			panel.namesChanged();
+			GolemPage open = page;
+			pageRenamed(open == null ? null : open.getShowing());
 		}
 
 		if ("maxGolems".equals(event.getKey()) || "limitGolems".equals(event.getKey()))

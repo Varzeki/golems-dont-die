@@ -197,7 +197,7 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "golemsJoinShip",
 		name = "Golems join your ship",
-		description = "Golems standing near your boat when you step aboard come too: they stand at "
+		description = "Golems standing near you when you step aboard come too: they stand at "
 			+ "the rail while you sail and step off where you do. Not while golem ambition is restricted.",
 		section = golemsSection,
 		position = 10

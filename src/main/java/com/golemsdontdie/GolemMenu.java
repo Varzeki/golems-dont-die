@@ -241,8 +241,9 @@ class GolemMenu
 		}
 	}
 
+	/** Sent as the game sends a real NPC's examine, so chat filters and colours treat it as one. */
 	private void message(String text)
 	{
-		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", text, null);
+		client.addChatMessage(ChatMessageType.NPC_EXAMINE, "", text, null);
 	}
 }

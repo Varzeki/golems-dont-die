@@ -1,12 +1,15 @@
 package com.golemsdontdie;
 
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.geom.*;
 import java.text.*;
 import java.util.*;
 import java.util.List;
 import java.util.function.*;
 import javax.swing.*;
+import javax.swing.Timer;
 import javax.swing.event.*;
 import net.runelite.client.ui.*;
 
@@ -130,6 +133,12 @@ class GolemListPanel extends PluginPanel
 	private final JButton next = new JButton(">");
 	private final JLabel pageLabel = new JLabel();
 	private final JPanel paging = new JPanel(new BorderLayout());
+
+	/**
+	 * Where the rows would be, when a search matches none of them. Not on the pager, which is hidden
+	 * with fewer than two pages and so is never there to say it.
+	 */
+	private final JLabel nothingFound = new JLabel("No golems found");
 
 	/** Says what the order is, under the pager: starred, then nearest, and nothing else said so. */
 	private final JLabel order = new JLabel("Starred first, then closest");
@@ -321,6 +330,13 @@ class GolemListPanel extends PluginPanel
 		JPanel filler = new Tracking();
 		filler.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		filler.add(rows, BorderLayout.NORTH);
+		nothingFound.setFont(ROW);
+		nothingFound.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		nothingFound.setHorizontalAlignment(SwingConstants.CENTER);
+		nothingFound.setVerticalAlignment(SwingConstants.TOP);
+		nothingFound.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+		nothingFound.setVisible(false);
+		filler.add(nothingFound, BorderLayout.CENTER);
 
 		JScrollPane scroll = new JScrollPane(filler,
 			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
@@ -368,7 +384,7 @@ class GolemListPanel extends PluginPanel
 	 * @param names   also take names given in game, which leave the roster otherwise unchanged
 	 */
 	/**
-	 * Puts the list back in order, unless the player is typing in it.
+	 * Puts the list back in order, unless the player is typing in it or has the mouse over it.
 	 *
 	 * <p>Reordering moves rows, and a text field taken out of the list and put back loses the keyboard:
 	 * a name half typed carried on into the game. So while a name or the search box has the caret the
@@ -382,7 +398,9 @@ class GolemListPanel extends PluginPanel
 			{
 				return;
 			}
-			roster = golems;
+			// Nor under the mouse: a row moved out from under the pointer gives the click meant for it
+			// to another golem. Golems still come and go; the order waits for the mouse to leave.
+			roster = pointedAt() ? inPlace(golems) : golems;
 			updateRevive(missing);
 			updateSummary(golems.size());
 			relist();
@@ -406,13 +424,35 @@ class GolemListPanel extends PluginPanel
 		return false;
 	}
 
+	/**
+	 * Whether the mouse is anywhere over this panel. Asked of where the pointer is on the screen
+	 * rather than kept from enter and exit events, which each row, button and field has its own of,
+	 * so that moving from one to the next inside the panel is not taken for leaving it.
+	 */
+	private boolean pointedAt()
+	{
+		if (!isShowing())
+		{
+			return false;
+		}
+		PointerInfo pointer = MouseInfo.getPointerInfo();
+		if (pointer == null)
+		{
+			return false;
+		}
+		Point at = pointer.getLocation();
+		SwingUtilities.convertPointFromScreen(at, this);
+		return contains(at);
+	}
+
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
 			// While a name is being typed the order stands, as it does for reorder: a row moved is a
-			// field that loses the keyboard. Golems still come and go.
-			roster = typing() ? inPlace(golems) : golems;
+			// field that loses the keyboard. So too while the mouse is over the list. Golems still
+			// come and go.
+			roster = typing() || pointedAt() ? inPlace(golems) : golems;
 			updateRevive(missing);
 			updateSummary(golems.size());
 			relist();
@@ -514,8 +554,9 @@ class GolemListPanel extends PluginPanel
 		paging.setVisible(pages > 1);
 		previous.setEnabled(page > 0);
 		next.setEnabled(page < pages - 1);
-		pageLabel.setText(matching.isEmpty() ? "No golems found"
-			: "Page " + (page + 1) + " of " + pages + "  (" + matching.size() + ")");
+		pageLabel.setText("Page " + (page + 1) + " of " + pages + "  (" + matching.size() + ")");
+		// Only for a search: an empty roster is already said, as "No golems yet", above.
+		nothingFound.setVisible(matching.isEmpty() && !wanted.isEmpty());
 		rows.revalidate();
 		rows.repaint();
 	}
@@ -606,6 +647,99 @@ class GolemListPanel extends PluginPanel
 		return isShowing();
 	}
 
+	/** How fast a hovered name too long for its field scrolls, in pixels a second. */
+	private static final int MARQUEE_SPEED = 30;
+
+	/** How long it rests at each end, in milliseconds, so the ends can be read. */
+	private static final int MARQUEE_REST = 1200;
+
+	/**
+	 * Scrolls the hovered name back and forth when it is too long for its field, so the whole of it
+	 * can be read without widening the field into the buttons' room. One timer for the panel, and
+	 * running only while a name is hovered.
+	 */
+	private final Timer marquee = new Timer(40, e -> scrollHovered());
+
+	/** The name field under the mouse, and when the mouse came onto it. */
+	private PlaceholderField hovered;
+	private long hoveredSince;
+
+	private void hover(PlaceholderField field)
+	{
+		hovered = field;
+		hoveredSince = System.currentTimeMillis();
+		marquee.start();
+	}
+
+	private void leave(PlaceholderField field)
+	{
+		if (hovered != field)
+		{
+			return;
+		}
+		hovered = null;
+		marquee.stop();
+		// Back to the beginning of the name, unless the caret is in it: then it is the caret's to place.
+		if (!field.isFocusOwner() || field.getText().isEmpty())
+		{
+			field.scrollTo(0);
+		}
+	}
+
+	private void scrollHovered()
+	{
+		PlaceholderField field = hovered;
+		if (field == null || !field.isShowing())
+		{
+			// The row went, rebuilt or turned off the page, without the mouse ever leaving it.
+			hovered = null;
+			marquee.stop();
+			return;
+		}
+		if (field.isFocusOwner())
+		{
+			// A name being typed stays where the caret put it: text moving under the caret would
+			// fight every keypress. Started over from the beginning once the caret has gone.
+			hoveredSince = System.currentTimeMillis();
+			if (field.getText().isEmpty())
+			{
+				field.scrollTo(0);
+			}
+			return;
+		}
+		field.scrollTo(marqueeOffset(field.overflow(), System.currentTimeMillis() - hoveredSince));
+	}
+
+	/**
+	 * How far along a name should be shown this long into the hover: resting at the beginning,
+	 * scrolled to the end, resting there, scrolled back, and round again.
+	 */
+	private static int marqueeOffset(int overflow, long elapsed)
+	{
+		if (overflow <= 0)
+		{
+			return 0;
+		}
+		long travel = overflow * 1000L / MARQUEE_SPEED;
+		long at = elapsed % (2 * (MARQUEE_REST + travel));
+		if (at < MARQUEE_REST)
+		{
+			return 0;
+		}
+		at -= MARQUEE_REST;
+		if (at < travel)
+		{
+			return (int) (overflow * at / travel);
+		}
+		at -= travel;
+		if (at < MARQUEE_REST)
+		{
+			return overflow;
+		}
+		at -= MARQUEE_REST;
+		return (int) (overflow - overflow * at / travel);
+	}
+
 	/** Puts a golem's name into its field, if it differs, without that counting as typing. */
 	private static void showName(Row row, Golem golem)
 	{
@@ -674,15 +808,29 @@ class GolemListPanel extends PluginPanel
 		// as somebody. Left as a prompt rather than put in the field: it is not a name until it
 		// is typed, and a field holding it would save it as one.
 		String suggested = names.suggested(golem);
-		JTextField name = new PlaceholderField(golem.getNickname(),
-			suggested == null ? "Unnamed Golem" : suggested);
+		PlaceholderField name = new PlaceholderField(golem.getNickname(),
+			suggested == null ? "Unnamed golem" : suggested);
 		name.setMinimumSize(SQUEEZED);
 		// A field holding more than it can show scrolls to the caret, and a fresh one leaves that
 		// at the end: a golem with a long name showed the last of it with the first off the left
 		// edge. The row is built with the name already in it, so this is where it is wound back.
 		name.setCaretPosition(0);
 		Row[] self = new Row[1];
-		name.setToolTipText("Name this golem");
+		name.nameTip();
+		name.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				hover(name);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				leave(name);
+			}
+		});
 		name.getDocument().addDocumentListener(new DocumentListener()
 		{
 			@Override
@@ -705,6 +853,8 @@ class GolemListPanel extends PluginPanel
 
 			private void rename()
 			{
+				// Typed or put in from the game, the tip says the name the field now holds.
+				name.nameTip();
 				if (self[0] != null && self[0].settingName)
 				{
 					return;
@@ -898,9 +1048,12 @@ class GolemListPanel extends PluginPanel
 	{
 		private final String prompt;
 
+		/** How far the prompt is scrolled to the left, while a prompt too long for the field is hovered. */
+		private int promptOffset;
+
 		PlaceholderField(String initial)
 		{
-			this(initial, "Unnamed Golem");
+			this(initial, "Unnamed golem");
 		}
 
 		PlaceholderField(String initial, String prompt)
@@ -912,6 +1065,49 @@ class GolemListPanel extends PluginPanel
 			setForeground(Color.WHITE);
 			setCaretColor(Color.WHITE);
 			setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+		}
+
+		/**
+		 * Says the whole name, typed or prompted, when a golem's name field is hovered. The field is
+		 * kept narrow so the buttons beside it have their room, and a long name is cut off in it.
+		 */
+		void nameTip()
+		{
+			String typed = getText().trim();
+			String shown = (typed.isEmpty() ? prompt : typed)
+				.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+			setToolTipText("<html>" + shown + "<br>" + (typed.isEmpty() ? "Click to name" : "Click to rename")
+				+ "</html>");
+		}
+
+		/** How many pixels of what the field shows, its text or else its prompt, do not fit in it. */
+		int overflow()
+		{
+			if (getText().isEmpty())
+			{
+				Insets edges = getInsets();
+				return getFontMetrics(PLACEHOLDER).stringWidth(prompt) - (getWidth() - edges.left - edges.right);
+			}
+			BoundedRangeModel visible = getHorizontalVisibility();
+			return visible.getMaximum() - visible.getExtent();
+		}
+
+		/**
+		 * Shows what the field holds from this many pixels in. Text is scrolled the way the field
+		 * scrolls it for the caret; the prompt is painted here and not by the field, so it is moved
+		 * along by hand.
+		 */
+		void scrollTo(int offset)
+		{
+			if (!getText().isEmpty())
+			{
+				setScrollOffset(offset);
+			}
+			else if (promptOffset != offset)
+			{
+				promptOffset = offset;
+				repaint();
+			}
 		}
 
 		@Override
@@ -934,9 +1130,13 @@ class GolemListPanel extends PluginPanel
 
 				// On the same baseline as the real text, so the prompt does not jump
 				// when the player types over it.
-				int x = getInsets().left;
+				Insets edges = getInsets();
+				int x = edges.left - promptOffset;
 				int y = (getHeight() - g2.getFontMetrics().getHeight()) / 2
 					+ g2.getFontMetrics().getAscent();
+				// Kept inside the border, as the field keeps its own text, so a prompt scrolled
+				// left does not run out over the edge.
+				g2.clipRect(edges.left, 0, getWidth() - edges.left - edges.right, getHeight());
 				g2.drawString(prompt, x, y);
 			}
 			finally
