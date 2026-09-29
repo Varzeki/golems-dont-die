@@ -3002,7 +3002,7 @@ public class GolemsDontDiePlugin extends Plugin
 		obstacleObserver.onClientTick();
 
 		// The map as soon as it opens, and every frame until it knows where it draws a cave.
-		if (mapPoints.wantsFrame())
+		if (mapPoints.wantsFrame(golems))
 		{
 			refreshMap();
 		}

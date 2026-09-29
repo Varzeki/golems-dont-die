@@ -49,9 +49,6 @@ class GolemMapPoints
 	/** How far north of the ground above it a cave is laid out, and drawn. See WorldLayout. */
 	private static final int UNDERGROUND = WorldLayout.CAVE_OFFSET;
 
-	/** Whether the map is looking at a dungeon rather than the ground above it. For the log. */
-	private boolean underground;
-
 	/**
 	 * The map being looked at, which is what decides where a golem belongs on it.
 	 *
@@ -83,31 +80,45 @@ class GolemMapPoints
 	/** Whether the map was shut last time this ran: opening it is what starts a measurement. */
 	private boolean wasShut = true;
 
-	/** Frames since the map opened, while the measurement is still being attempted. */
+	/** Game ticks since the map opened, while the measurement is still being attempted. */
 	private int sinceOpen;
 
 	/**
-	 * Whether the map wants a refresh before the next game tick: while it is shut, so opening it is
-	 * seen on the frame it happens, and while it is open and not yet measured. A tick is 600ms, and
-	 * a golem underground has no place on the map until the measurement is made; asked once a tick,
-	 * the golems in a cave came onto the map a second or more after everything else.
+	 * Whether the map wants a refresh before the next game tick: on the frame it opens, and on the
+	 * frame the measurement succeeds. A tick is 600ms, and a golem underground has no place on the
+	 * map until the measurement is made; asked once a tick, the golems in a cave came onto the map
+	 * a second or more after everything else. Only the measurement is tried each frame — a whole
+	 * refresh every frame, for a map that could not be measured, was the roster sorted fifty times
+	 * a second for seven seconds.
 	 */
-	boolean wantsFrame()
+	boolean wantsFrame(List<Golem> roster)
 	{
 		if (wasShut)
 		{
 			Widget window = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
 			return window != null && !window.isHidden();
 		}
-		return !measured && sinceOpen <= MEASURE_FRAMES;
+		if (measured || sinceOpen > MEASURE_TICKS)
+		{
+			return false;
+		}
+		WorldMap map = client.getWorldMap();
+		if (map == null || map.getWorldMapData() != measuredFor)
+		{
+			// Another map was picked: the refresh starts its measurement over.
+			return true;
+		}
+		measure(map.getWorldMapPosition(), roster);
+		return measured;
 	}
 
 	/**
-	 * How long after the map opens, in game ticks, the translation may be measured. The first frame is too early —
-	 * the map still holds the position it was left at, and the centre is not the player yet — and
-	 * long after it the player may have panned somewhere else, where the centre means nothing.
+	 * How long after the map opens, in game ticks, the translation may be measured. The first
+	 * frames can be too early — the map still holds the position it was left at, and the centre is
+	 * not the player yet, which measure's checks turn down — and long after it the player may have
+	 * panned somewhere else, where the centre means nothing.
 	 */
-	private static final int MEASURE_FRAMES = 12;
+	private static final int MEASURE_TICKS = 12;
 
 	/** Golems sampled to check a measurement, and how near the player they must be to count. */
 	private static final int SAMPLE = 30;
@@ -256,9 +267,6 @@ class GolemMapPoints
 		int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2) + MARGIN;
 		int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2) + MARGIN;
 
-		// Only for the log: which layer is on screen is settled per golem, below.
-		underground = centre.getY() >= UNDERGROUND;
-
 		if (showing != measuredFor)
 		{
 			// A different map, drawn somewhere else again.
@@ -268,7 +276,7 @@ class GolemMapPoints
 			offsetY = 0;
 			sinceOpen = 0;
 		}
-		if (!measured && sinceOpen <= MEASURE_FRAMES)
+		if (!measured && sinceOpen <= MEASURE_TICKS)
 		{
 			measure(centre, roster);
 		}
@@ -728,6 +736,24 @@ class GolemMapPoints
 			// No "Focus on" entry: it is a second thing to read beside the tooltip, in a menu the
 			// map puts up whether or not anything was asked of it.
 			setJumpOnClick(false);
+		}
+
+		/**
+		 * Only ever itself. RuneLite's point is a value, equal to any other at the same tile with the
+		 * same picture and tooltip, and the map takes points off by equality: two unnamed golems on
+		 * one tile, and taking one face off took the other's, leaving a face on the map that nothing
+		 * held any more, through closing the map and turning the plugin off.
+		 */
+		@Override
+		public boolean equals(Object other)
+		{
+			return this == other;
+		}
+
+		@Override
+		public int hashCode()
+		{
+			return System.identityHashCode(this);
 		}
 
 		/** What this face is of: a golem's name, or how many golems are standing together. */
