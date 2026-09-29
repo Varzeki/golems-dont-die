@@ -438,7 +438,7 @@ class GolemListPanel extends PluginPanel
 	 * Takes the roster as it now stands, in the order the client thread put it: nearest first.
 	 *
 	 * <p>Only a page of it is ever built. One row is half a dozen Swing components, and a player who
-	 * has crafted for months has thousands of golems — sixty thousand components in one scroll pane
+	 * has crafted for months has thousands of golems - sixty thousand components in one scroll pane
 	 * is minutes of laying out and megabytes held for a list nobody can read anyway.
 	 *
 	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
@@ -1041,7 +1041,7 @@ class GolemListPanel extends PluginPanel
 
 	/**
 	 * A text field that shows dimmed italic prompt text while it is empty. Swing has no
-	 * placeholder, and the obvious workaround — real text cleared on focus — is wrong here:
+	 * placeholder, and the obvious workaround - real text cleared on focus - is wrong here:
 	 * that text is indistinguishable from a name and would be saved as one.
 	 */
 	private static final class PlaceholderField extends JTextField

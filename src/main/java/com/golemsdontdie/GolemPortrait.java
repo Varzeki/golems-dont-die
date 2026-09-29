@@ -11,13 +11,13 @@ import net.runelite.api.*;
  * it is about rather than the same picture twenty thousand times.
  *
  * <p>The pose and the angle come out of the golem's seed, so each golem stands a little
- * differently and always the same way — one caught mid-idle, another square on, another half
+ * differently and always the same way - one caught mid-idle, another square on, another half
  * turned away.
  *
  * <p>Drawn here rather than by the client. The scene renderer draws what is in the scene, and a
  * golem on the other side of the world is not; the model itself is all that is needed, so the
  * faces are sorted by depth and filled flat, which at this size reads as the low-poly figure it
- * is. Client thread only — the models and the animation frames belong to it.
+ * is. Client thread only - the models and the animation frames belong to it.
  */
 @Singleton
 class GolemPortrait
@@ -42,7 +42,7 @@ class GolemPortrait
 	 * <p>Picked from what the golem already plays in the world. Others were tried and left out:
 	 * squeezing through a gap leans the whole model at the viewer, a climb turns its head away, and
 	 * the beam-walking poses hold both arms straight out, which a picture cut at the waist loses.
-	 * The listing is the weighting — a pose named twice comes up twice as often.
+	 * The listing is the weighting - a pose named twice comes up twice as often.
 	 */
 	private static final int[] POSES = {
 		GolemContent.GOLEM_IDLE_ANIMATION,
@@ -195,7 +195,7 @@ class GolemPortrait
 		}
 
 		// Framed on the golem standing: its top half, at the size that fills the frame. Whatever
-		// the pose puts outside that — a raised hand, the legs below the cut — falls off the edge.
+		// the pose puts outside that - a raised hand, the legs below the cut - falls off the edge.
 		float[] framing = framing(standing, shown);
 		float scale = zoom * framing[0];
 		float offsetX = WIDTH / 2f;

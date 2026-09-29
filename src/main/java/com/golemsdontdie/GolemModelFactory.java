@@ -35,7 +35,7 @@ class GolemModelFactory
 
 	/**
 	 * One built model per NPC ID, shared by every golem wearing it. Every golem is the same NPC,
-	 * so building one each meant a cache load, merge, vertex clone and lighting pass per golem —
+	 * so building one each meant a cache load, merge, vertex clone and lighting pass per golem -
 	 * seconds of stall as a few hundred arrive with the scene. Safe because
 	 * {@link Client#applyTransformations} clones its source's vertices rather than writing to it.
 	 */
@@ -60,8 +60,8 @@ class GolemModelFactory
 
 	/**
 	 * Animation definitions, shared the same way the models are: there are exactly two across the
-	 * whole population, and an {@link Animation} is immutable frame data — mutable playback state
-	 * lives in each golem's own controller — so one copy of each serves every golem.
+	 * whole population, and an {@link Animation} is immutable frame data - mutable playback state
+	 * lives in each golem's own controller - so one copy of each serves every golem.
 	 */
 	private final Map<Integer, Animation> animations = new HashMap<>();
 
@@ -87,7 +87,7 @@ class GolemModelFactory
 	 * True if this animation is built to repeat.
 	 *
 	 * <p>{@code frameStep} is how many frames the client winds back at a clip's end: positive
-	 * loops, -1 runs once. It cannot be guessed from the name — {@code human_climbing} (737) does
+	 * loops, -1 runs once. It cannot be guessed from the name - {@code human_climbing} (737) does
 	 * not loop, {@code human_climbing_loop} (4435) does. Only a loop may be stretched to fill a
 	 * duration; a stretched one-shot restarts partway and drifts.
 	 */
@@ -111,7 +111,7 @@ class GolemModelFactory
 		}
 
 		// Frame lengths, summed, not getDuration(): that is a frame *count*, and reading it as
-		// cycles made every clip four or five times shorter — a hop came out at 8 cycles against
+		// cycles made every clip four or five times shorter - a hop came out at 8 cycles against
 		// its real 38. Frame lengths are in client cycles.
 		int[] frames = animation.getFrameLengths();
 		if (frames == null || frames.length == 0)

@@ -24,12 +24,12 @@ import net.runelite.api.coords.*;
  *
  * <p>The <i>live</i> half of a pair: {@link WorldMesh} is the shipped read-only floor for
  * the whole reachable world, and this takes precedence wherever the two disagree, because
- * a harvest reflects the world as it is now — objects that come and go included, and the
+ * a harvest reflects the world as it is now - objects that come and go included, and the
  * window between a game update and the mesh being regenerated.
  *
  * <p>What is persisted is the island and everywhere golems have been found able to reach from
  * it: every instance the player loads, and the ground around the far end of every learned route.
- * That grows as the player plays, deliberately — the shipped data does not cover instances or
+ * That grows as the player plays, deliberately - the shipped data does not cover instances or
  * every shortcut yet, and until it does, what was learned is kept. The world the mesh covers
  * stays in the jar.
  */
@@ -42,8 +42,8 @@ class IslandMemory
 
 	/**
 	 * The island map shipped with the plugin, covering the nine regions around the crafting
-	 * site. Built from Shortest Path's world collision map — generated from the cache with XTEA
-	 * keys the local key file lacks for these regions — and cross-checked tile by tile against
+	 * site. Built from Shortest Path's world collision map - generated from the cache with XTEA
+	 * keys the local key file lacks for these regions - and cross-checked tile by tile against
 	 * live collision. Without it, free roam could only cover ground the player had walked.
 	 *
 	 * @see #loadBundled()
@@ -60,7 +60,7 @@ class IslandMemory
 
 	/**
 	 * Tiles at the edge of the loaded scene that are never harvested. The client fills a border
-	 * of the scene's collision with "blocked" whatever is really there — harmless while
+	 * of the scene's collision with "blocked" whatever is really there - harmless while
 	 * harvesting only added open edges, but once a harvest cleared what it re-read it wrote a
 	 * band of false walls, boxing the plinth into two hundred tiles.
 	 */
@@ -113,7 +113,7 @@ class IslandMemory
 	 *
 	 * <p>A region is 64 tiles square and a scene rarely shows all of one. Unread tiles were
 	 * zeros, zeros read as walls, and those walls stood in front of the shipped mesh for the
-	 * whole region — golems were rescued off cave ground the mesh knows perfectly well.
+	 * whole region - golems were rescued off cave ground the mesh knows perfectly well.
 	 */
 	private final Map<Long, long[]> seen = new HashMap<>();
 
@@ -444,8 +444,8 @@ class IslandMemory
 
 	/**
 	 * Records an instance's ground under its template's coordinates, which is where golems in an
-	 * instance are simulated. The template room is sealed off — nothing leads into it on foot,
-	 * which is why golems that wandered in were stuck — so its floor can only be learned from an
+	 * instance are simulated. The template room is sealed off - nothing leads into it on foot,
+	 * which is why golems that wandered in were stuck - so its floor can only be learned from an
 	 * instance built on it. An edge is only recorded where both tiles come from the same
 	 * template, side by side: chunks are stitched together as the instance is built, so
 	 * neighbours there need not be neighbours in the world.
@@ -569,7 +569,7 @@ class IslandMemory
 	 * Can something step one tile from (x, y), cardinal or diagonal? A diagonal is a corner and
 	 * the game will not cut one: both ways round must be clear, or a golem would slip between
 	 * two walls meeting at a point. The four-term tests below are the game's own rule, from
-	 * Shortest Path's {@code CollisionMap}. Diagonals matter — Port Tasks' sailing routes are
+	 * Shortest Path's {@code CollisionMap}. Diagonals matter - Port Tasks' sailing routes are
 	 * 854 perfect diagonals against 817 axis-aligned segments.
 	 */
 	boolean canStep(int x, int y, int plane, int dx, int dy)
@@ -621,7 +621,7 @@ class IslandMemory
 	 */
 	private boolean get(int x, int y, int plane, int flag)
 	{
-		// The client does not block the open sea — boats sail it — so a harvest reads it as
+		// The client does not block the open sea - boats sail it - so a harvest reads it as
 		// open ground, and the shipped island map lists the water off the cathedral as
 		// walkable. The mesh's ocean bit marks exactly that sea, so it overrules every source.
 		int toX = flag == FLAG_EAST ? x + 1 : x;
@@ -642,14 +642,14 @@ class IslandMemory
 			return (bits[bit >> 6] >>> (bit & 63) & 1L) != 0L;
 		}
 
-		// The mesh says water is passable, because it is — to a boat. A step is refused unless
+		// The mesh says water is passable, because it is - to a boat. A step is refused unless
 		// both ends are ground the land fill reached; both, because land beside water has a
 		// perfectly open edge leading off the beach.
 		//
 		// The land mask, not the ocean bit: ocean marks only the one connected sea, so cave
 		// water, lakes and enclosed basins passed the old check, most visibly inside
 		// Wyrmscraig's caves. The live harvest needs no such check, except that the client
-		// does not block water a boat can sail — which is why the sea and the underground lake
+		// does not block water a boat can sail - which is why the sea and the underground lake
 		// are refused first. See WorldMesh.isInlandWater.
 		if (flag == FLAG_NORTH)
 		{
@@ -669,7 +669,7 @@ class IslandMemory
 	}
 
 	/**
-	 * Something that changes passability was added or removed — a door opening or shutting — so
+	 * Something that changes passability was added or removed - a door opening or shutting - so
 	 * its region is read again on the next harvest. A region was harvested once a session and
 	 * then trusted, which a door makes wrong: open when read, shut a minute later, and golems
 	 * still walking through.
@@ -709,7 +709,7 @@ class IslandMemory
 
 	/**
 	 * Encodes the whole memory as one string: anchor, then each region-plane's bits, gzipped
-	 * and base64'd. Compression is not a nicety — a region is 1KB of flags and a passability
+	 * and base64'd. Compression is not a nicety - a region is 1KB of flags and a passability
 	 * map is overwhelmingly long runs of "walkable", so it deflates to a fraction, which is the
 	 * difference between a config value and an abuse of one.
 	 */

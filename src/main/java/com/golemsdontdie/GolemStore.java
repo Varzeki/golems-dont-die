@@ -10,7 +10,7 @@ import net.runelite.api.coords.*;
  * Reads and writes the saved golem roster.
  *
  * <p>Only what the cache cannot supply is written: the NPC ID, position, home tile, the three
- * animation IDs no composition exposes, and what the golem has been and done — its seed, traits,
+ * animation IDs no composition exposes, and what the golem has been and done - its seed, traits,
  * history and journal. Everything visual is re-fetched on load, so the save stays a couple of
  * dozen numbers per golem. A flat delimited string rather than JSON: the record
  * is all numbers, and a save the player can read and edit is worth more than a schema.
@@ -231,12 +231,12 @@ class GolemStore
 		WorldPoint home = new WorldPoint(saved.homeX, saved.homeY, saved.plane);
 
 		// A golem's seed is its character: its gait comes out of it, and so do its traits. It is
-		// saved with the golem for that reason — worked out from where it stood, it changed every
+		// saved with the golem for that reason - worked out from where it stood, it changed every
 		// time the golem moved, and a golem came back a different one.
 		//
 		// Saves written before it was kept have none, and one is made for them the old way: from
-		// the position and the index, the index because two golems on one tile — which is what a
-		// spawn tile gives you — would otherwise share a seed and a gait.
+		// the position and the index, the index because two golems on one tile - which is what a
+		// spawn tile gives you - would otherwise share a seed and a gait.
 		long seed = saved.seed != 0 ? saved.seed
 			: ((long) saved.worldX << 32) ^ ((long) saved.worldY << 8) ^ saved.npcId ^ (index * 0x9E3779B9L);
 		Golem golem = Golem.onTile(snapshot, home, seed, at);

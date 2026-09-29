@@ -17,7 +17,7 @@ import static com.golemsdontdie.RouteGeometry.span;
  *
  * <p>A ship is a world of its own: aboard, the player stands in the boat's own world view, which the
  * client moves and turns as the boat sails. A golem aboard is drawn in that same view, at a place on
- * the deck, so the client carries it with the boat exactly as it carries the player — nothing here
+ * the deck, so the client carries it with the boat exactly as it carries the player - nothing here
  * chases a moving hull frame by frame. Its simulated position is kept at the boat's place in the
  * main world, which is what the map, the sidebar and the distance to it want.
  *
@@ -35,7 +35,7 @@ class GolemShipmates
 
 	/**
 	 * How near where the ship was the player must step ashore for the golems to step ashore with
-	 * them. Further, and the player left some other way — a teleport, a log out — and the golems go
+	 * them. Further, and the player left some other way - a teleport, a log out - and the golems go
 	 * back to the quay they boarded at rather than appearing wherever the player landed.
 	 */
 	private static final int LANDING_TILES = 12;
@@ -308,7 +308,7 @@ class GolemShipmates
 	 * What stands in the way on each tile of a deck. Off the hull, its collision. Over the hull, the
 	 * ship itself says, and not in its collision, which on a skiff marks the mast's tile blocked and
 	 * leaves the salvaging station's open: a tile is deck unless the deck's settings mark it blocked,
-	 * as the bow and the helm's row are, or something that fills its tile stands on it — an object
+	 * as the bow and the helm's row are, or something that fills its tile stands on it - an object
 	 * placed with bit 0x100 of its config, which the stations, the wind catcher and the flag are
 	 * and the mast, the sail, the helm and the cleats are not. Read so, a skiff's deck is the five
 	 * places a player can walk to, where the collision gave golems the stations to stand in.
@@ -584,7 +584,7 @@ class GolemShipmates
 
 	/**
 	 * Sends every golem aboard back to the quay it boarded from: the voyage is over for a reason the
-	 * golems were not part of — a world hop, a log out, the plugin stopping.
+	 * golems were not part of - a world hop, a log out, the plugin stopping.
 	 */
 	void abandon(int tick)
 	{

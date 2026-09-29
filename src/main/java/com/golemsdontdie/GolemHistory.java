@@ -10,8 +10,8 @@ import static com.golemsdontdie.RouteGeometry.span;
  * What one golem has done, in six numbers and a short journal: enough for its own page, and little
  * enough to save beside a roster of ten thousand.
  *
- * <p>Distance is sampled rather than counted. Nothing watches a far golem walk — it is moved along
- * a route by the tick — so this takes the ground between one census and the next, a few seconds
+ * <p>Distance is sampled rather than counted. Nothing watches a far golem walk - it is moved along
+ * a route by the tick - so this takes the ground between one census and the next, a few seconds
  * apart, and throws away any step too long to have been walked: that was a shortcut or a crossing,
  * and they are counted on their own.
  */
@@ -79,7 +79,7 @@ class GolemHistory
 	/**
 	 * The last twenty places the golem arrived in, and how it got to each.
 	 *
-	 * <p>One int apiece — region, plane and manner packed together — and the array is not made
+	 * <p>One int apiece - region, plane and manner packed together - and the array is not made
 	 * until a golem goes somewhere, because ten thousand golems pay for anything kept per golem.
 	 * The names are looked up when the page is opened rather than stored: they are the same
 	 * strings for every golem that has been to the same place.
@@ -159,7 +159,7 @@ class GolemHistory
 			return;
 		}
 
-		// Walked off the surface — into a cave, or somewhere laid out apart from the map, such as
+		// Walked off the surface - into a cave, or somewhere laid out apart from the map, such as
 		// God Wars or Zanaris: that is exploring, and reads better than walking.
 		GolemTravel arrived = mannerRegion == -1 || mannerRegion == region ? manner : GolemTravel.WALKED;
 		GolemTravel how = arrived == GolemTravel.WALKED && !WorldLayout.isSurface(y)
@@ -223,8 +223,8 @@ class GolemHistory
 
 	/**
 	 * The journal for the save file, oldest first: each entry's packed region, plane and manner in
-	 * three bytes, then its minute — the first in full, the rest as minutes since the one before,
-	 * which are small — in base 64. About six characters an entry rather than the twenty the
+	 * three bytes, then its minute - the first in full, the rest as minutes since the one before,
+	 * which are small - in base 64. About six characters an entry rather than the twenty the
 	 * numbers written out would take, over a roster of thousands. Empty for no journal.
 	 */
 	String journalCode()
@@ -366,7 +366,7 @@ class GolemHistory
 	 *
 	 * <p>A cave counts as the ground above it: it is laid out a hundred regions north of what it runs
 	 * under, and a golem in the cave under the island is not six thousand tiles from home, it is
-	 * under it. Somewhere laid out apart from the map — God Wars, TzHaar — is under nowhere that can
+	 * under it. Somewhere laid out apart from the map - God Wars, TzHaar - is under nowhere that can
 	 * be named, and a number measured to it would be a number about the layout, not the golem.
 	 */
 	private static int away(int x, int y, WorldPoint home)

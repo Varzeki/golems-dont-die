@@ -7,7 +7,7 @@ package com.golemsdontdie;
  * the most northerly land on it, the Frozen Temple, is at 4121. Caves dug under that ground are laid
  * out {@link #CAVE_OFFSET} tiles north of what they run beneath, which is what lets the world map
  * draw a cave over its hill. And between the two is everything laid out apart from the map with no
- * ground above it that can be named — God Wars, TzHaar, Motherlode Mine and Zanaris, but also
+ * ground above it that can be named - God Wars, TzHaar, Motherlode Mine and Zanaris, but also
  * Prifddinas, which is not underground at all. Nothing about a tile in that band says where it is.
  */
 final class WorldLayout

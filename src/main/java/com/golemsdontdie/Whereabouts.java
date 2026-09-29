@@ -7,7 +7,7 @@ import net.runelite.api.coords.*;
  * Where a golem is, in words: "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
  *
  * <p>Said the way a player would say it, from what the golem is doing rather than from its
- * coordinates alone — a golem halfway across the sea is between two ports, and naming the water it
+ * coordinates alone - a golem halfway across the sea is between two ports, and naming the water it
  * is over would tell nobody anything.
  */
 @Singleton

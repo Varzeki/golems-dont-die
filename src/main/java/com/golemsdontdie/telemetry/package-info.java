@@ -1,21 +1,21 @@
 /**
- * Obstacle data: what the plugin keeps on disk about obstacles, and — in a later update — what it
+ * Obstacle data: what the plugin keeps on disk about obstacles, and - in a later update - what it
  * will offer to send. <b>This package is the whole of it.</b>
  *
  * <h2>For a reviewer</h2>
  *
  * <p>Everything that decides what is recorded, how it is written and (later) what leaves the
- * machine is in these files, and they depend on nothing else in the plugin — only the JDK and a
+ * machine is in these files, and they depend on nothing else in the plugin - only the JDK and a
  * logger. The rest of the plugin reaches this package through exactly one class,
  * {@code com.golemsdontdie.ObstacleDataBridge}, which copies numbers out of the plugin's own objects
  * into the plain records here. Reading this package and that bridge is reading all of it.
  *
  * <ul>
- *   <li>{@link com.golemsdontdie.telemetry.PlayerCrossing} — one crossing of an obstacle by the
+ *   <li>{@link com.golemsdontdie.telemetry.PlayerCrossing} - one crossing of an obstacle by the
  *       player: the object, what it played, how long it took, and the path taken across it.</li>
- *   <li>{@link com.golemsdontdie.telemetry.GolemCrossing} — one crossing of an obstacle by a golem
+ *   <li>{@link com.golemsdontdie.telemetry.GolemCrossing} - one crossing of an obstacle by a golem
  *       the player could see: the route it used and the path it actually took.</li>
- *   <li>{@link com.golemsdontdie.telemetry.ObstacleDataFile} — the file: reading it, adding to it,
+ *   <li>{@link com.golemsdontdie.telemetry.ObstacleDataFile} - the file: reading it, adding to it,
  *       and writing it back. The format is described at the top of that class and at the top of the
  *       file itself.</li>
  * </ul>
@@ -26,7 +26,7 @@
  * one is to watch a player use it. There are hundreds in the game and no one player visits them
  * all, so what one player's crossing proves could unlock that obstacle for everybody in a later
  * release. The golem crossings are the other half: they show where golems perform an obstacle
- * wrongly — crossing a stile on the slant, landing short, hopping over a stepping stone — so it can
+ * wrongly - crossing a stile on the slant, landing short, hopping over a stepping stone - so it can
  * be fixed.
  *
  * <h2>What is kept, and what is not</h2>

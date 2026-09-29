@@ -7,7 +7,7 @@ import net.runelite.api.coords.*;
 /**
  * Between an instance and the fixed place in the world it is copied from.
  *
- * <p>An instance — a boss room behind a church pew — is built fresh on every visit, in
+ * <p>An instance - a boss room behind a church pew - is built fresh on every visit, in
  * coordinates that mean nothing next time. Its template, the static copy elsewhere assembled from
  * in eight-tile chunks, does stay put, so all a golem keeps about an instance is in template
  * coordinates: golems wander the template room and are drawn in whichever instance is loaded.

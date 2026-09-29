@@ -10,7 +10,7 @@ import lombok.*;
  * player and nothing about where the player was otherwise.
  *
  * <p>Distances are in 128ths of a tile and times in client cycles (20 ms) unless a field says
- * otherwise — the units the game animates in.
+ * otherwise - the units the game animates in.
  */
 @AllArgsConstructor
 public final class PlayerCrossing

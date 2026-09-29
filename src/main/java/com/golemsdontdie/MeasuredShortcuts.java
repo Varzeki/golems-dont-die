@@ -3,8 +3,8 @@ package com.golemsdontdie;
 /**
  * Shortcuts whose real animation was watched in game, keyed by the object.
  *
- * <p>Which clip an obstacle plays is decided server-side and appears in no file — object
- * definitions carry the object's own animation, not the person's — so every entry below was
+ * <p>Which clip an obstacle plays is decided server-side and appears in no file - object
+ * definitions carry the object's own animation, not the person's - so every entry below was
  * measured in game. Measurements beat the archetype mapping in {@link GolemTransport}, which
  * guesses from the menu text: it put the basalt stones on the 68-cycle
  * {@code HUMAN_STEPPINGSTONEJUMP} rather than the 38-cycle 741, doubling every hop. The

@@ -53,7 +53,7 @@ final class ObstacleSighting
 
 	/**
 	 * The way the obstacle itself moved the player, in tiles: from the tile they began on to where
-	 * they finished. (0, 0) for no local movement — a ladder or a teleport. The route, where a golem
+	 * they finished. (0, 0) for no local movement - a ladder or a teleport. The route, where a golem
 	 * gets on and off, may be a tile either side but must lie along this. See {@link RouteGeometry}.
 	 */
 	final int lineX;

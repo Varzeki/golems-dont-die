@@ -3,8 +3,8 @@ package com.golemsdontdie;
 /**
  * How a golem came to be somewhere, as the line in its journal reads.
  *
- * <p>Taken from the transport it used — the tables say what each obstacle is, and a ladder reads
- * differently from a gangplank — or from the crossing it was on. Walking is what is left, and is
+ * <p>Taken from the transport it used - the tables say what each obstacle is, and a ladder reads
+ * differently from a gangplank - or from the crossing it was on. Walking is what is left, and is
  * much the commonest.
  */
 enum GolemTravel

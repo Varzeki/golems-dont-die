@@ -5,7 +5,7 @@ package com.golemsdontdie;
  *
  * <p>An obstacle moves the player along a fixed line: a stile from one of its tiles to the other.
  * A route is the two tiles a golem gets on and off at, travelled in a straight line, so off that
- * line is off the obstacle. That is how the stile came to be crossed diagonally — its ends came
+ * line is off the obstacle. That is how the stile came to be crossed diagonally - its ends came
  * from where the player happened to stand, eighteen degrees off. Such a route is refused when
  * learned and ignored if already saved.
  */
@@ -13,7 +13,7 @@ final class RouteGeometry
 {
 	/**
 	 * How far off an obstacle's line a route may run. Both are whole tiles, so a real route is on
-	 * the line or off by a whole tile's angle — the diagonal stile was eighteen — never between.
+	 * the line or off by a whole tile's angle - the diagonal stile was eighteen - never between.
 	 */
 	static final double MAX_DEGREES_OFF = 10;
 

@@ -17,8 +17,8 @@ import static org.junit.Assert.assertEquals;
 /**
  * A real skiff's deck, as ::gdeck and ::gparts read it off one at sea: where golems may stand. A
  * skiff has eight places to stand, one of them where its helmsman stands; this one has a salvaging
- * station and a wind catcher on two, so five are left for golems. Its collision says otherwise —
- * the mast's tile blocked, the stations' open — which is why the deck is read from its objects.
+ * station and a wind catcher on two, so five are left for golems. Its collision says otherwise -
+ * the mast's tile blocked, the stations' open - which is why the deck is read from its objects.
  */
 public class GolemSkiffDeckTest
 {

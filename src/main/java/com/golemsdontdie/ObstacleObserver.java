@@ -152,8 +152,8 @@ class ObstacleObserver
 		{
 			// Only scene objects are obstacles: a definition looked up for a walk target returns
 			// whatever object shares that number. A click on anything else drops the object being
-			// walked to, as the game does — a door clicked and then a teleport cast was learned as a
-			// door to the teleport's destination — but a traversal already started is left to finish.
+			// walked to, as the game does - a door clicked and then a teleport cast was learned as a
+			// door to the teleport's destination - but a traversal already started is left to finish.
 			if (startedAt == null && clips.isEmpty() && posing == -1)
 			{
 				clickedObject = -1;
@@ -313,7 +313,7 @@ class ObstacleObserver
 
 	/**
 	 * Finishes a traversal once the player has stopped moving somewhere new. A looping clip hides
-	 * its own length — a rock climb loops silently — so only the arrival gives it.
+	 * its own length - a rock climb loops silently - so only the arrival gives it.
 	 */
 	void onGameTick()
 	{
@@ -406,7 +406,7 @@ class ObstacleObserver
 		}
 
 		// Where the obstacle put the player, not always where they came to rest; see animEndTile.
-		// A tile equal to the start is a clip that ended before its own teleport — a ladder.
+		// A tile equal to the start is a clip that ended before its own teleport - a ladder.
 		WorldPoint to = at;
 		if (animEndTile != null && !animEndTile.equals(startedAt) && !animEndTile.equals(at))
 		{
@@ -417,7 +417,7 @@ class ObstacleObserver
 		// and ends: the stile puts the player on its own blocked tile first. See wayIn, wayOut.
 		WorldPoint landing = to;
 		// The direction and line in lasting coordinates. Across an instance edge the raw tiles are
-		// thousands apart — the pew to the Mad Angel's room recorded a line of 11486,5792.
+		// thousands apart - the pew to the Mad Angel's room recorded a line of 11486,5792.
 		WorldPoint landingTemplate = landing.equals(animEndTile) ? animEndTileTemplate : templateOf(landing);
 		WorldPoint lineFrom = startedAtTemplate != null ? startedAtTemplate : startedAt;
 		WorldPoint lineTo = landingTemplate != null ? landingTemplate : landing;
@@ -796,7 +796,7 @@ class ObstacleObserver
 	 * <p>Some obstacles start the player on a tile no golem can walk onto: clicking the stile walks
 	 * you onto its blocked tile, so a route learned from there started where no golem could stand
 	 * and the stile went unused. The way in is the walkable tile behind the obstacle, along its
-	 * line — from the obstacle alone, never from where the player was, since players come at a
+	 * line - from the obstacle alone, never from where the player was, since players come at a
 	 * stile from the side. A stepping stone is blocked too, but behind it is water.
 	 */
 	private WorldPoint wayIn(WorldPoint origin, int dirX, int dirY)
@@ -854,8 +854,8 @@ class ObstacleObserver
 	private boolean boatChanged;
 
 	/**
-	 * Forgets the player's last position and click for a new session — the plugin starting, a
-	 * logout, a world hop — since otherwise a jump that never happened could be learned.
+	 * Forgets the player's last position and click for a new session - the plugin starting, a
+	 * logout, a world hop - since otherwise a jump that never happened could be learned.
 	 */
 	void resetSession()
 	{
@@ -1017,8 +1017,8 @@ class ObstacleObserver
 
 		// The motion itself, sample by sample: what a golem performs, the window below being a summary
 		// for obstacles no curve was captured for. Sampled from the click onward, not the animation,
-		// because the movement can happen *before* the clip — a rock climb puts you at the far side
-		// first — so the approach is trimmed at the end. A rolling window; a cap left it unsampled.
+		// because the movement can happen *before* the clip - a rock climb puts you at the far side
+		// first - so the approach is trimmed at the end. A rolling window; a cap left it unsampled.
 		if (clickedTick >= 0 && local != null)
 		{
 			WorldView view = client.getTopLevelWorldView();
@@ -1045,8 +1045,8 @@ class ObstacleObserver
 		}
 
 		// The movement window, measured against the clip rather than the tick. A traversal holds the
-		// player still for part of its animation and then moves them quickly — 33 cycles of stillness
-		// then 12 of movement, on the stones — and only the total made golems drift.
+		// player still for part of its animation and then moves them quickly - 33 cycles of stillness
+		// then 12 of movement, on the stones - and only the total made golems drift.
 		if (clipStartCycle >= 0 && fine != null && previousFine != null)
 		{
 			boolean moving = fine.getX() != previousFine.getX()

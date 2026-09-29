@@ -10,7 +10,7 @@ import lombok.extern.slf4j.*;
 
 /**
  * What to call a golem the player has not named: one of the names of Gielinor, and a surname off
- * the rocks — Akrisae Flint, Doris Millstone, Veos Greystone — or, in the ordinal style, the order
+ * the rocks - Akrisae Flint, Doris Millstone, Veos Greystone - or, in the ordinal style, the order
  * it was crafted in, in Latin: Primus, Vicesimus Septimus, Bis Millesimus Quingentesimus.
  *
  * <p>No name is written down. It is worked out from the golem's own number, and the older golems'

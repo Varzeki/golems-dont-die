@@ -18,7 +18,7 @@ import net.runelite.api.*;
  * <p>Three bits per tile rather than two. <b>north</b> and <b>east</b> use the packing
  * Shortest Path and {@code IslandMemory} use; south and west are the neighbouring tile's.
  * <b>ocean</b> is the single connected sea: two ports are only sailable between if both sit
- * on it, and enclosed water exists — Karamja's inland body is 26,000 tiles leading nowhere.
+ * on it, and enclosed water exists - Karamja's inland body is 26,000 tiles leading nowhere.
  * <b>isolated</b> marks components under 50 tiles, computed offline rather than by a flood
  * fill the client cannot afford.
  *
@@ -76,7 +76,7 @@ class WorldMesh
 		final byte[] components;
 
 		/**
-		 * Tiles the land fill reached — ground a golem may stand on, on foot. The ocean bit
+		 * Tiles the land fill reached - ground a golem may stand on, on foot. The ocean bit
 		 * marks only the one connected sea, so cave water, lakes and enclosed basins read as
 		 * passable and golems walked out across them. Shoreline edges are blocked, so a fill
 		 * starting on land cannot leak.
@@ -195,7 +195,7 @@ class WorldMesh
 	}
 
 	/**
-	 * True if this tile sits in a component too small to wander — the question stuck
+	 * True if this tile sits in a component too small to wander - the question stuck
 	 * detection asks, as a bit lookup. A golem restored onto one is relocated rather than
 	 * left walking into the same four walls forever.
 	 */
@@ -299,7 +299,7 @@ class WorldMesh
 		lakeComponent = lake;
 	}
 
-	/** True if something could stand here — the tile can be left in some direction. */
+	/** True if something could stand here - the tile can be left in some direction. */
 	boolean isWalkable(int x, int y, int plane)
 	{
 		return north(x, y, plane) || east(x, y, plane)
@@ -389,7 +389,7 @@ class WorldMesh
 	 * pocket is under fifty tiles by the shipped mesh's own reckoning, so a golem in it is walking
 	 * in circles, and with nothing starting or ending there it has neither a shortcut to take nor
 	 * one to reverse back out of. Judged on its own so that it still holds when the wider question
-	 * — does this ground join up with home — has been answered by a world the plugin has misread.
+	 * - does this ground join up with home - has been answered by a world the plugin has misread.
 	 */
 	boolean isSealedPocket(int x, int y, int plane)
 	{
@@ -511,7 +511,7 @@ class WorldMesh
 	 *
 	 * <p>The fill was run offline from Lumbridge over the tables it was given, so a floor
 	 * reachable only by a ladder no table lists has collision, a component and every wall
-	 * but no land bit — Wyrmscraig's ladder tops, the cathedral basement, every place newer
+	 * but no land bit - Wyrmscraig's ladder tops, the cathedral basement, every place newer
 	 * than the tables. A transport row is the same evidence the fill used. The exact end
 	 * tile only: a stepping stone's tile is blocked, and snapping to the water beside it
 	 * would admit a river as land.
@@ -614,8 +614,8 @@ class WorldMesh
 	}
 
 	/**
-	 * The spaces a transport's end touches: its own, or — where it stands on blocked ground, as a
-	 * door, a stile or a stepping stone does — the spaces around it. Nearly a third of the ends in
+	 * The spaces a transport's end touches: its own, or - where it stands on blocked ground, as a
+	 * door, a stile or a stepping stone does - the spaces around it. Nearly a third of the ends in
 	 * the tables have no component of their own, and reading those as "leads nowhere" cut whole
 	 * floors off from home.
 	 *

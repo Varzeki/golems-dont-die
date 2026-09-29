@@ -43,7 +43,7 @@ class Golem
 
 	/**
 	 * Which floor the golem is on. Fixed in the island-only plugin; mutable now because the
-	 * transport network is mostly vertical — 2,262 of the 5,168 plain rows change plane.
+	 * transport network is mostly vertical - 2,262 of the 5,168 plain rows change plane.
 	 * Only {@link #relocate} may change it, and never mid-step.
 	 */
 	@Getter
@@ -210,7 +210,7 @@ class Golem
 
 	/**
 	 * Where a golem on a crossing has got to, or null if it is not on one. Its own tile is the
-	 * port it is bound for — see {@link #saveTile} — so anything that wants the raft rather than
+	 * port it is bound for - see {@link #saveTile} - so anything that wants the raft rather than
 	 * the landfall, such as the world map, asks the crossing itself.
 	 */
 	WorldPoint seaPosition(int tick)
@@ -315,7 +315,7 @@ class Golem
 	/**
 	 * Set while the real golem this copy took over is still alive. The real one is hidden, but the
 	 * game still dots it on the minimap, and a copy walking off on its own left two dots going two
-	 * ways. So the copy stands in for it — where it is, which way it faces, walking or not — until
+	 * ways. So the copy stands in for it - where it is, which way it faces, walking or not - until
 	 * it is gone. See GolemsDontDiePlugin.followRealGolems.
 	 */
 	private boolean shadowing;
@@ -465,7 +465,7 @@ class Golem
 	private volatile int craftNumber;
 
 	/**
-	 * True while the golem is inside an instance — through the pew, in the Mad Angel's room.
+	 * True while the golem is inside an instance - through the pew, in the Mad Angel's room.
 	 * Golems are simulated in the instance's template, ordinary world coordinates, so
 	 * coordinates alone cannot say who is inside; without this, golems near the cathedral
 	 * were drawn inside the player's instance.
@@ -554,8 +554,8 @@ class Golem
 
 	/**
 	 * Stands the golem at the quayside for a while instead of casting off, while a crew is made
-	 * up around it. The crossing it had planned is given up — the crew's is planned when the crew
-	 * is, and a golem let go without one plans afresh — so the tally gives that one back too.
+	 * up around it. The crossing it had planned is given up - the crew's is planned when the crew
+	 * is, and a golem let go without one plans afresh - so the tally gives that one back too.
 	 */
 	void waitAshore(int tick, int ticks, WorldPoint quayside)
 	{
@@ -791,7 +791,7 @@ class Golem
 	 * Moves the golem between tiers, doing the one-off work each crossing needs.
 	 *
 	 * <p>Called every frame; most frames the tier is unchanged. Inward, the route resolves to
-	 * a tile snapped onto real walkable ground — which is what makes the straight-line far
+	 * a tile snapped onto real walkable ground - which is what makes the straight-line far
 	 * routes safe, correcting them exactly when the error would show. Outward, the renderer
 	 * is dropped and a route is planned.
 	 *
@@ -1018,7 +1018,7 @@ class Golem
 	private Itinerary arrived;
 
 	/**
-	 * Puts the golem down somewhere else entirely — the far end of a ladder, a dock it has
+	 * Puts the golem down somewhere else entirely - the far end of a ladder, a dock it has
 	 * just sailed to, or a valid tile after it was found somewhere it cannot stand.
 	 *
 	 * <p>Everything mid-flight has to go: a queued path found on the old plane would walk
@@ -1153,7 +1153,7 @@ class Golem
 		turnToward(cycles);
 
 		// Movement is resolved a step at a time rather than by advancing a distance, so a
-		// large `cycles` — after a stutter or a tab-out — carries the golem through several
+		// large `cycles` - after a stutter or a tab-out - carries the golem through several
 		// whole tiles instead of teleporting it past a wall.
 		int remaining = cycles;
 		while (remaining > 0)
@@ -1227,11 +1227,11 @@ class Golem
 					}
 					if (path.isEmpty())
 					{
-						// Nowhere to go — usually a golem boxed in by scenery. Counted,
+						// Nowhere to go - usually a golem boxed in by scenery. Counted,
 						// because the difference between briefly hemmed in and
 						// permanently trapped is only how often this happens.
 						failedSearches++;
-						// Twice in a row with nowhere to walk is a dead end, not bad luck —
+						// Twice in a row with nowhere to walk is a dead end, not bad luck -
 						// but on ground it can stand on, only a fresh way out is taken.
 						// Going back is how golems ping-ponged up and down the tower ladder
 						// a hundred and sixty times, each shut-in floor sending them back.
@@ -1424,8 +1424,8 @@ class Golem
 						continue;
 					}
 
-					// Somewhere that cannot be walked off — mid-crossing, on a stepping
-					// stone — the next hop is not a choice: rolling for it would strand
+					// Somewhere that cannot be walked off - mid-crossing, on a stepping
+					// stone - the next hop is not a choice: rolling for it would strand
 					// the golem on a rock until the watchdog came.
 					if (!stranded)
 					{
@@ -1602,7 +1602,7 @@ class Golem
 	/**
 	 * Walks to the nearest way off a floor it can find nowhere to walk on, and takes it, even the
 	 * way it came. A golem that climbed onto a lookout the size of a room found nowhere to go,
-	 * over and over, until the watchdog carried it to the plinth — which, from the ground, looked
+	 * over and over, until the watchdog carried it to the plinth - which, from the ground, looked
 	 * like a golem crafted out of nothing. It goes back down, and the ladder is then on its long
 	 * cooldown both ways, so it does not climb straight back up.
 	 *
@@ -1684,7 +1684,7 @@ class Golem
 			return true;
 		}
 
-		// A stepping stone is blocked ground — that is why crossing it is a transport — but
+		// A stepping stone is blocked ground - that is why crossing it is a transport - but
 		// it is somewhere you can stand, the proof being that another transport starts
 		// there. So a transport origin is accepted as a destination, but only if it goes on
 		// somewhere: golems hopped back and forth across the extra-slippery crossing forty
@@ -1979,7 +1979,7 @@ class Golem
 		stepping = false;
 		walking = false;
 		transitionAnimation = animation;
-		// The whole clip set, in order — mount, cross, dismount — each phase running exactly
+		// The whole clip set, in order - mount, cross, dismount - each phase running exactly
 		// as long as its clip does; a fixed length made a cliff take the same two thirds of
 		// a second as a doorway. What the player was seen doing beats what was shipped,
 		// which beats the archetype's guess from menu text.
@@ -2001,7 +2001,7 @@ class Golem
 		// How long the obstacle takes, in order of how much the answer is worth: a measured
 		// tick count, then this row's authored duration, then the clip's own length. The
 		// middle term used to be last, and it matters: a clip length is per obstacle *type*
-		// — every rock climb plays 4435 — so ranking it above the row gave them all one
+		// - every rock climb plays 4435 - so ranking it above the row gave them all one
 		// duration, where the tables author eight to fifteen ticks across the climbing-rock
 		// rows and three to six across the stiles.
 		int measuredTicks = context.getKnowledge() == null
@@ -2011,7 +2011,7 @@ class Golem
 		// Whether this is walked or performed follows from how long it takes and how far it
 		// goes, not whether its clip loops: human_climbing (737) is a one-shot and yet is
 		// the walk animation of a climb, while hole_squeeze (3835) loops and is not walked.
-		// Duration does separate them — stepping stones read one or two ticks, log balances
+		// Duration does separate them - stepping stones read one or two ticks, log balances
 		// and slopes six to eight.
 		int obstacleTicks = measuredTicks > 0 ? measuredTicks
 			: context.getObstacles() != null
@@ -2019,7 +2019,7 @@ class Golem
 				? context.getObstacles().ticksFor(transport.getObjectId())
 				: transport.getDuration();
 
-		// Whether a clip may be stretched is still the clip's own business — a one-shot
+		// Whether a clip may be stretched is still the clip's own business - a one-shot
 		// restarted halfway through looks broken however long the obstacle takes.
 		int stretchIndex = phaseCycles.length > 2 ? 1 : phaseCycles.length - 1;
 		boolean stretchable = total == 0 || stretchIndex < 0
@@ -2088,8 +2088,8 @@ class Golem
 
 		// Movement is whole game ticks while the clip is whatever length it was drawn at:
 		// the measured hop covers its gap in one tick under a clip of nearly one and a
-		// third. The measured window wins — how long it stands still, then how long it
-		// moves — which a single duration cannot express.
+		// third. The measured window wins - how long it stands still, then how long it
+		// moves - which a single duration cannot express.
 		int learnedDelay = context.getKnowledge() == null ? 0
 			: context.getKnowledge().moveDelayFor(transport);
 		int learnedSpan = context.getKnowledge() == null ? 0
@@ -2099,7 +2099,7 @@ class Golem
 		{
 			// Never longer than the clip. A chained crossing recorded a 72-cycle span for a
 			// 38-cycle hop, and a window wider than the transition left the golem partway
-			// through its glide when it was dropped at the far side — the
+			// through its glide when it was dropped at the far side - the
 			// jump-in-place-then-teleport.
 			int moveCycles = Math.max(1, Math.min(learnedSpan, total));
 
@@ -2190,7 +2190,7 @@ class Golem
 			path.add(new int[]{x, y});
 		}
 
-		// Three clips is ready, loop, merge — the idle, the walk, and a one-shot on
+		// Three clips is ready, loop, merge - the idle, the walk, and a one-shot on
 		// arrival. Fewer than three and the one clip is the walk.
 		gaitWalk = clips.length > 2 ? clips[1] : clips[clips.length - 1];
 		gaitIdle = clips.length > 2 ? clips[0] : gaitWalk;
@@ -2229,15 +2229,15 @@ class Golem
 
 	/**
 	 * Ticks above which a traversal is walked rather than performed. Four: the cache's own
-	 * durations cluster either side — one or two for stepping stones and broken walls, six
-	 * to eight for log balances and slopes — with nothing on it.
+	 * durations cluster either side - one or two for stepping stones and broken walls, six
+	 * to eight for log balances and slopes - with nothing on it.
 	 */
 	private static final int WALKED_TICKS = 4;
 
 	/**
 	 * Where to draw the golem relative to where it is, in fine units, and on which plane.
-	 * Zero everywhere but an instance, where the golem is simulated at the room's template —
-	 * the only address it keeps between visits — and the player inside sees it elsewhere.
+	 * Zero everywhere but an instance, where the golem is simulated at the room's template -
+	 * the only address it keeps between visits - and the player inside sees it elsewhere.
 	 */
 	private int drawOffsetX;
 	private int drawOffsetY;
@@ -2436,7 +2436,7 @@ class Golem
 	/**
 	 * How far a berth lies from the boat's helm, along the world's axes. Model units and the
 	 * golem's own hundred-and-twenty-eighths of a tile are the same size, so the deck's numbers
-	 * need no scaling — only turning, to wherever the boat is pointing.
+	 * need no scaling - only turning, to wherever the boat is pointing.
 	 */
 	private int deckOffset(boolean acrossX)
 	{
@@ -2575,7 +2575,7 @@ class Golem
 
 		// Face the way it is about to go, immediately: a golem still turning as a recording
 		// starts performs the whole thing at the wrong angle. Turned by the player's facing
-		// relative to their travel — on the rockslide they face the rock and move away from
+		// relative to their travel - on the rockslide they face the rock and move away from
 		// it, and a golem facing its travel climbed off the cliff. Only where the traversal
 		// goes somewhere; a ladder has no direction to be relative to.
 		int heading = headingFor(Math.round(dx), Math.round(dy));
@@ -2602,7 +2602,7 @@ class Golem
 
 	/**
 	 * Starts this golem dancing where it stands, for its own reasons rather than a celebration:
-	 * the life of the party, with a crowd around it. No fireworks — those are for the occasions.
+	 * the life of the party, with a crowd around it. No fireworks - those are for the occasions.
 	 */
 	void startParty(int untilTick)
 	{
@@ -2623,8 +2623,8 @@ class Golem
 	private static final int MOST_MOMENT_TICKS = 30;
 
 	/**
-	 * Forgets anything the golem was in the middle of for the player's benefit — a wave, a look, a
-	 * dance of its own — on a log out or a world hop, where the moment is over whatever the clock
+	 * Forgets anything the golem was in the middle of for the player's benefit - a wave, a look, a
+	 * dance of its own - on a log out or a world hop, where the moment is over whatever the clock
 	 * says.
 	 */
 	void forgetMoments()
@@ -2814,7 +2814,7 @@ class Golem
 		{
 			return walking ? gaitWalk : gaitIdle;
 		}
-		// Attending to the player — a wave, a copied emote, or simply looking — which stops for
+		// Attending to the player - a wave, a copied emote, or simply looking - which stops for
 		// nothing except the things above: a golem halfway up a ladder has its hands full. A
 		// golem that is only watching plays nothing and falls through to standing still.
 		if (!walking && isGreeting(tickNow) && greetAnimation != -1)
@@ -2839,7 +2839,7 @@ class Golem
 	 * The gait a golem climbs with, replacing its own for the length of the obstacle; -1
 	 * when it uses its own, which is nearly always. A long climb is not a long animation:
 	 * the game swaps the base animation set and walks the player up the cliff a tile at a
-	 * time, which is why {@code human_climbing_loop} loops — it is a walk animation, and
+	 * time, which is why {@code human_climbing_loop} loops - it is a walk animation, and
 	 * walk animations repeat once per tile.
 	 */
 	private int gaitWalk = -1;
@@ -2855,7 +2855,7 @@ class Golem
 
 	/**
 	 * The clip playing while the golem climbs, jumps or squeezes through something. All are
-	 * the game's own human animations, playable because the golem shares the human rig —
+	 * the game's own human animations, playable because the golem shares the human rig -
 	 * see {@link GolemContent#GOLEM_FRAMEMAP}. Nothing is authored or deformed.
 	 */
 	private int transitionAnimation = -1;
@@ -2948,7 +2948,7 @@ class Golem
 			fineX = motionFromX + motionOffset[0];
 			fineY = motionFromY + motionOffset[1];
 
-			// Between clips — before the first starts, or after the last ends — the golem is
+			// Between clips - before the first starts, or after the last ends - the golem is
 			// itself: idle, or walking if the recording is moving it. Keeping the last value
 			// left golems in their bare model waiting to hop, and frozen after the stile.
 			int playing = motion.animationAt(elapsed);

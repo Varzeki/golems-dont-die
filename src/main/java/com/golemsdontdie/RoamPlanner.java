@@ -40,7 +40,7 @@ class RoamPlanner
 	/**
 	 * Collision harvested from the live scene, which outranks the shipped mesh: that mesh's fill
 	 * spreads only through the transports shipped with it, so anywhere reached only by a taught
-	 * obstacle is neither land nor reachable — Wyrmscraig's upper floors, where golems climbed a
+	 * obstacle is neither land nor reachable - Wyrmscraig's upper floors, where golems climbed a
 	 * taught staircase and took it straight back down.
 	 */
 	@Inject
@@ -89,7 +89,7 @@ class RoamPlanner
 			return Itinerary.of(single(from), from.getPlane(), tick, DOCK_WAIT_POLL);
 		}
 
-		// Standing where no walk starts — a stepping stone, a landing the map calls blocked — the
+		// Standing where no walk starts - a stepping stone, a landing the map calls blocked - the
 		// only way on is a transport from this very tile; sampling the area left the golem on it.
 		if (!isSafe(from.getX(), from.getY(), from.getPlane()))
 		{
@@ -186,7 +186,7 @@ class RoamPlanner
 	 * The way back out through something that led here, for a golem somewhere with no known way out;
 	 * or null if it knows one, or the mesh cannot say.
 	 *
-	 * <p>A player can learn the way into a place without the way out — in by cave, out by teleport —
+	 * <p>A player can learn the way into a place without the way out - in by cave, out by teleport -
 	 * and golems gathered in Wyrmscraig's cave until taught the exit. Refusing to go in would bar
 	 * every such dungeon, so a golem leaves the way it came; "somewhere" is the mesh's component.
 	 */
@@ -234,7 +234,7 @@ class RoamPlanner
 	 * it: the Doom of Mokhaiotl's arena is entered by jumping down a gap and left through a loot
 	 * interface, a teleport or death, none of which is ever learned, and golems that followed the
 	 * player in stayed for good, on every level of the delve at once. So the room is worked out from
-	 * the island map's own collision instead — the floor a golem can walk from where it stands — and
+	 * the island map's own collision instead - the floor a golem can walk from where it stands - and
 	 * if nothing offered leads out of it, it leaves the way it came in. Ground that floods past a few
 	 * thousand tiles is not a room, and is left to wander.
 	 */
@@ -416,7 +416,7 @@ class RoamPlanner
 	// them out of Meiyerditch, whose ways out are two tiles in a warren.
 
 	/**
-	 * Everywhere a golem can walk to from where it stands, within the budget — flooded at most once
+	 * Everywhere a golem can walk to from where it stands, within the budget - flooded at most once
 	 * per plan, only after a straight line fails, and underground those almost never exist.
 	 */
 	@RequiredArgsConstructor
@@ -658,7 +658,7 @@ class RoamPlanner
 
 	/**
 	 * A walk to the quayside of the nearest open dock in reach, or null. Not while on shore leave,
-	 * and not to a dock the golem is already at — that is the voyage roll's business.
+	 * and not to a dock the golem is already at - that is the voyage roll's business.
 	 */
 	private Itinerary toNearbyDock(WorldPoint from, int tick, TransportMemory memory, Reach reach)
 	{
@@ -692,7 +692,7 @@ class RoamPlanner
 	}
 
 	/**
-	 * A walk to a tile — a straight line where there is one, otherwise through the flood — the
+	 * A walk to a tile - a straight line where there is one, otherwise through the flood - the
 	 * golem's own tile first; null if there is no way within reach.
 	 */
 	private List<int[]> walk(WorldPoint from, int toX, int toY, Reach reach)
@@ -759,7 +759,7 @@ class RoamPlanner
 
 	/**
 	 * True if a golem arriving by this transport has somewhere to go: walkable ground, or a chain of
-	 * transports onward — not this one in reverse — ending on some. See leadsToGround.
+	 * transports onward - not this one in reverse - ending on some. See leadsToGround.
 	 */
 	private boolean landsSomewhereUseful(GolemTransport transport)
 	{
@@ -924,7 +924,7 @@ class RoamPlanner
 
 	/**
 	 * A walk to a transport in range and the transport itself, or null. Every transport starting
-	 * within reach is considered in a random order, which keeps the choice fair — except for a
+	 * within reach is considered in a random order, which keeps the choice fair - except for a
 	 * golem with a taste in places, which considers the ones that suit it first.
 	 */
 	private Itinerary toNearbyTransport(WorldPoint from, int tick, Random random, TransportMemory memory,
@@ -938,7 +938,7 @@ class RoamPlanner
 		{
 			// Shortcuts and boats are how a golem covers real distance, so a golem that wants to be
 			// somewhere in particular takes the one that gets it nearest. Shuffled first, so the
-			// ones it has no opinion about — which is most of them — stay in a random order.
+			// ones it has no opinion about - which is most of them - stay in a random order.
 			near.sort((one, other) -> Float.compare(climate.liking(memory, other.getToX(), other.getToY()),
 				climate.liking(memory, one.getToX(), one.getToY())));
 		}
@@ -960,7 +960,7 @@ class RoamPlanner
 				continue;
 			}
 			// What the golem itself makes of this one: a taste in places, and a taste in obstacles.
-			// Turned down here it is turned down for good — unlike a crowd, which a golem would
+			// Turned down here it is turned down for good - unlike a crowd, which a golem would
 			// rather push through than stay put in.
 			float wanted = reach.context == null ? 1f
 				: reach.context.desire(memory, from.getX(), from.getY(), transport.getToX(), transport.getToY());
@@ -991,7 +991,7 @@ class RoamPlanner
 				noteTaken(transport, tick + path.size() - 1, memory);
 				return Itinerary.thenTransport(path, from.getPlane(), tick, transport);
 			}
-			// Past the first few, each try is a line and a lookup in the flood — cheap, but a town
+			// Past the first few, each try is a line and a lookup in the flood - cheap, but a town
 			// can have a hundred rows in range.
 			if (++walksTried >= ATTEMPTS * 4)
 			{
@@ -1058,7 +1058,7 @@ class RoamPlanner
 	 * The nearest tile a golem could actually stand on, spiralling outward.
 	 *
 	 * <p>Used when a golem is promoted into view, and when one is restored onto ground that has since
-	 * changed. A golem is moved, never replaced — name, id and gait kept — since golems do not die.
+	 * changed. A golem is moved, never replaced - name, id and gait kept - since golems do not die.
 	 *
 	 * @return a safe tile, or the original if nothing better was found within range
 	 */
@@ -1093,7 +1093,7 @@ class RoamPlanner
 		int origin = sameSpace ? mesh.componentAt(at.getX(), at.getY(), at.getPlane()) : 0;
 		if (sameSpace && origin == 0)
 		{
-			// The mesh has nothing to say about the tile itself — it is in a wall, or off the
+			// The mesh has nothing to say about the tile itself - it is in a wall, or off the
 			// shipped map. Then the ground it was standing beside speaks for it, because a golem
 			// being picked up belongs back where it came from. Without this the search was free to
 			// take the nearest walkable tile in any direction for thirty-two tiles, which across a

@@ -24,7 +24,7 @@ dependencies {
 }
 
 // The client drags in LWJGL's natives for every platform, and the ones for Linux on ARM are not
-// in the local repository — which failed the whole test run before a test could start. Nothing
+// in the local repository - which failed the whole test run before a test could start. Nothing
 // tested here draws anything, so they are left out.
 configurations.testRuntimeClasspath {
 	exclude group: 'org.lwjgl'

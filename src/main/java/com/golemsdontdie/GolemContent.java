@@ -33,7 +33,7 @@ final class GolemContent
 	static final int GOLEM_IDLE_ANIMATION = 14453;
 
 	/**
-	 * The crumble, on no definition — a death is played by a script — so it was found by watching
+	 * The crumble, on no definition - a death is played by a script - so it was found by watching
 	 * one die. Golems vanish 6 ticks later; those 6 ticks are the swap's window.
 	 */
 	static final int GOLEM_DEATH_ANIMATION = 14455;
@@ -75,7 +75,7 @@ final class GolemContent
 
 	/**
 	 * The varp {@link #GOLEM_COUNT_VARBIT} is packed into. Named because a varp-level change is
-	 * reported as its own event carrying the whole varp — carving state and count together.
+	 * reported as its own event carrying the whole varp - carving state and count together.
 	 */
 	static final int GOLEM_COUNT_VARP = 5709;
 
@@ -88,8 +88,8 @@ final class GolemContent
 
 	/**
 	 * Where a golem that had to be fetched is put down: in front of the tent south of the plinth.
-	 * Not the plinth itself — a golem appearing there looks like one just crafted, to a player who
-	 * crafted nothing — and a golem stepping out by a tent is a golem that was only ever resting.
+	 * Not the plinth itself - a golem appearing there looks like one just crafted, to a player who
+	 * crafted nothing - and a golem stepping out by a tent is a golem that was only ever resting.
 	 */
 	static final WorldPoint RECOVERY = new WorldPoint(2597, 2224, 0);
 
@@ -107,7 +107,7 @@ final class GolemContent
 	 * Golem base, three Unfinished golems and an Unpowered golem.
 	 *
 	 * <p>The scene holds the two stations, 62351 and 62352, and the client swaps in whichever
-	 * state the carving varbit says — which is why a menu has to know all eight. Found by asking
+	 * state the carving varbit says - which is why a menu has to know all eight. Found by asking
 	 * the cache which objects the carving halves of {@link #GOLEM_COUNT_VARP} drive.
 	 */
 	private static final int[] PLINTHS = {62351, 62352, 62353, 62354, 62355, 62356, 62357, 62358};
@@ -129,7 +129,7 @@ final class GolemContent
 	 * The regions the bundled island map covers: (39..41, 34..36) around the site.
 	 *
 	 * <p>From the Shortest Path world collision map (cache-generated, with XTEA keys this machine
-	 * lacks), cross-checked against collision recorded live — 95% agreement overall, 99.9% away
+	 * lacks), cross-checked against collision recorded live - 95% agreement overall, 99.9% away
 	 * from the site. Shipping it lets golems roam unwalked ground.
 	 */
 	static final int[] ISLAND_REGIONS = {
@@ -187,7 +187,7 @@ final class GolemContent
 	static final int ANIM_DITCH_VAULT = 6132;
 
 	/**
-	 * Hopping between stepping stones — <b>measured</b>, not assumed. A player crossing
+	 * Hopping between stepping stones - <b>measured</b>, not assumed. A player crossing
 	 * Wyrmscraig's basalt stones played 741, a 38-cycle clip, once per stone. The catalogue named
 	 * {@code HUMAN_STEPPINGSTONEJUMP} (769), real but 68 cycles, so every hop ran at half speed.
 	 */
@@ -207,13 +207,13 @@ final class GolemContent
 	static final int ANIM_SQUEEZE_LOOP = 746;
 	static final int ANIM_SQUEEZE_END = 748;
 
-	/** Crossing a log, rope bridge or tightrope — slow, arms out. */
+	/** Crossing a log, rope bridge or tightrope - slow, arms out. */
 	static final int ANIM_BALANCE_WALK = 762;
 	static final int ANIM_BALANCE_WALK_LOOP = 7134;
 	static final int ANIM_TIGHTROPE = 4772;
 
 	/**
-	 * Three animations the golem does not play: they are <i>prop</i> animations on other rigs —
+	 * Three animations the golem does not play: they are <i>prop</i> animations on other rigs -
 	 * {@code DOCK_GANGPLANK01} (13562) on framemap 2503, the raft helm pair (13335/13336) on
 	 * framemap 2486. Nothing is lost; walking a plank is walking. The pair is kept because
 	 * {@link FakeRaft} draws a boat model, itself on framemap 2486.
@@ -226,7 +226,7 @@ final class GolemContent
 	 * Sailing's own raft, the 1x3 boat, as the three models it is built from.
 	 *
 	 * <p>Read offline from the cache: Sailing's boats are scene objects, whose models live only in
-	 * the cache — {@code SAILING_BOAT_HULL_KANDARIN_1X3_WOOD} (59494),
+	 * the cache - {@code SAILING_BOAT_HULL_KANDARIN_1X3_WOOD} (59494),
 	 * {@code SAILING_BOAT_SAIL_KANDARIN_1X3_WOOD} (59530) and
 	 * {@code SAILING_BOAT_STEERING_KANDARIN_1X3_WOOD_IN_USE} (59555). The hull is centred along z,
 	 * 450 units long; the sail spans it from the middle tile; the helm is one tile at the stern.
@@ -303,7 +303,7 @@ final class GolemContent
 	 * The emote tab's own animations, which a golem may copy off the player.
 	 *
 	 * <p>Two runs of ids, and every one of them checked against the cache: all are framemap 0, the human rig the golem is built on, so they play against it untouched.
-	 * Anything outside these runs is left alone — a combat or skilling clip on the wrong framemap
+	 * Anything outside these runs is left alone - a combat or skilling clip on the wrong framemap
 	 * folds a golem through itself rather than looking merely wrong.
 	 */
 	private static final int EMOTES_FROM = 855;

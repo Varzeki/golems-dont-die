@@ -18,7 +18,7 @@ import net.runelite.client.config.*;
  * golems crafted on mobile or before the plugin was installed are counted by the next login
  * rather than staying wrong until the next craft. The chat line on every craft reports the same
  * number and is a backstop: it does not depend on the varbit meaning what it appears to, and is
- * not capped at 65,535. Counting golem spawns was dropped — on a shared island it would tally
+ * not capped at 65,535. Counting golem spawns was dropped - on a shared island it would tally
  * other players' golems.
  */
 @Slf4j

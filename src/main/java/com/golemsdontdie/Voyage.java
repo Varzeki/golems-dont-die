@@ -12,7 +12,7 @@ import static com.golemsdontdie.RouteGeometry.span;
  *
  * <p>Two rules, both chosen because they need no tuning. <b>Uniform dispersal:</b> the
  * destination is drawn evenly from every port the golem may reach, since weighting by distance
- * compounds — a golem near Catherby draws Catherby's neighbours forever. <b>One blocked port:</b>
+ * compounds - a golem near Catherby draws Catherby's neighbours forever. <b>One blocked port:</b>
  * a golem may not sail straight back where it came from, one field of state rather than a timer,
  * leaving home reachable again from the third hop. Wyrmscraig's population thins over a long
  * session as a result, but the island refills with every craft.
@@ -131,7 +131,7 @@ class Voyage
 		{
 			// A few tries for a port with room ashore and weather to suit, then wherever the last
 			// roll lands. Ports are how a golem crosses the world, so this is where a taste for the
-			// cold or the heat takes it somewhere it could never have walked — and a golem with one
+			// cold or the heat takes it somewhere it could never have walked - and a golem with one
 			// reads the whole board rather than sampling it, three ports out of ninety being no way
 			// to find the one port in the snow.
 			GolemClimate climate = context == null ? null : context.getClimates();
@@ -543,7 +543,7 @@ class Voyage
 	 * golem nobody is watching costs nothing on the way.
 	 *
 	 * <p>Every few ticks it picks a heading at random from the compass, weighted toward getting
-	 * nearer and away from turning hard — nearer by sea, the distance being filled outward from
+	 * nearer and away from turning hard - nearer by sea, the distance being filled outward from
 	 * the destination round every headland, so the way out of a bay is the way closer. It turns
 	 * toward that heading a point a tick while moving, and where its next move would ground it,
 	 * edges out a tile at a time down the travel distance, which is also how it moors.

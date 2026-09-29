@@ -11,12 +11,12 @@ import lombok.extern.slf4j.*;
  * <p>Curated by name against the place names the plugin already ships: every entry below is a name
  * the map or the region list gives that place, and the names are resolved to regions on load, so a
  * name that no longer exists costs nothing but a debug line. Places are marked a whole region at a
- * time, which is as fine as this needs to be — a taste in weather is not a taste in tiles.
+ * time, which is as fine as this needs to be - a taste in weather is not a taste in tiles.
  *
  * <p>From those regions a distance field is spread across the world in region steps, and that is
  * the whole of it: a golem likes somewhere in proportion to how near it is to the nearest place of
  * its kind. {@link #liking} is that, and {@link #desire} is what a golem makes of moving from one
- * place to another — never above 1, so a taste can only ever hold a golem back, not send it
+ * place to another - never above 1, so a taste can only ever hold a golem back, not send it
  * somewhere the rest of its plan did not offer.
  */
 @Slf4j
@@ -61,8 +61,8 @@ class GolemClimate
 
 	/**
 	 * How far a taste is felt, in regions: most of the world, so that a golem always has some idea
-	 * which way the snow is. The slope this far out is very shallow and only its order is used —
-	 * which of the ways on offer leads nearer — never as a chance in itself.
+	 * which way the snow is. The slope this far out is very shallow and only its order is used -
+	 * which of the ways on offer leads nearer - never as a chance in itself.
 	 */
 	private static final int REACH = 64;
 
@@ -178,7 +178,7 @@ class GolemClimate
 	 * is somewhere it likes and the offer is somewhere it likes less.
 	 *
 	 * <p>The shortfall counts twice over, which is deliberate: {@link #liking} decides which way a
-	 * golem goes out of what its plan found, and this is what it makes of one particular offer —
+	 * golem goes out of what its plan found, and this is what it makes of one particular offer -
 	 * turning down the shortcut out of the snow it came for.
 	 */
 	float desire(TransportMemory memory, int fromX, int fromY, int toX, int toY)
@@ -211,7 +211,7 @@ class GolemClimate
 			return 1f;
 		}
 		// Only a golem that went somewhere settles there. A temperate golem is not looking for
-		// anywhere in particular — it is avoiding two — so it never stops travelling.
+		// anywhere in particular - it is avoiding two - so it never stops travelling.
 		boolean arrived = memory.is(GolemTrait.LIKES_THE_COLD) && isCold(x, y)
 			|| memory.is(GolemTrait.LIKES_THE_HEAT) && isHot(x, y)
 			|| memory.is(GolemTrait.HOMESICK) && nearness(toHome, x, y, true) >= 1f;
@@ -220,7 +220,7 @@ class GolemClimate
 
 	/**
 	 * @param underAsAbove whether a tile underground counts as being where it is underneath.
-	 *                     True of home, which a golem is near or is not — the island's own cave is
+	 *                     True of home, which a golem is near or is not - the island's own cave is
 	 *                     part of it. False of weather, which a cave has none of.
 	 */
 	private static float nearness(byte[] grid, int x, int y, boolean underAsAbove)
@@ -240,7 +240,7 @@ class GolemClimate
 		}
 		// Being in the place is worth a step down from anywhere outside it, which is what keeps a
 		// golem in the snow once it is there; past that the slope is gentle, and only wanted for
-		// its direction — it is what tells a golem which way the snow is.
+		// its direction - it is what tells a golem which way the snow is.
 		return NEAR - (NEAR - FLOOR) * Math.min(1f, (away - 1) / (float) (REACH - 1));
 	}
 

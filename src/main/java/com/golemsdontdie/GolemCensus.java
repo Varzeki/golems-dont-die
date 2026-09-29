@@ -11,7 +11,7 @@ import lombok.extern.slf4j.*;
  * shape sends them: a simulated year put a third of every golem in Meiyerditch, a walled maze with
  * a dozen ladders and no way out on foot. This count is all golems know of each other.
  *
- * <p>Counted by map region and floor — 64 tiles square, about one leg of a walk — and recounted
+ * <p>Counted by map region and floor - 64 tiles square, about one leg of a walk - and recounted
  * every few ticks: it need only be roughly right, and a golem's move must stay one write.
  */
 @Slf4j
@@ -57,7 +57,7 @@ class GolemCensus
 
 	/**
 	 * How willing a golem should be to go here: 1 where there is room, towards 0 where packed. A
-	 * multiplier, never a bar — a golem with one way on takes it.
+	 * multiplier, never a bar - a golem with one way on takes it.
 	 */
 	float roominess(int x, int y, int plane)
 	{

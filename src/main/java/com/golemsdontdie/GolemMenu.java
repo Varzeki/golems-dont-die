@@ -159,7 +159,7 @@ class GolemMenu
 	 */
 	private static final int MAX_CLICKBOX_TESTS = 10;
 
-	/** Lower on screen first — that is nearer the camera. */
+	/** Lower on screen first - that is nearer the camera. */
 	private static final Comparator<Candidate> BY_DEPTH =
 		(a, b) -> Integer.compare(b.screenY, a.screenY);
 
@@ -168,7 +168,7 @@ class GolemMenu
 
 	/**
 	 * The golem whose clickbox contains the mouse and is nearest the camera. Nearest is the
-	 * largest canvas Y — in an isometric view a golem drawn lower is closer — the ordering
+	 * largest canvas Y - in an isometric view a golem drawn lower is closer - the ordering
 	 * the client's own entity picking produces. Clickboxes are only computed for golems
 	 * already near the cursor: building one projects every face of the model, and doing
 	 * that for a few hundred golems every client tick made the client stutter.
@@ -206,7 +206,7 @@ class GolemMenu
 		}
 
 		// Nearest the camera first, so the first golem whose box contains the cursor is the
-		// answer and the rest are never projected — the early exit that keeps this cheap
+		// answer and the rest are never projected - the early exit that keeps this cheap
 		// when hundreds are piled under the mouse, where the radius filter cannot.
 		candidates.sort(BY_DEPTH);
 

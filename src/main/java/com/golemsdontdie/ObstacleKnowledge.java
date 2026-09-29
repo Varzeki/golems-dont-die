@@ -18,7 +18,7 @@ import static com.golemsdontdie.RouteGeometry.span;
  * of a two-way transport would strand golems upstairs.
  *
  * <p>{@link ObstacleObserver} watches the player, and two consistent sightings unlock an obstacle
- * permanently — two rather than one because a single animation after a click proves nothing.
+ * permanently - two rather than one because a single animation after a click proves nothing.
  */
 @Slf4j
 @Singleton
@@ -83,7 +83,7 @@ class ObstacleKnowledge
 	private final Map<Integer, List<MotionCurve>> curves = new LinkedHashMap<>();
 
 	/**
-	 * The line each obstacle moves the player along, as counts of each direction seen — "0,1" for
+	 * The line each obstacle moves the player along, as counts of each direction seen - "0,1" for
 	 * a stile crossed north or south. Counted, not taken from the first sighting, so one odd
 	 * traversal cannot fix a line for good; see {@link RouteGeometry}.
 	 */
@@ -462,7 +462,7 @@ class ObstacleKnowledge
 	}
 
 	/**
-	 * True if a route leaps over a tile some other learned route starts or ends on — a stepping
+	 * True if a route leaps over a tile some other learned route starts or ends on - a stepping
 	 * stone. A hop recorded wrongly came out two tiles long, over the stone the true hops use;
 	 * held out rather than deleted, the next correct crossing overwriting it in place.
 	 */
@@ -874,8 +874,8 @@ class ObstacleKnowledge
 		noteConfirmed(sighting);
 		noteLine(sighting);
 
-		// Only a route lying along the obstacle is learned — along this traversal's movement and the
-		// line the obstacle is known to move players — since a route off the line is performed off
+		// Only a route lying along the obstacle is learned - along this traversal's movement and the
+		// line the obstacle is known to move players - since a route off the line is performed off
 		// it, as with the stile crossed on a slant. The animation is still learned.
 		if (followsLine(sighting))
 		{
@@ -1015,7 +1015,7 @@ class ObstacleKnowledge
 
 	/**
 	 * The obstacles the player has personally used, as one line: {@code objectId,x,y,plane}
-	 * groups separated by semicolons. Purely cosmetic — losing it costs some green outlines.
+	 * groups separated by semicolons. Purely cosmetic - losing it costs some green outlines.
 	 */
 	String serialiseConfirmed()
 	{

@@ -13,13 +13,13 @@ import net.runelite.api.gameval.*;
 /**
  * The game's own list of ports, read from its database at login.
  *
- * <p>Sailing ships a table of docks — sixty-odd, with a name, a level and sometimes a quest.
+ * <p>Sailing ships a table of docks - sixty-odd, with a name, a level and sometimes a quest.
  * Reading it live means the plugin gains new ports when the game does.
  *
  * <p>Two things are defensive on purpose. The location sits in one of the table's unnamed
  * columns, so every column is probed and the one decoding to a plausible world coordinate wins.
- * And a dock's authored position is a marker, not necessarily a tile anything can float on — the
- * Summer Shore's is one fully blocked tile — so each dock is snapped onto open water at load.
+ * And a dock's authored position is a marker, not necessarily a tile anything can float on - the
+ * Summer Shore's is one fully blocked tile - so each dock is snapped onto open water at load.
  */
 @Slf4j
 @Singleton
@@ -59,7 +59,7 @@ class SailingDocks
 		/**
 		 * True if this dock sits on the one connected ocean. Not every dock does: Wyrmscraig has a
 		 * second inside its caves, whose water is its own body. The flag decides how a voyage is
-		 * expressed — an open-sea dock gets a drawn route, a cave dock a timed passage.
+		 * expressed - an open-sea dock gets a drawn route, a cave dock a timed passage.
 		 */
 		@Getter
 		private final boolean onOpenSea;
@@ -241,7 +241,7 @@ class SailingDocks
 
 	/**
 	 * True if a golem is allowed to sail to this dock: the player's real Sailing level and the dock's
-	 * quest, both applied. Never a boost — a port that opened only while boosted would strand golems.
+	 * quest, both applied. Never a boost - a port that opened only while boosted would strand golems.
 	 */
 	boolean isOpen(Dock dock)
 	{
@@ -311,7 +311,7 @@ class SailingDocks
 	/**
 	 * Where a dock is, from the shipped table of docking buoys.
 	 *
-	 * <p>The dock table has no location in it — a dock's position is that of its <em>docking
+	 * <p>The dock table has no location in it - a dock's position is that of its <em>docking
 	 * buoy</em>, a scene object with a {@code Dock} action, read offline from the cache. The
 	 * link is {@link DBTableID.SailingDock#COL_DOCK_ID}, the index into that list in object-id
 	 * order: Wyrmscraig's row reads dock id 59, the 60th buoy.
@@ -331,13 +331,13 @@ class SailingDocks
 
 	/**
 	 * Gangplank positions, indexed the same way; the buoy's own tile where none was found. The plank
-	 * is where a person walks aboard, so it beats the nearest land to the buoy — across the water,
+	 * is where a person walks aboard, so it beats the nearest land to the buoy - across the water,
 	 * or the wrong pier.
 	 */
 	private final List<WorldPoint> gangplanks = new ArrayList<>();
 
 	/**
-	 * Reads the shipped table: a count, then six shorts a dock — the buoy's tile then the
+	 * Reads the shipped table: a count, then six shorts a dock - the buoy's tile then the
 	 * gangplank's, each x, y and plane, in the order they were written. Reading
 	 * {@code int, short, short, byte} put every dock at something like 0,3038 on plane 12.
 	 */
@@ -391,7 +391,7 @@ class SailingDocks
 	}
 
 	/**
-	 * @param onOpenSea false for a dock on water that is not the sea — Wyrmscraig's cave, where
+	 * @param onOpenSea false for a dock on water that is not the sea - Wyrmscraig's cave, where
 	 *                  every open tile near the buoy is the lake, passable but not ocean, so it was
 	 *                  chosen as the quayside, admitted as floor, and golems walked on the water.
 	 */

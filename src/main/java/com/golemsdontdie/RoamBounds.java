@@ -23,7 +23,7 @@ class RoamBounds
 	private final int centreX;
 	private final int centreY;
 
-	/** Destinations to pass over — a crowded tile — or null. Never blocks walking through. */
+	/** Destinations to pass over - a crowded tile - or null. Never blocks walking through. */
 	private final BiPredicate<Integer, Integer> avoid;
 
 	RoamBounds(IslandMemory memory, int plane, int centreX, int centreY)
@@ -52,7 +52,7 @@ class RoamBounds
 		return memory.isKnownWalkable(worldX, worldY, plane);
 	}
 
-	/** A candidate destination. May be unwalkable — the caller rejects and retries. */
+	/** A candidate destination. May be unwalkable - the caller rejects and retries. */
 	int[] sample(Random random)
 	{
 		return new int[]{

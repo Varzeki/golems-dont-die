@@ -22,7 +22,7 @@ enum GolemTier
 	 *
 	 * <p>A coarse once-a-second step here was dropped: the previous version stepped every
 	 * golem in full near Wyrmscraig and handled hundreds, so the saving is not needed, and
-	 * a throttled golem would enter the scene up to a second out of place — precisely the
+	 * a throttled golem would enter the scene up to a second out of place - precisely the
 	 * boundary where that shows.
 	 */
 	NEAR,

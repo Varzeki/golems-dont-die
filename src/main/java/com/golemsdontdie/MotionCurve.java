@@ -7,8 +7,8 @@ import lombok.*;
  * A traversal as it actually happened, cycle by cycle, ready to be performed again.
  *
  * <p>This replaces a parametric model of clip, delay and duration, which had to rebuild the
- * motion differently for every obstacle shape — a hop, a climb and a door all want something
- * else — so fitting it to one broke it on another. The position is already recorded every
+ * motion differently for every obstacle shape - a hop, a climb and a door all want something
+ * else - so fitting it to one broke it on another. The position is already recorded every
  * 20ms, so the motion is kept and replayed instead; a teleport is a curve that does not move
  * and then does.
  *
@@ -52,7 +52,7 @@ final class MotionCurve
 
 	/**
 	 * Which way the player faced while traversing, relative to the direction of travel, in
-	 * orientation units — 0 forwards, 1024 backwards — or -1 if not recorded. Not always
+	 * orientation units - 0 forwards, 1024 backwards - or -1 if not recorded. Not always
 	 * forwards: on the rockslide they face the rock and move away from it, and a golem
 	 * facing its travel climbs off the cliff.
 	 */
@@ -318,7 +318,7 @@ final class MotionCurve
 		}
 
 		// The axis is the straight line to the destination. Where a traversal does not move
-		// at all — a ladder, which animates and then teleports — north stands in; nothing is
+		// at all - a ladder, which animates and then teleports - north stands in; nothing is
 		// projected onto it anyway.
 		float dx = toFineX - fromFineX;
 		float dy = toFineY - fromFineY;

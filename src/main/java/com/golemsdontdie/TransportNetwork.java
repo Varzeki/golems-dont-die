@@ -36,7 +36,7 @@ class TransportNetwork
 	/** Origin tile (x, y packed) to the transports starting there. Immutable once built. */
 	private final Map<Long, List<GolemTransport>> byOrigin = new HashMap<>();
 
-	/** Quest display name to enum, built once — the tables name quests as players do. */
+	/** Quest display name to enum, built once - the tables name quests as players do. */
 	private static Map<String, Quest> questsByName;
 
 	/**
@@ -160,7 +160,7 @@ class TransportNetwork
 		transports.addAll(learned);
 
 		// Learned rows are numbered above the shipped ones. Nothing reads the number for cooldowns
-		// any more — those are kept by a transport's two ends, which survive a rebuild — but it
+		// any more - those are kept by a transport's two ends, which survive a rebuild - but it
 		// still tells a learned row from a shipped one in a log.
 		for (int i = 0; i < learned.size(); i++)
 		{
@@ -249,7 +249,7 @@ class TransportNetwork
 		return false;
 	}
 
-	/** True if any transport starts on this tile — the cheap test, and the common one. */
+	/** True if any transport starts on this tile - the cheap test, and the common one. */
 	boolean hasOrigin(int x, int y)
 	{
 		return byOrigin.containsKey(pack(x, y));
@@ -295,7 +295,7 @@ class TransportNetwork
 	 * Wyrmscraig and everywhere its own transports lead: the regions a golem stays in when its
 	 * ambition is restricted.
 	 *
-	 * <p>The island's regions, then — repeatedly, until nothing new turns up — the region every
+	 * <p>The island's regions, then - repeatedly, until nothing new turns up - the region every
 	 * transport starting in the area lands in, which picks up caves and the floors above ladders
 	 * without a list. The region either side of each landing is allowed too, a floor rarely
 	 * fitting one region, but does not seed further transports, which leaks along coasts.
@@ -528,7 +528,7 @@ class TransportNetwork
 	/**
 	 * {@code "4070=0;10032>0;4560&2"} to triples of (id, operator, value). The {@code @} form is a
 	 * real-time countdown in wall-clock minutes; a golem has nothing to count down, so those
-	 * clauses are kept and never satisfied — see {@link GolemAbilities}.
+	 * clauses are kept and never satisfied - see {@link GolemAbilities}.
 	 */
 	private static int[] parseConditions(String spec)
 	{

@@ -8,7 +8,7 @@ import javax.inject.*;
  *
  * <p>Everything is in world tiles, queried against {@link IslandMemory}, so a search works the
  * same whether the golem is on screen or three regions away: pathing cannot depend on the scene.
- * Paths are breadth-first over cardinal steps — distances are short, and BFS is exhaustive within
+ * Paths are breadth-first over cardinal steps - distances are short, and BFS is exhaustive within
  * its budget, so a golem penned in by scenery finds out it is stuck rather than walking into it.
  */
 @Singleton

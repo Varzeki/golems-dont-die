@@ -92,7 +92,7 @@ class GolemMinimapOverlay extends Overlay
 		}
 
 		// Beyond the minimap's reach no projection can yield a dot, and a tile-distance test is
-		// two subtractions against a matrix transform — this runs every frame with hundreds of
+		// two subtractions against a matrix transform - this runs every frame with hundreds of
 		// golems. Measured in the main world, aboard a boat too; see PlayerPosition.
 		WorldPoint me = PlayerPosition.of(client);
 		if (me == null)

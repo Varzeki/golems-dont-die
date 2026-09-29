@@ -13,7 +13,7 @@ import net.runelite.api.coords.*;
  */
 final class GolemTransport
 {
-	// Archetypes. Written into the shipped table; the numbering is a file format, so append only —
+	// Archetypes. Written into the shipped table; the numbering is a file format, so append only -
 	// changing a value silently remaps every row in the shipped resource.
 	static final int ARCHETYPE_NONE = 0;
 	static final int ARCHETYPE_DOOR = 1;
@@ -108,7 +108,7 @@ final class GolemTransport
 	/**
 	 * {@link #INTO_INSTANCE}, {@link #OUT_OF_INSTANCE}, or neither. A golem through the pew is
 	 * where nobody outside can see it, and one in the instance's copy of the island is not in
-	 * the instance at all — identical in coordinates, since an instance is its template's.
+	 * the instance at all - identical in coordinates, since an instance is its template's.
 	 */
 	@Getter
 	private int instanceFlags;
@@ -192,7 +192,7 @@ final class GolemTransport
 		return varpRequirements;
 	}
 
-	/** True if this transport has no requirements at all — most of the network. */
+	/** True if this transport has no requirements at all - most of the network. */
 	boolean isUnconditional()
 	{
 		return skillRequirements.length == 0 && questRequirements.length == 0
@@ -222,7 +222,7 @@ final class GolemTransport
 
 	/**
 	 * The clips to play, in order, while the golem uses this. OSRS builds obstacle animations in
-	 * threes — mount, loop, dismount — and using only the middle one left nine of twenty
+	 * threes - mount, loop, dismount - and using only the middle one left nine of twenty
 	 * catalogued clips unused. The set comes from the plane change and the distance carried;
 	 * clips are shared, so three cost as one.
 	 */
@@ -253,7 +253,7 @@ final class GolemTransport
 					// the east (62267) the climbing loop; three server reimplementations
 					// use 740 for a descent too. Only the plane says which way a climb
 					// goes, so a cliff on flat ground gets the ascent both ways unless
-					// measured — the better failure, as an ascent played descending reads
+					// measured - the better failure, as an ascent played descending reads
 					// as effortful.
 					return new int[]{GolemContent.ANIM_CLIMB_DOWN};
 				}
@@ -271,8 +271,8 @@ final class GolemTransport
 			{
 				// A hop between stones and a running leap across a chasm are different
 				// movements, and distance is the only thing here that separates them. The
-				// thresholds are unverified: only the shortest rung is measured —
-				// Wyrmscraig's basalt stones, two tiles, play 741 — and the longer clips
+				// thresholds are unverified: only the shortest rung is measured -
+				// Wyrmscraig's basalt stones, two tiles, play 741 - and the longer clips
 				// come from the catalogue by name. A 2019 server reimplementation plays 741
 				// for every stepping stone regardless of span, so the split may not exist.
 				int span = travelDistance();

@@ -50,7 +50,7 @@ final class Itinerary
 	/**
 	 * Where a transport at the end of the walk puts the golem, or null for a plain route. Kept
 	 * apart from the waypoints: as the last one, a ladder into a dungeon joins tiles some six
-	 * thousand apart, and that distance was walked at a tick a tile — one ladder took an hour.
+	 * thousand apart, and that distance was walked at a tick a tile - one ladder took an hour.
 	 * Using the transport is a wait at the end of the walk.
 	 */
 	private final WorldPoint landing;
@@ -70,7 +70,7 @@ final class Itinerary
 	/**
 	 * For a crossing, the dock it leaves, or -1. Whoever takes the crossing may not sail straight
 	 * back there; set on the golem as it takes it, not as it is planned, since a crossing planned
-	 * is not always sailed — a crew's muster can hold it at the quay instead.
+	 * is not always sailed - a crew's muster can hold it at the quay instead.
 	 */
 	@Getter
 	@Setter
@@ -105,7 +105,7 @@ final class Itinerary
 	 * Plans a route.
 	 *
 	 * @param path         tiles in order, as {@code {x, y}} pairs; the golem's tile first
-	 * @param ticksPerTile pace — one for walking, more for something slower
+	 * @param ticksPerTile pace - one for walking, more for something slower
 	 * @param extra        ticks on top of the travel itself, for boarding and the like
 	 * @param voyage       true if this crosses water
 	 */

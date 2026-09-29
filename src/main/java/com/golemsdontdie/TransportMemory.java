@@ -8,14 +8,14 @@ import static com.golemsdontdie.RouteGeometry.span;
 /**
  * What one golem has used recently, so it does not pace back and forth through a door.
  *
- * <p>Per golem, not global — two golems meeting at the same ladder should both be able to take
+ * <p>Per golem, not global - two golems meeting at the same ladder should both be able to take
  * it. Transport cooldowns are not saved: they stop a golem visibly oscillating over the next
  * minute or two, and after a logout there is none left to interrupt. Shore leave is the exception
  * on both counts, saved and in real time, because a golem restored at a port it has just landed
  * at should not sail straight back out.
  *
- * <p>Endpoints, not row numbers: two rows can go the same way — the rockslide had a shipped row
- * and a learned route with identical ends under different object ids — and learned rows are
+ * <p>Endpoints, not row numbers: two rows can go the same way - the rockslide had a shipped row
+ * and a learned route with identical ends under different object ids - and learned rows are
  * renumbered whenever what was learned changes. Going back the way it came is about tiles.
  */
 final class TransportMemory
@@ -319,8 +319,8 @@ final class TransportMemory
 
 	/**
 	 * Takes back the shore leave a crossing booked. Shore leave is set when a voyage is planned
-	 * rather than when it ends, so a golem whose crossing is given up — held at the quayside to
-	 * wait for a crew — would sit out the leave for a voyage it never made, and by the time that
+	 * rather than when it ends, so a golem whose crossing is given up - held at the quayside to
+	 * wait for a crew - would sit out the leave for a voyage it never made, and by the time that
 	 * ran out the crew would be long gone.
 	 */
 	void clearShoreLeave()

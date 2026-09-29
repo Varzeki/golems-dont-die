@@ -6,7 +6,7 @@ import lombok.extern.slf4j.*;
 import net.runelite.api.*;
 
 /**
- * What a golem is allowed to do — the player's account, minus an inventory.
+ * What a golem is allowed to do - the player's account, minus an inventory.
  *
  * <p>A golem made by a player who has done Plague City can use the Ardougne shortcuts that
  * quest opens: a door locked to a golem that the player walks through freely would read as
@@ -22,7 +22,7 @@ import net.runelite.api.*;
  * </ul>
  *
  * <p>Read live each time: the lookups are cheap, and a cached answer would go stale
- * whenever the player levels up or flips a lever — §12 of the plan calls that the likeliest
+ * whenever the player levels up or flips a lever - §12 of the plan calls that the likeliest
  * way to strand a golem mid-journey.
  */
 @Slf4j

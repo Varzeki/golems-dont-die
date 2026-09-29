@@ -88,7 +88,7 @@ final class RoamContext
 
 	/**
 	 * As {@link #appeal}, for one golem: a crowd weighs differently on a sociable golem than on a
-	 * crowd-shy one. Only crowds — what a golem makes of the place itself is {@link #desire}, kept
+	 * crowd-shy one. Only crowds - what a golem makes of the place itself is {@link #desire}, kept
 	 * apart because a golem hemmed in by others should still take a way out it does not care for.
 	 */
 	float appeal(int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane, TransportMemory memory)
