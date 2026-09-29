@@ -293,9 +293,15 @@ final class GolemContent
 	private static final int LATER_EMOTES_FROM = 2105;
 	private static final int LATER_EMOTES_TO = 2113;
 
+	/**
+	 * The one id in the first run that is not an emote: chopping with a rune axe, which sits between
+	 * the dance and running on the spot. Copied, a golem would chop the air beside a woodcutter.
+	 */
+	private static final int RUNE_AXE_CHOP = 867;
+
 	static boolean isEmote(int animation)
 	{
-		return animation >= EMOTES_FROM && animation <= EMOTES_TO
+		return animation >= EMOTES_FROM && animation <= EMOTES_TO && animation != RUNE_AXE_CHOP
 			|| animation >= LATER_EMOTES_FROM && animation <= LATER_EMOTES_TO;
 	}
 
