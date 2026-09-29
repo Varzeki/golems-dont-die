@@ -1815,12 +1815,27 @@ public class GolemsDontDiePlugin extends Plugin
 		for (Golem golem : golems)
 		{
 			// Aboard the player's ship: nowhere to walk and nothing to plan. It goes where the ship
-			// goes, is drawn on its deck, and dances there if there is something to dance about.
+			// goes, is drawn on its deck, and dances there if there is something to dance about, or
+			// copies the player's emote.
 			if (golem.isAboard())
 			{
 				shipmates.carry(golem);
 				golem.setTickNow(tick);
-				golem.setDancing(celebrating);
+				if (golem.isDying())
+				{
+					// Told to go while aboard: it crumbles on deck, and is then dropped from the
+					// ship and the roster like any other. The crumble only counts down in advance,
+					// which a golem aboard is otherwise never given, so it stood on deck for good.
+					golem.advance(elapsed, roamContext);
+				}
+				else
+				{
+					golem.setDancing(celebrating);
+					if (social && playerAt != null)
+					{
+						mimicAboard(golem, tick, playerAt);
+					}
+				}
 				updateRenderer(golem, wv, true, drawnPerTile);
 				continue;
 			}
@@ -2671,6 +2686,21 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			golem.startParty(tick + PARTY_TICKS);
 		}
+	}
+
+	/**
+	 * A golem aboard the player's ship copies the player's emote, as one near them ashore does,
+	 * where it stands at the rail. Aboard it is never far from the player and never lost in a
+	 * crowd, so only the chance is asked; it faces out over the water whatever it is doing.
+	 */
+	private void mimicAboard(Golem golem, int tick, WorldPoint playerAt)
+	{
+		if (playerEmote == -1 || golem.isGreeting(tick) || moods.nextFloat() >= MIMIC_CHANCE)
+		{
+			return;
+		}
+		WorldPoint at = golem.currentTile();
+		golem.mimic(tick + MIMIC_TICKS, playerAt.getX() - at.getX(), playerAt.getY() - at.getY(), playerEmote);
 	}
 
 	/** How near two golems alone together must be to wave at each other, in tiles. */

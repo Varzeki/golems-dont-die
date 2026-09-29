@@ -1,13 +1,17 @@
 package com.golemsdontdie;
 
 import java.lang.reflect.Proxy;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.BiFunction;
 import net.runelite.api.CollisionData;
 import net.runelite.api.CollisionDataFlag;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.coords.WorldPoint;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -115,6 +119,41 @@ public class GolemShipmatesTest
 		{
 			assertFalse(rail[0] / Golem.TILE == DECK_WEST && rail[1] / Golem.TILE == 4);
 		}
+	}
+
+	private static final WorldPoint QUAY = new WorldPoint(3029, 3217, 0);
+
+	/** Golems step off onto tiles of their own around the player while there are any. */
+	@Test
+	public void eachStepsOffOntoATileOfItsOwn()
+	{
+		Set<Long> taken = new HashSet<>();
+		taken.add(RoamContext.tileKey(QUAY.getX(), QUAY.getY(), QUAY.getPlane()));
+		// Room for one beside the player, then none.
+		BiFunction<WorldPoint, Set<Long>, WorldPoint> place = (at, stood) ->
+		{
+			WorldPoint beside = at.dx(1);
+			return stood.contains(RoamContext.tileKey(beside.getX(), beside.getY(), beside.getPlane())) ? at : beside;
+		};
+		assertEquals(QUAY.dx(1), GolemShipmates.stepOff(QUAY, taken, place));
+		// A narrow quay: the next shares the player's tile, not the port it boarded at.
+		assertEquals(QUAY, GolemShipmates.stepOff(QUAY, taken, place));
+		assertEquals(QUAY, GolemShipmates.stepOff(QUAY, taken, (at, stood) -> null));
+	}
+
+	/** A golem told to go while aboard crumbles on deck and is done, rather than sailing on for good. */
+	@Test
+	public void aGolemToldToGoAboardCrumblesThere()
+	{
+		GolemSnapshot snapshot = new GolemSnapshot(1234, "Golem", new int[0], new short[0], new short[0],
+			128, 128, 1, -1, -1, -1, QUAY, 0);
+		Golem golem = Golem.onTile(snapshot, QUAY, 42L, QUAY);
+		golem.boardShip(7, 3 * Golem.TILE, 4 * Golem.TILE, 1, 512);
+		golem.startDying();
+		assertFalse(golem.isCrumbled());
+		golem.advance(GolemContent.GOLEM_DEATH_CYCLES, null);
+		assertTrue(golem.isAboard());
+		assertTrue(golem.isCrumbled());
 	}
 
 	/** A few golems stand round the ship, not in a queue down one side of it. */

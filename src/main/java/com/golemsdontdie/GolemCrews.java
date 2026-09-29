@@ -53,10 +53,50 @@ class GolemCrews
 		final List<Golem> waiting = new ArrayList<>();
 		final int since;
 
+		/**
+		 * The port chosen for the crew, or null, kept while its crossing is worked out: chosen afresh
+		 * every tick, a crew asked for a new sea field each time and sailed only if one happened to
+		 * be built already. Chosen again whenever someone joins, for them too.
+		 */
+		SailingDocks.Dock port;
+
+		/** The last tick the crew waits on that port's crossing, as a lone golem waits on its own. */
+		int portUntil;
+
+		/** When each golem in view next moves about the quay while it waits. */
+		final Map<Golem, Integer> nextMove = new IdentityHashMap<>();
+
+		/** Golems that have just come to wait, to be waved at. */
+		final Map<Golem, Newcomer> newcomers = new IdentityHashMap<>();
+
 		Muster(SailingDocks.Dock dock, int since)
 		{
 			this.dock = dock;
 			this.since = since;
+		}
+
+		/** Signs a golem onto the wait, as a newcomer to be waved at. */
+		void join(Golem golem, int tick)
+		{
+			if (!waiting.contains(golem))
+			{
+				waiting.add(golem);
+				newcomers.put(golem, new Newcomer(tick));
+				port = null;
+			}
+		}
+	}
+
+	/** A golem that has just come to wait at a quay: when it came, and who waved first. */
+	private static final class Newcomer
+	{
+		final int came;
+		Golem wavedBy;
+		int wavedOn;
+
+		Newcomer(int came)
+		{
+			this.came = came;
 		}
 	}
 
@@ -135,10 +175,7 @@ class GolemCrews
 		// Already on the list and sailing again: its wait ran out, it planned afresh and cast off
 		// while the crew was still making up. Held again rather than left under way on a list it
 		// could be signed off, which would have carried it back to the dock it had left.
-		if (!muster.waiting.contains(golem))
-		{
-			muster.waiting.add(golem);
-		}
+		muster.join(golem, tick);
 		// Put back on the quayside rather than left where it stands. Crossings begin between game
 		// ticks and this runs on one, so by now the golem is a tile or two out on the water, and
 		// standing it there would leave it on the sea until the watchdog fetched it back.
@@ -171,10 +208,7 @@ class GolemCrews
 			return false;
 		}
 		Muster muster = mustering.computeIfAbsent(dock.getRowId(), id -> new Muster(dock, tick));
-		if (!muster.waiting.contains(golem))
-		{
-			muster.waiting.add(golem);
-		}
+		muster.join(golem, tick);
 		golem.waitAshore(tick, MUSTER_TICKS, placeFor(golem, muster), context);
 		// Planning the crossing booked shore leave for its whole length.
 		golem.getTransportMemory().clearShoreLeave();
@@ -215,22 +249,164 @@ class GolemCrews
 				it.remove();
 				continue;
 			}
-			// However many are waiting: a crew no crossing can be planned for — no port that suits
-			// all of them — waited the same as one nobody joined, and then went its separate ways.
-			// Left to wait until one could be, it never could, and they stood at the quay for good.
+			// However many are waiting: a crew no crossing can be planned for waited the same as one
+			// nobody joined, and then went its separate ways. Left to wait until one could be, it
+			// never could, and they stood at the quay for good.
 			if (tick - muster.since >= MUSTER_TICKS || tick < muster.since)
 			{
-				for (Golem golem : muster.waiting)
-				{
-					released.put(golem, tick);
-				}
+				release(muster.waiting, tick);
 				it.remove();
+				continue;
+			}
+			mill(muster, tick, context);
+		}
+	}
+
+	/** Ticks between one move about the quay and a waiting golem's next: three to seven seconds. */
+	private static final int MOVE_MIN_TICKS = 5;
+	private static final int MOVE_SPREAD_TICKS = 7;
+
+	/** The chance a move is a look out at the water rather than a few steps. */
+	private static final float LOOK_CHANCE = 0.4f;
+
+	/** How long after a golem comes to wait the others wave at it, and it may wave back. */
+	private static final int WELCOME_TICKS = 5;
+	private static final int WAVE_BACK_TICKS = 12;
+
+	/** The chance a golem waiting waves at a newcomer on a given tick, so they do not all at once. */
+	private static final float WELCOME_CHANCE = 0.5f;
+
+	/** How long a wave takes, and how long before a golem at a quay waves at another again. */
+	private static final int WAVE_TICKS = 4;
+	private static final int WAVE_COOLDOWN_TICKS = 100;
+
+	/**
+	 * Golems waiting at a quay in view of the player, kept from standing frozen for as long as the
+	 * muster lasts, facing wherever their last step pointed: now and then each wanders a tile or two
+	 * about its place, or turns to look out at the water, each on its own clock so they do not move
+	 * as one. Whoever is waiting waves at a golem coming to join them, and it waves back once it is
+	 * in its place. Nothing is given to a golem still walking: a wave would stop it where it was.
+	 */
+	private void mill(Muster muster, int tick, RoamContext context)
+	{
+		muster.newcomers.values().removeIf(newcomer -> tick - newcomer.came > WAVE_BACK_TICKS || tick < newcomer.came);
+		for (Golem golem : muster.waiting)
+		{
+			if (!golem.isIdleOnQuay(tick) || welcome(muster, golem, tick))
+			{
+				continue;
+			}
+			Integer due = muster.nextMove.get(golem);
+			if (due != null && tick < due && due - tick <= MOVE_MIN_TICKS + MOVE_SPREAD_TICKS)
+			{
+				continue;
+			}
+			muster.nextMove.put(golem, tick + MOVE_MIN_TICKS + random.nextInt(MOVE_SPREAD_TICKS));
+			if (due == null)
+			{
+				// Only just settled: it stands a moment first.
+				continue;
+			}
+			WorldPoint at = golem.currentTile();
+			WorldPoint water = muster.dock.getBerth();
+			if (random.nextFloat() < LOOK_CHANCE)
+			{
+				golem.faceToward(water.getX() - at.getX(), water.getY() - at.getY());
+				continue;
+			}
+			WorldPoint spot = golem.waitingSpot();
+			WorldPoint to = spot == null ? null : planner.quayTileNear(spot, taken(muster, golem), random);
+			// Never so far it no longer counts as waiting here.
+			if (to != null && to.distanceTo2D(muster.dock.getShore()) <= QUAYSIDE)
+			{
+				golem.millTo(to, context);
 			}
 		}
 	}
 
 	/**
-	 * Picks the crew's port, plans the one crossing, and signs everyone on.
+	 * Waves at a newcomer, or back at whoever waved first. Golems standing still only, and not again
+	 * for a while, so a busy quay is not all waving.
+	 *
+	 * @return true if the golem waved
+	 */
+	private boolean welcome(Muster muster, Golem golem, int tick)
+	{
+		if (!golem.mayWaveAtGolem(tick, WAVE_COOLDOWN_TICKS))
+		{
+			return false;
+		}
+		Golem other = null;
+		Newcomer self = muster.newcomers.get(golem);
+		// In its place now, and somebody waved on its way in: it waves back, the once. Not the tick
+		// they waved, which looks like two golems who happened to wave at the same moment.
+		if (self != null && self.wavedBy != null && tick > self.wavedOn)
+		{
+			other = self.wavedBy;
+			muster.newcomers.remove(golem);
+		}
+		else
+		{
+			// A chance a tick rather than all at once, so the quay's welcome comes a tick or two apart.
+			for (Map.Entry<Golem, Newcomer> entry : muster.newcomers.entrySet())
+			{
+				Newcomer newcomer = entry.getValue();
+				if (entry.getKey() != golem && tick - newcomer.came <= WELCOME_TICKS
+					&& entry.getKey().getRenderer() != null && random.nextFloat() < WELCOME_CHANCE)
+				{
+					other = entry.getKey();
+					if (newcomer.wavedBy == null)
+					{
+						newcomer.wavedBy = golem;
+						newcomer.wavedOn = tick;
+					}
+					break;
+				}
+			}
+		}
+		if (other == null || !muster.waiting.contains(other))
+		{
+			return false;
+		}
+		WorldPoint at = golem.currentTile();
+		WorldPoint there = other.currentTile();
+		golem.waveAtGolem(tick + WAVE_TICKS, there.getX() - at.getX(), there.getY() - at.getY(), tick);
+		return true;
+	}
+
+	/** The tiles golems waiting here stand on, and the others are walking to, for one to keep off. */
+	private static Set<Long> taken(Muster muster, Golem golem)
+	{
+		Set<Long> taken = new HashSet<>();
+		for (Golem other : muster.waiting)
+		{
+			WorldPoint tile = other.currentTile();
+			taken.add(RoamContext.tileKey(tile.getX(), tile.getY(), tile.getPlane()));
+			if (other != golem)
+			{
+				tile = other.goalTile();
+				taken.add(RoamContext.tileKey(tile.getX(), tile.getY(), tile.getPlane()));
+			}
+		}
+		return taken;
+	}
+
+	/**
+	 * Lets golems waiting at a quay go, each to sail alone or not as it would have without company,
+	 * and not to be held again straight away.
+	 */
+	private void release(List<Golem> golems, int tick)
+	{
+		for (Golem golem : golems)
+		{
+			released.put(golem, tick);
+			golem.endWait();
+		}
+	}
+
+	/**
+	 * Picks the crew's port, plans the one crossing, and signs everyone on; or, if there is no port
+	 * all of them would go to, lets them go.
 	 *
 	 * @return false if the crossing could not be planned this tick, so the crew keeps waiting
 	 */
@@ -246,10 +422,28 @@ class GolemCrews
 			memories.add(golem.getTransportMemory());
 		}
 
+		if (muster.port == null)
+		{
+			muster.port = voyage.crewPort(muster.dock, memories, random, context);
+			muster.portUntil = tick + TransportMemory.PENDING_WAIT_TICKS;
+		}
+		// Nowhere all of them would go, and waiting longer changes nothing about that; nor does
+		// waiting any longer on a crossing still being worked out. They go their separate ways now
+		// rather than stand out the muster.
+		if (muster.port == null || tick > muster.portUntil)
+		{
+			release(muster.waiting, tick);
+			return true;
+		}
 		WorldPoint at = crew.get(0).currentTile();
-		Itinerary crossing = voyage.crewCrossing(muster.dock, memories, at, tick, random, context);
+		Itinerary crossing = voyage.crossTo(muster.dock, muster.port, at, tick, random, context);
 		if (crossing == null)
 		{
+			// Waiting on its sea field: the port is kept. No crossing to be had there at all: another.
+			if (!voyage.wasNotReady())
+			{
+				muster.port = null;
+			}
 			return false;
 		}
 
@@ -268,13 +462,9 @@ class GolemCrews
 		}
 		// More waiting than the boat has berths: the rest are let go rather than left standing at
 		// a quayside whose crew has sailed.
-		for (Golem left : muster.waiting)
-		{
-			if (crews.get(left) != made)
-			{
-				released.put(left, tick);
-			}
-		}
+		List<Golem> left = new ArrayList<>(muster.waiting);
+		left.removeIf(golem -> crews.get(golem) == made);
+		release(left, tick);
 		log.debug("{} golems crewed a {} from {}", made.size(), boat, muster.dock.getName());
 		return true;
 	}

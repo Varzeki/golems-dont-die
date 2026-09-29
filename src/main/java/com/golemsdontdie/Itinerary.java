@@ -67,6 +67,15 @@ final class Itinerary
 	private final int[] fineYs;
 	private final int[] facings;
 
+	/**
+	 * For a crossing, the dock it leaves, or -1. Whoever takes the crossing may not sail straight
+	 * back there; set on the golem as it takes it, not as it is planned, since a crossing planned
+	 * is not always sailed — a crew's muster can hold it at the quay instead.
+	 */
+	@Getter
+	@Setter
+	private int leftPort = -1;
+
 	private Itinerary(int[] xs, int[] ys, int[] reached, int length, int plane,
 		int startTick, int duration, boolean voyage, WorldPoint landing, GolemTransport transport,
 		int[] fineXs, int[] fineYs, int[] facings)

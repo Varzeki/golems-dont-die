@@ -530,6 +530,31 @@ class RoamPlanner
 		return at;
 	}
 
+	/** How far from its place at a quayside a golem waiting there wanders. */
+	private static final int MILL_TILES = 2;
+
+	/**
+	 * Somewhere near its place at a quayside for a golem waiting there to wander to, or null if a
+	 * few tries find nowhere: ground it can stand on, joined to its place on foot, and as a landing
+	 * is, never the sea or the start of a transport. Not in {@code taken} either, one golem a tile.
+	 */
+	WorldPoint quayTileNear(WorldPoint spot, Set<Long> taken, Random random)
+	{
+		int plane = spot.getPlane();
+		for (int attempt = 0; attempt < 4; attempt++)
+		{
+			int x = spot.getX() + random.nextInt(MILL_TILES * 2 + 1) - MILL_TILES;
+			int y = spot.getY() + random.nextInt(MILL_TILES * 2 + 1) - MILL_TILES;
+			if (!taken.contains(RoamContext.tileKey(x, y, plane)) && isSafe(x, y, plane)
+				&& mesh.sameComponent(spot.getX(), spot.getY(), x, y, plane)
+				&& !mesh.isOcean(x, y, plane) && !transports.hasOrigin(x, y))
+			{
+				return new WorldPoint(x, y, plane);
+			}
+		}
+		return null;
+	}
+
 	/** Standing where it is for a while: a golem waiting at a quayside for a crew to make up. */
 	static Itinerary stayPut(WorldPoint at, int tick, int ticks)
 	{

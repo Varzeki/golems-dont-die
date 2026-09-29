@@ -281,6 +281,10 @@ class Golem
 			if (replanned != null)
 			{
 				itinerary = replanned;
+				if (replanned.isVoyage())
+				{
+					leave(replanned);
+				}
 				noteUnstuck(tick);
 				return true;
 			}
@@ -490,9 +494,15 @@ class Golem
 	 */
 	void waitAshore(int tick, int ticks, WorldPoint quayside)
 	{
-		if (itinerary != null && itinerary.isVoyage())
+		// Only a crossing under way is being given up. One already sailed is still the plan of a
+		// golem out of view that has just come ashore here, and it was sailed.
+		if (itinerary != null && itinerary.isVoyage() && !itinerary.isFinished(tick))
 		{
 			history.unsailed();
+			if (itinerary.getLeftPort() >= 0)
+			{
+				transportMemory.setBlockedPort(blockedBefore);
+			}
 		}
 		path.clear();
 		walking = false;
@@ -513,6 +523,9 @@ class Golem
 			&& (at.equals(quayside) || walkTo(quayside.getX(), quayside.getY(), context)))
 		{
 			walking = !path.isEmpty();
+			// Whatever it was walking to use is given up with the crossing.
+			queuedTransport = null;
+			queuedDock = null;
 			itinerary = RoamPlanner.stayPut(quayside, tick, ticks);
 			waiting = itinerary;
 			return;
@@ -536,6 +549,58 @@ class Golem
 	 * frame after it was stood there, and never sailed while anyone watched.
 	 */
 	private Itinerary waiting;
+
+	/**
+	 * True for a golem in view standing on its wait at a quayside with nothing else in hand: not
+	 * stepping, waving, dancing, climbing or crumbling. Only then is it given anything to do there,
+	 * since a wave begun mid-walk dropped the rest of the walk.
+	 */
+	boolean isIdleOnQuay(int tick)
+	{
+		return renderer != null && isWaiting(tick) && path.isEmpty() && !stepping && !isDying() && !dancing
+			&& !isGreeting(tick) && !isPartying(tick) && !inTransition();
+	}
+
+	/** The place at a quayside this golem is waiting at, or null if it is not waiting. */
+	WorldPoint waitingSpot()
+	{
+		return waiting == null ? null : waiting.destination();
+	}
+
+	/** The tile the golem is walking to, or the one it stands on. */
+	WorldPoint goalTile()
+	{
+		int[] last = path.peekLast();
+		return last == null ? currentTile() : new WorldPoint(last[0], last[1], plane);
+	}
+
+	/** Most tiles a golem waiting at a quay walks to stretch its legs; further is a wander. */
+	private static final int MILL_STEPS = 4;
+
+	/**
+	 * Walks a golem waiting at a quay to a tile near its place there, still waiting. Nothing it
+	 * passes is taken, since no transport is rolled for while it waits.
+	 *
+	 * @return true if it set off
+	 */
+	boolean millTo(WorldPoint to, RoamContext context)
+	{
+		if (to.getPlane() != plane || !walkTo(to.getX(), to.getY(), context) || path.size() > MILL_STEPS)
+		{
+			path.clear();
+			return false;
+		}
+		return true;
+	}
+
+	/** Turns the golem, at its own pace, to look toward something this far east and north. */
+	void faceToward(int dx, int dy)
+	{
+		if (dx != 0 || dy != 0)
+		{
+			targetOrientation = headingFor(dx, dy);
+		}
+	}
 
 	/**
 	 * Turns the golem to a heading at once, without turning through it: a golem on a boat is
@@ -592,8 +657,26 @@ class Golem
 		if (plan != null && plan.isVoyage())
 		{
 			history.sailed();
+			leave(plan);
 		}
 	}
+
+	/**
+	 * Keeps the golem from sailing straight back to the port a crossing it is taking leaves. Done
+	 * as it takes the crossing rather than as it is planned: one held for a crew's muster instead
+	 * had moved the block to a port the golem never left.
+	 */
+	private void leave(Itinerary crossing)
+	{
+		if (crossing.getLeftPort() >= 0)
+		{
+			blockedBefore = transportMemory.getBlockedPort();
+			transportMemory.setBlockedPort(crossing.getLeftPort());
+		}
+	}
+
+	/** The port blocked before the crossing it is on, put back if that crossing is given up at the quay. */
+	private int blockedBefore = -1;
 
 	/** The tile the golem is standing on or walking out of. */
 	WorldPoint currentTile()
@@ -1137,9 +1220,11 @@ class Golem
 				// A tile has just been entered, the one moment a transport roll may happen:
 				// rolling per frame would tie the behaviour to framerate, and a golem
 				// loitering near a ladder would eventually always take it. A shortcut it
-				// walked here to use comes first, having already decided.
-				if (takeQueuedTransport(context) || takeQueuedDock(context) || considerBoarding(context)
-					|| considerTransport(context))
+				// walked here to use comes first, having already decided. Never on the way to a place
+				// at a quayside, or about it: a ladder taken there left a crew waiting on a golem
+				// that had wandered off.
+				if (!isWaiting(context.getTick()) && (takeQueuedTransport(context) || takeQueuedDock(context)
+					|| considerBoarding(context) || considerTransport(context)))
 				{
 					return searched;
 				}
@@ -2026,6 +2111,12 @@ class Golem
 		boatSeed = 0;
 	}
 
+	/** True for a golem sailing alone, or at its crew's helm, whose berth is the boat's 0,0. */
+	boolean isAtHelm()
+	{
+		return !crewed || deckAcross == 0 && deckAlong == 0;
+	}
+
 	/**
 	 * The boat this golem is on, for riding its swell: the helm's id for a crew, this golem's own for
 	 * a raft of its own. See FakeRaft.bob.
@@ -2422,6 +2513,19 @@ class Golem
 	}
 
 	/**
+	 * Done waiting at a quay, let go by the crew it was waiting for: it plans for itself from here,
+	 * finishing any step it is on rather than being stood on its tile.
+	 */
+	void endWait()
+	{
+		if (itinerary != null && itinerary == waiting)
+		{
+			itinerary = null;
+		}
+		waiting = null;
+	}
+
+	/**
 	 * Turns the golem to face something and waves at it, for as long as the wave takes.
 	 *
 	 * @param dx how far east the thing being waved at is
@@ -2539,7 +2643,9 @@ class Golem
 		}
 		if (afloat)
 		{
-			return GolemContent.ANIM_GOLEM_HELM;
+			// One pair of hands on the wheel. The rest of a crew stands on deck: every one of them
+			// steering read as eight helmsmen and no helm.
+			return isAtHelm() ? GolemContent.ANIM_GOLEM_HELM : snapshot.getIdlePoseAnimation();
 		}
 		if (gaitWalk != -1)
 		{
