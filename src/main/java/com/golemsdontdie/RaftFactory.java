@@ -57,12 +57,14 @@ class RaftFactory
 			hull = recolour(hull.cloneVertices().cloneColors(), boat.getHullFrom(), boat.getHullTo());
 			helm = recolour(helm.cloneVertices().cloneColors(), GolemContent.RAFT_HELM_RECOLOUR_FROM,
 				GolemContent.RAFT_HELM_RECOLOUR_TO);
-			// Hull, mast and sail sit on the middle tile; the helm is its own tile at the stern.
+			// The helm is its own tile at the stern, and the rig stands where the boat's own does.
 			helm = helm.translate(0, 0, boat.getHelmOffset());
+			mast = mast.cloneVertices().translate(boat.getMastX(), 0, boat.getMastZ());
+			cloth = cloth.cloneVertices().translate(boat.getClothX(), 0, boat.getClothZ());
 			ModelData merged;
 			if (boat.getKeelModel() < 0)
 			{
-				merged = client.mergeModels(hull, mast.cloneVertices(), cloth.cloneVertices(), helm);
+				merged = client.mergeModels(hull, mast, cloth, helm);
 			}
 			else
 			{
@@ -75,7 +77,7 @@ class RaftFactory
 				}
 				keel = recolour(keel.cloneVertices().cloneColors(), GolemBoat.keelFrom(), GolemBoat.keelTo())
 					.translate(boat.getKeelX(), 0, boat.getKeelZ());
-				merged = client.mergeModels(hull, keel, mast.cloneVertices(), cloth.cloneVertices(), helm);
+				merged = client.mergeModels(hull, keel, mast, cloth, helm);
 			}
 			Model made = merged.light(BASE_AMBIENT, BASE_CONTRAST, LIGHT_X, LIGHT_Y, LIGHT_Z);
 			models.put(boat, made);

@@ -22,14 +22,14 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 0),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
 	 * rest along a deck 324 units across and 714 long.
 	 */
 	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
-		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320),
+		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320, 0, 0, 0, 0),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
@@ -37,7 +37,7 @@ enum GolemBoat
 	 */
 	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, -240, 240, -554, 536, 8,
 		new int[][]{{0, 0}, {-120, 180}, {120, 180}, {-120, 400}, {120, 400}, {-120, 620},
-			{120, 620}, {0, 830}}, 58228, -256, -448);
+			{120, 620}, {0, 830}}, 58228, -256, -448, 128, 448, 128, 576);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -102,6 +102,17 @@ enum GolemBoat
 	private final int keelModel;
 	private final int keelX;
 	private final int keelZ;
+
+	/**
+	 * Where the mast and the sail's cloth stand from the middle of the hull, across then along. Each
+	 * is an object of its own on a tile of its own; on the raft that is the middle tile, but a
+	 * sloop's rig stands three and a half tiles along and one across, and drawn at the middle it
+	 * stood out over the sea beside its own hull. The skiff's is not measured yet.
+	 */
+	private final int mastX;
+	private final int mastZ;
+	private final int clothX;
+	private final int clothZ;
 
 	static short[] keelFrom()
 	{

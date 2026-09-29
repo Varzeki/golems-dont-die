@@ -229,19 +229,23 @@ class GolemShipmates
 		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
 		Tile[][] floor = tiles == null || plane >= tiles.length ? null : tiles[plane];
 
+		// Only over the hull. A sloop's floor runs a tile out past the hull on each side, under the
+		// trim round its edge, and nothing there blocks; golems took those tiles for the rail and
+		// stood out beside the ship, over the sea.
+		int[] hull = hullFootprint(deck);
 		List<int[]> rail = new ArrayList<>();
 		for (int x = 0; x < sizeX; x++)
 		{
 			for (int y = 0; y < sizeY; y++)
 			{
-				if (!isDeck(flags, x, y, sizeX, sizeY)
+				if (!onHull(hull, x, y) || !isDeck(flags, x, y, sizeX, sizeY)
 					|| floor != null && (x >= floor.length || y >= floor[x].length || floor[x][y] == null))
 				{
 					continue;
 				}
 				for (int[] way : OUTBOARD)
 				{
-					if (!isDeck(flags, x + way[0], y + way[1], sizeX, sizeY))
+					if (!onHull(hull, x + way[0], y + way[1]) || !isDeck(flags, x + way[0], y + way[1], sizeX, sizeY))
 					{
 						rail.add(new int[]{x, y, way[2]});
 						break;
@@ -283,6 +287,54 @@ class GolemShipmates
 			spread.add(new int[]{chosen[0] * Golem.TILE + Golem.TILE / 2, chosen[1] * Golem.TILE + Golem.TILE / 2, chosen[2]});
 		}
 		return spread;
+	}
+
+	/**
+	 * The tiles the hull covers, as {minX, minY, maxX, maxY} in the ship's scene, or null if no hull
+	 * is found, when every tile counts. Found by the hull objects' own ids: the largest object on a
+	 * ship is not its hull but the trim round the edge of it.
+	 */
+	static int[] hullFootprint(WorldView deck)
+	{
+		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
+		if (tiles == null)
+		{
+			return null;
+		}
+		for (Tile[][] plane : tiles)
+		{
+			for (Tile[] column : plane == null ? new Tile[0][] : plane)
+			{
+				for (Tile tile : column == null ? new Tile[0] : column)
+				{
+					if (tile == null || tile.getGameObjects() == null)
+					{
+						continue;
+					}
+					for (GameObject object : tile.getGameObjects())
+					{
+						if (object != null && isHull(object.getId()))
+						{
+							int x = object.getSceneMinLocation().getX();
+							int y = object.getSceneMinLocation().getY();
+							return new int[]{x, y, x + object.sizeX() - 1, y + object.sizeY() - 1};
+						}
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/** The Kandarin hulls in every wood, raft to sloop, the colossal one and the pirates'. */
+	private static boolean isHull(int objectId)
+	{
+		return objectId >= 59494 && objectId <= 59515 || objectId == 29472;
+	}
+
+	private static boolean onHull(int[] hull, int x, int y)
+	{
+		return hull == null || x >= hull[0] && y >= hull[1] && x <= hull[2] && y <= hull[3];
 	}
 
 	private static boolean isDeck(int[][] flags, int x, int y, int sizeX, int sizeY)
