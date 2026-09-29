@@ -678,6 +678,7 @@ class Golem
 			// Walking to a shortcut or a dock is something only a golem in view does.
 			queuedTransport = null;
 			queuedDock = null;
+			facingObstacle = null;
 			// A crossing keeps going, out of view as into it. Planning afresh from the open
 			// sea found nowhere to walk, so the golem idled on the water for good.
 			if (itinerary != null && itinerary.isVoyage() && !itinerary.isFinished(context.getTick()))
@@ -903,6 +904,7 @@ class Golem
 		itinerary = null;
 		queuedTransport = null;
 		queuedDock = null;
+		facingObstacle = null;
 		transportMemory.clearPending();
 		// A crossing interrupted by being put somewhere else is not one worth recording.
 		tracing = null;
@@ -940,6 +942,21 @@ class Golem
 		// until it has finished and landed.
 		if (advanceTransition(cycles))
 		{
+			return false;
+		}
+
+		// Turning to face an obstacle, then using it. See take.
+		if (facingObstacle != null)
+		{
+			turnToward(cycles);
+			facingCycles -= cycles;
+			if (orientation != targetOrientation && facingCycles > 0)
+			{
+				return false;
+			}
+			GolemTransport transport = facingObstacle;
+			facingObstacle = null;
+			startObstacle(transport, context);
 			return false;
 		}
 
@@ -1638,6 +1655,42 @@ class Golem
 	 * and land immediately, which is correct rather than a shortcut: a door animates itself.
 	 */
 	private void take(GolemTransport transport, RoamContext context)
+	{
+		// Turned to face it first, where anyone can see: a golem that arrived at a stile walking
+		// the other way climbed it backwards, snapping round only as it went over. Not between the
+		// hops of a crossing, whose timing was measured stone to stone, and not a ladder or a
+		// trapdoor, which goes nowhere a heading could point at.
+		int dx = transport.getToX() - transport.getFromX();
+		int dy = transport.getToY() - transport.getFromY();
+		int tick = context.getTick();
+		boolean hopping = lastHopTick != Integer.MIN_VALUE && tick >= lastHopTick && tick - lastHopTick <= CROSSING_TICKS;
+		if (tier == GolemTier.SCENE && (dx != 0 || dy != 0) && !hopping)
+		{
+			int heading = headingFor(dx, dy);
+			if (Math.abs(((heading - orientation + 1024) & 2047) - 1024) > FACE_FIRST_OFF)
+			{
+				facingObstacle = transport;
+				targetOrientation = heading;
+				facingCycles = FACE_MOST_CYCLES;
+				path.clear();
+				stepping = false;
+				walking = false;
+				return;
+			}
+		}
+		startObstacle(transport, context);
+	}
+
+	/** An obstacle the golem is turning to face before it uses it, or null. See take. */
+	private GolemTransport facingObstacle;
+	private int facingCycles;
+
+	/** How far off facing an obstacle a golem turns first, and the longest it takes to. */
+	private static final int FACE_FIRST_OFF = 256;
+	private static final int FACE_MOST_CYCLES = 50;
+
+	/** Uses a transport, facing whichever way the golem already does. */
+	private void startObstacle(GolemTransport transport, RoamContext context)
 	{
 		if (transport.getFromPlane() == transport.getToPlane())
 		{
@@ -2599,7 +2652,8 @@ class Golem
 		// A climb is walked rather than played, so it has no transition cycles, but it is as
 		// much mid-obstacle as a hop: without this the watchdog called a golem on a cliff
 		// face unwalkable ground and relocated it halfway up.
-		return transitionCycles > 0 || gaitWalk != -1;
+		// Turning to face one is part of it too.
+		return transitionCycles > 0 || gaitWalk != -1 || facingObstacle != null;
 	}
 
 	/**
