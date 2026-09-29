@@ -7,7 +7,7 @@ import net.runelite.api.coords.*;
 /**
  * Draws the boat a golem crosses the ocean in.
  *
- * <p>{@code WorldEntity} — what the game's own boats are — is read-only to a plugin, so this
+ * <p>{@code WorldEntity} - what the game's own boats are - is read-only to a plugin, so this
  * is a drawn model at a position, as a fake golem is. It turns at a third of a golem's rate,
  * because a boat pivoting at a golem's rate reads as a sliding crate, and its heading leads
  * its motion.
@@ -64,11 +64,8 @@ class FakeRaft extends RuneLiteObjectController
 		return (int) Math.round(Math.sin((gameCycle + phase) * 2 * Math.PI / BOB_CYCLES) * BOB_HEIGHT);
 	}
 
-	/** The radius the parts share with the hull; see GolemBoat.drawRadius. */
-	private final int radius;
-
 	FakeRaft(Client client, Model model, GolemModelFactory shared, int fineX, int fineY,
-		int orientation, int radius, long seed)
+		int orientation, long seed)
 	{
 		this.client = client;
 		this.model = model;
@@ -76,17 +73,10 @@ class FakeRaft extends RuneLiteObjectController
 		this.fineY = fineY;
 		this.orientation = orientation;
 		this.targetOrientation = orientation;
-		this.radius = radius;
 		this.seed = seed;
 
 		// The raft's models carry no rig, so it plays nothing; the golem at the helm does.
 		this.animation = new AnimationController(client, -1);
-
-		// A boat covers several tiles; ground under its footprint must draw first or the hull
-		// z-fights with the water. How many tiles is the boat's own business — see
-		// GolemBoat.drawRadius.
-		setRadius(radius);
-		setDrawFrontTilesFirst(true);
 		syncTransform();
 	}
 
@@ -98,7 +88,7 @@ class FakeRaft extends RuneLiteObjectController
 	{
 		if (model != null)
 		{
-			parts.add(new FakeRigPart(client, this, model, animation, acrossOffset, alongOffset, radius));
+			parts.add(new FakeRigPart(client, this, model, animation, acrossOffset, alongOffset));
 		}
 	}
 

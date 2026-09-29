@@ -128,7 +128,7 @@ enum GolemBoat
 	 * What the mast and the cloth play while the boat is under way: the sail full. Unanimated, a
 	 * sail stood in its bind pose, which is neither up nor down and in the wrong place, and a skiff's
 	 * foresail was not there at all. The cloth's is an _OFFSET animation, made for cloth standing
-	 * along from its mast as it does on every boat — on a raft two tiles, past the helm: drawn at
+	 * along from its mast as it does on every boat - on a raft two tiles, past the helm: drawn at
 	 * the mast, a raft's sail flew off the raft.
 	 */
 	private final int mastAnimation;
@@ -152,16 +152,6 @@ enum GolemBoat
 	static short[] keelTo()
 	{
 		return Palette.KEEL_TO;
-	}
-
-	/**
-	 * How far the boat reaches from its middle, in model units, which is what the client culls and
-	 * sorts it by. Taken from the hull rather than assumed: a sloop is three times the raft's
-	 * length, and at the raft's radius most of it would be clipped away.
-	 */
-	int drawRadius()
-	{
-		return Math.max(Math.max(-hullMinX, hullMaxX), Math.max(-hullMinZ, hullMaxZ));
 	}
 
 	/** The smallest boat that carries this many golems; the raft for one. */

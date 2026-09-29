@@ -50,12 +50,6 @@ class FakeGolem extends RuneLiteObjectController
 		this.animation = new AnimationController(client, -1);
 		this.animation.setOnFinished(this::poseFinished);
 
-		// The default radius suits a single-tile object; a bigger golem needs the tiles under
-		// its footprint drawn first or it z-fights with the ground.
-		int size = Math.max(1, golem.getSnapshot().getSize());
-		setRadius(size * 64 - 4);
-		setDrawFrontTilesFirst(true);
-
 		syncTransform();
 		applyPose();
 	}
@@ -72,7 +66,7 @@ class FakeGolem extends RuneLiteObjectController
 		applyPose();
 
 		// A recording drives its own keyframes, so the client's clock must not also
-		// advance them — that was the drift.
+		// advance them - that was the drift.
 		if (golem.getMotionFrame() < 0)
 		{
 			animation.tick(ticksSinceLastFrame);
@@ -154,7 +148,7 @@ class FakeGolem extends RuneLiteObjectController
 		// holding its spawn height would sink into a rise.
 		if (Golem.isInScene(wv, localX, localY))
 		{
-			// Terrain height plus whatever the golem is doing above it — mid-jump an arc, so
+			// Terrain height plus whatever the golem is doing above it - mid-jump an arc, so
 			// a hop leaves the ground instead of sliding at ankle height.
 			// And at sea, riding the swell with the boat under it, as golems on the player's ship
 			// ride that ship.
@@ -231,7 +225,7 @@ class FakeGolem extends RuneLiteObjectController
 		// While performing a recording, the keyframe is the player's own, set directly.
 		// Advancing the clip by elapsed cycles at its authored speed is wrong: on a basalt
 		// stone the player holds keyframe one for about twenty-five cycles then runs the other
-		// seven during the jump, where the authored clip takes forty — golems finished hopping
+		// seven during the jump, where the authored clip takes forty - golems finished hopping
 		// before leaving the ground.
 		//
 		// Never past the last keyframe: the controller nulls a completed one-shot, and the

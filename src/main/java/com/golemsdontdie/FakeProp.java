@@ -55,8 +55,6 @@ class FakeProp extends RuneLiteObjectController
 		this.animation = new AnimationController(client, -1);
 		this.animation.setAnimation(clip);
 
-		setRadius(80);
-		setDrawFrontTilesFirst(true);
 		syncTransform();
 	}
 

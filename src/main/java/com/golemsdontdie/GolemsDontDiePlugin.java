@@ -227,7 +227,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/**
 	 * Whether a learned route is an obstacle. The answer can take a path search, and every
-	 * route used to be re-asked on every sighting — one search per stone of a crossing.
+	 * route used to be re-asked on every sighting - one search per stone of a crossing.
 	 */
 	private final Map<String, Boolean> obstacleVerdicts = new HashMap<>();
 
@@ -561,7 +561,7 @@ public class GolemsDontDiePlugin extends Plugin
 	/**
 	 * Whether something the player used is a way across, rather than anything else they clicked
 	 * and walked away from. Yes if the cache or the transport tables say so; otherwise only if
-	 * it took them somewhere they could not have walked — another floor, a long way off, or
+	 * it took them somewhere they could not have walked - another floor, a long way off, or
 	 * somewhere their map has no short walk to. A tree fails that, as does an open door. Routes
 	 * in an instance's own coordinates point at a room that no longer exists.
 	 */
@@ -887,7 +887,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 *
 	 * <p>Golems, their maps and everything drawn belong to that thread, and the plugin is stopped
 	 * from Swing's. Nothing waits for the task: the client runs while the plugin is being stopped,
-	 * so it is picked up on the next cycle, and a closing client has its own moment to save — see
+	 * so it is picked up on the next cycle, and a closing client has its own moment to save - see
 	 * {@link #onClientShutdown}.
 	 */
 	private void onClientThread(Runnable task)
@@ -1246,8 +1246,8 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// The game's own arrow points at a tile and moves when the tick says so, which beside a
 		// walking golem reads as an arrow trailing it. So it is used only where the plugin cannot
-		// draw its own: a golem out of the scene, where the arrow's other half — the marker on the
-		// minimap — is the whole of what a player can go on. In the scene the two were drawn one
+		// draw its own: a golem out of the scene, where the arrow's other half - the marker on the
+		// minimap - is the whole of what a player can go on. In the scene the two were drawn one
 		// on top of the other, and GolemNameplateOverlay's is the better of them.
 		if (finding.getRenderer() != null)
 		{
@@ -1281,7 +1281,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/**
 	 * Takes the hint arrow away if it is still the one this plugin put up. One the game has put up
-	 * since — a quest step, a clue — is left where it is.
+	 * since - a quest step, a clue - is left where it is.
 	 */
 	private void clearOurArrow()
 	{
@@ -1474,7 +1474,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/**
 	 * Takes over from a live golem: builds the copy and hides the original. The copy goes at the
-	 * NPC's <i>local</i> location, not its world tile, which is the tile it is moving onto — one
+	 * NPC's <i>local</i> location, not its world tile, which is the tile it is moving onto - one
 	 * caught mid-step would appear to teleport.
 	 */
 	private void replace(NPC npc)
@@ -1999,7 +1999,7 @@ public class GolemsDontDiePlugin extends Plugin
 		int tick = roamContext.getTick();
 
 		// A visible golem somewhere it could not have walked to is wrong now, not in five
-		// minutes, so it is put right rather than waiting for the watchdog — a net under
+		// minutes, so it is put right rather than waiting for the watchdog - a net under
 		// everything else. A stepping stone is the legitimate exception: blocked ground the
 		// network says you may stand on.
 		//
@@ -2041,7 +2041,7 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
-		// The cheap, invisible things first — spin, back out, re-plan — before the golem is
+		// The cheap, invisible things first - spin, back out, re-plan - before the golem is
 		// picked up and put somewhere.
 		if (golem.workFree(roamContext, roamPlanner))
 		{
@@ -2128,7 +2128,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * on. Whether a space joins up with home rests on the transport tables and the docks, and a
 	 * missing piece can strand whole countries: measured against the shipped tables alone, with
 	 * no docks to sail between them, ninety-nine per cent of the world's standable ground came
-	 * out unreachable — Varrock and Falador included. A world that answers like that is a world
+	 * out unreachable - Varrock and Falador included. A world that answers like that is a world
 	 * the plugin has misread, and emptying it onto the island would be the worst of the two
 	 * mistakes. So the sweep counts first and moves nobody.
 	 */
@@ -2140,11 +2140,11 @@ public class GolemsDontDiePlugin extends Plugin
 	/**
 	 * Brings a golem home from ground that does not join up with home.
 	 *
-	 * <p>A golem only ever walks inside the space it is standing in — every other way of getting
+	 * <p>A golem only ever walks inside the space it is standing in - every other way of getting
 	 * anywhere is a transport or a crossing. So the spaces and the transports make a graph, and a
 	 * golem belongs in the part of it that can be reached from the plinth and walked back to it.
 	 * Ground outside that is a trap however much of it there is: no golem could have arrived
-	 * there, so one that is there was put there — by a rescue that reached across a channel, by a
+	 * there, so one that is there was put there - by a rescue that reached across a channel, by a
 	 * route since withdrawn, by a saved position from a build that allowed it. Most of the world
 	 * is outside it, because the obstacles that would let a golem in have not been learned yet.
 	 * That is the same statement from the other side, and the same answer: a golem cannot be
@@ -2294,7 +2294,7 @@ public class GolemsDontDiePlugin extends Plugin
 	/**
 	 * Hulls drawn under golems at sea, keyed by the golem itself. Not by id: ids come from the
 	 * crafting site and the game's NPC slot, which the game reuses, so two golems could share
-	 * one raft — whichever was updated last had it, and if the other was ashore it took the
+	 * one raft - whichever was updated last had it, and if the other was ashore it took the
 	 * raft away again, leaving a golem at the helm of nothing.
 	 */
 	private final Map<Golem, FakeRaft> rafts = new IdentityHashMap<>();
@@ -2344,7 +2344,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			raft = new FakeRaft(client, hull, modelFactory,
-				golem.getFineX(), golem.getFineY(), golem.getOrientation(), kind.drawRadius(), golem.getBoatSeed());
+				golem.getFineX(), golem.getFineY(), golem.getOrientation(), golem.getBoatSeed());
 			raft.addPart(raftFactory.rigModel(kind, false), kind.getMastAnimation(), kind.getMastX(), kind.getMastZ());
 			raft.addPart(raftFactory.rigModel(kind, true), kind.getClothAnimation(), kind.getClothX(), kind.getClothZ());
 			raft.attach();
@@ -2352,7 +2352,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		// The hull follows the golem, which is at the helm at the stern, so the boat's middle is
-		// ahead of it — the way it faces: 0 south, 512 west, 1024 north, 1536 east. How far ahead
+		// ahead of it - the way it faces: 0 south, 512 west, 1024 north, 1536 east. How far ahead
 		// is the boat's own business: a sloop's helm sits three and a half tiles back.
 		double facing = golem.getOrientation() * Math.PI / 1024;
 		int aheadX = (int) Math.round(-Math.sin(facing) * kind.getHelmOffset());
@@ -2891,7 +2891,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Where a golem stands says whether it is in an instance, whatever it was told on the
 		// way: the room exists only as a copy walked in template coordinates. Told wrongly, it
-		// was drawn in the wrong world — golems that had climbed out of the Mad Angel's room
+		// was drawn in the wrong world - golems that had climbed out of the Mad Angel's room
 		// went on walking the instance's copy of the island. The flag was only set by the
 		// crossing, and one performed as a walk, or cut short by going out of view, never set
 		// it.
@@ -2907,7 +2907,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			golem.setDrawOffset(0, 0, -1);
 			// A golem in an instance is somewhere the overworld cannot see, even though it
-			// is simulated in the template room — a real, sealed room on the island.
+			// is simulated in the template room - a real, sealed room on the island.
 			if (golem.isInInstance())
 			{
 				return GolemTier.FAR;
@@ -3023,7 +3023,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 	/**
 	 * Offers to revive missing golems from the plinth they were carved on, for a player with the
-	 * sidebar off — and for anyone standing at the plinth, which is where it would occur to them.
+	 * sidebar off - and for anyone standing at the plinth, which is where it would occur to them.
 	 *
 	 * <p>On a plain right-click and not behind shift: the entry is there only while golems are
 	 * missing, so it is never in the way of carving another one.
@@ -3093,7 +3093,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// A new floor is ground to learn even though no scene was loaded: the harvest reads the
 		// player's plane and only ran on a scene load, which a ladder does not trigger, so
-		// golems that climbed arrived on unknown ground and were lifted back to the plinth —
+		// golems that climbed arrived on unknown ground and were lifted back to the plinth -
 		// 217 times in one session.
 		WorldPoint me = PlayerPosition.of(client);
 		int plane = me == null ? -1 : me.getPlane();
@@ -3283,7 +3283,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
 		{
-			// Golems are permanent, so nothing is released here — only the renderers,
+			// Golems are permanent, so nothing is released here - only the renderers,
 			// which belong to a scene that is going away. Any aboard the player's ship go back
 			// to their quays first: the ship does not come with the player.
 			shipmates.abandon(client.getTickCount());
@@ -3300,8 +3300,8 @@ public class GolemsDontDiePlugin extends Plugin
 			lastGameCycle = -1;
 
 			// The levels and the golem count are about to be sent again, and must not be taken for
-			// news. And whatever the golems were doing for the player's benefit — a wave, a dance, a
-			// crew making up at a quay — is over: those moments were timed against this session.
+			// news. And whatever the golems were doing for the player's benefit - a wave, a dance, a
+			// crew making up at a quay - is over: those moments were timed against this session.
 			celebration.reset();
 			for (Golem golem : golems)
 			{
@@ -3476,7 +3476,7 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 		// Nothing to write until the saved roster has been loaded: golems are restored at login,
-		// and saving the empty roster before that replaced every saved golem with nothing —
+		// and saving the empty roster before that replaced every saved golem with nothing -
 		// launching the client and closing it without logging in was enough.
 		if (!pendingRestore.isEmpty())
 		{

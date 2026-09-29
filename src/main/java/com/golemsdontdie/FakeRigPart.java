@@ -19,7 +19,7 @@ class FakeRigPart extends RuneLiteObjectController
 	private final int across;
 	private final int along;
 
-	FakeRigPart(Client client, FakeRaft boat, Model model, int animation, int across, int along, int radius)
+	FakeRigPart(Client client, FakeRaft boat, Model model, int animation, int across, int along)
 	{
 		this.client = client;
 		this.boat = boat;
@@ -27,8 +27,6 @@ class FakeRigPart extends RuneLiteObjectController
 		this.animation = new AnimationController(client, animation);
 		this.across = across;
 		this.along = along;
-		setRadius(radius);
-		setDrawFrontTilesFirst(true);
 	}
 
 	@Override
