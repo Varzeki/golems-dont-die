@@ -342,6 +342,17 @@ final class GolemTransport
 		return objectId > 0 && archetype != ARCHETYPE_NONE && archetype != ARCHETYPE_DOOR;
 	}
 
+	/**
+	 * True for what a golem's page counts as a shortcut: something climbed, jumped, squeezed
+	 * through or balanced across. Not a door, a ladder or stairs, a gangplank or a teleport,
+	 * which every golem uses to get anywhere and which made the count mostly doorways.
+	 */
+	boolean isShortcut()
+	{
+		return archetype != ARCHETYPE_NONE && archetype != ARCHETYPE_DOOR
+			&& archetype != ARCHETYPE_LADDER && archetype != ARCHETYPE_GANGPLANK;
+	}
+
 	@Override
 	public String toString()
 	{

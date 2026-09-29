@@ -668,6 +668,13 @@ class Golem
 
 		if (now == GolemTier.FAR)
 		{
+			// Nothing plays the rest of an obstacle out of view. Left standing, it froze until the
+			// golem came back into view minutes later and then finished, dragging the golem back
+			// to the far side of an obstacle it had long since walked away from.
+			if (inTransition())
+			{
+				landNow();
+			}
 			// Walking to a shortcut or a dock is something only a golem in view does.
 			queuedTransport = null;
 			queuedDock = null;
@@ -691,10 +698,18 @@ class Golem
 				return true;
 			}
 
-			if (itinerary != null && itinerary.isFinished(context.getTick()) && itinerary.transport() != null)
+			if (itinerary != null && itinerary != arrived && itinerary.isFinished(context.getTick()))
 			{
-				noteInstance(itinerary.transport());
-				history.tookTransport(itinerary.transport());
+				arrived = itinerary;
+				if (itinerary.transport() != null)
+				{
+					noteInstance(itinerary.transport());
+					history.tookTransport(itinerary.transport());
+				}
+				else if (itinerary.isVoyage())
+				{
+					history.cameAshore();
+				}
 			}
 			WorldPoint resolved = itinerary != null
 				? itinerary.positionAt(context.getTick())
@@ -804,16 +819,22 @@ class Golem
 			return false;
 		}
 
-		if (itinerary != null && itinerary.transport() != null)
+		// Once per route: a golem that cannot plan yet comes back here every frame until it can,
+		// and counting each time made one ladder a hundred shortcuts.
+		if (itinerary != null && itinerary != arrived)
 		{
-			noteInstance(itinerary.transport());
-			history.tookTransport(itinerary.transport());
-		}
-		else if (itinerary != null && itinerary.isVoyage())
-		{
-			// Out of view, a crossing ends here rather than at a landing anyone watched: the journal
-			// hears it came ashore all the same, or it would say the golem walked there.
-			history.cameAshore();
+			arrived = itinerary;
+			if (itinerary.transport() != null)
+			{
+				noteInstance(itinerary.transport());
+				history.tookTransport(itinerary.transport());
+			}
+			else if (itinerary.isVoyage())
+			{
+				// Out of view, a crossing ends here rather than at a landing anyone watched: the
+				// journal hears it came ashore all the same, or it would say the golem walked there.
+				history.cameAshore();
+			}
 		}
 		WorldPoint at = itinerary == null ? currentTile() : itinerary.destination();
 		this.fineX = at.getX() * TILE + TILE / 2;
@@ -840,6 +861,9 @@ class Golem
 	/** Plans in a row that found nowhere to go; lengthens the pause before the next. */
 	private int farFailures;
 
+	/** The route whose arrival has been noted in the history, so it is noted once. */
+	private Itinerary arrived;
+
 	/**
 	 * Puts the golem down somewhere else entirely — the far end of a ladder, a dock it has
 	 * just sailed to, or a valid tile after it was found somewhere it cannot stand.
@@ -854,6 +878,16 @@ class Golem
 		this.fineX = to.getX() * TILE + TILE / 2;
 		this.fineY = to.getY() * TILE + TILE / 2;
 
+		// Any obstacle it was partway through is over: finished later, it would put the golem
+		// back where the obstacle leads.
+		transitionCycles = 0;
+		transitionAnimation = -1;
+		transitionGlide = false;
+		transitionDestination = null;
+		phaseClips = new int[0];
+		phaseCycles = new int[0];
+		phase = 0;
+		motionFrame = -1;
 		path.clear();
 		gaitWalk = -1;
 		gaitIdle = -1;
@@ -1716,6 +1750,17 @@ class Golem
 			}
 		}
 
+		// Nothing to play: a ladder down, whose shipped clip is not trusted, or an obstacle the
+		// player was seen to cross without one. The golem stands for as long as it takes. A
+		// transition of no cycles never finished, and the golem stayed at the top of the ladder.
+		if (clips.length == 0)
+		{
+			clips = new int[]{snapshot.getIdlePoseAnimation()};
+			phaseClips = clips;
+			phaseCycles = new int[]{wanted};
+			total = wanted;
+		}
+
 		if (phaseCycles.length > 0 && total != wanted)
 		{
 			int loop = phaseCycles.length > 2 ? 1 : phaseCycles.length - 1;
@@ -2025,6 +2070,8 @@ class Golem
 		if (sailed)
 		{
 			history.cameAshore();
+			// A trip on the player's ship is a voyage on the golem's page as well as in its journal.
+			history.sailed();
 		}
 		noteUnstuck(tick);
 	}
@@ -2601,6 +2648,25 @@ class Golem
 			landInInstance();
 		}
 		return false;
+	}
+
+	/** Puts a golem partway through an obstacle where the obstacle leads, at once. */
+	private void landNow()
+	{
+		WorldPoint landing = transitionDestination;
+		if (landing == null && gaitWalk != -1 && !path.isEmpty())
+		{
+			// A climb is walked, and ends at the last tile of its path.
+			int[] last = path.peekLast();
+			landing = new WorldPoint(last[0], last[1], plane);
+		}
+		gaitFinish = -1;
+		relocate(landing != null ? landing : currentTile());
+		if (landing != null)
+		{
+			landInInstance();
+		}
+		landingInstance = -1;
 	}
 
 	/** Frames kept of one traced crossing: ten seconds of them at fifty a second. */

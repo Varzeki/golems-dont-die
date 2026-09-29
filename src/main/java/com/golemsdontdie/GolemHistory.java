@@ -24,7 +24,7 @@ class GolemHistory
 	@Getter
 	private long firstSeen;
 
-	/** Shortcuts, doors, ladders and travel systems used. */
+	/** Shortcuts used: see GolemTransport#isShortcut. */
 	@Getter
 	private int transports;
 
@@ -106,7 +106,10 @@ class GolemHistory
 	/** Notes an obstacle as the golem steps off it. */
 	void tookTransport(GolemTransport transport)
 	{
-		transports++;
+		if (transport == null || transport.isShortcut())
+		{
+			transports++;
+		}
 		if (transport != null)
 		{
 			manner = GolemTravel.of(transport.getArchetype(), transport.getFromPlane(),
