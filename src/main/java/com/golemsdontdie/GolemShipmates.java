@@ -374,8 +374,8 @@ class GolemShipmates
 	}
 
 	/**
-	 * Where the player stands to steer, as x << 32 | y: the helm's own tile, or where the helm stands
-	 * off the end of the hull, as a sloop's does, the hull's tile beside it. Only that one: a golem
+	 * Where the player stands to steer, as x << 32 | y: the tile before the helm, toward the bow, which
+	 * on a sloop, whose helm stands off the end of the hull, is the hull's last tile. Only that one: a golem
 	 * was stood at the wheel, but keeping clear of every tile round it left a skiff with five open
 	 * places taking two golems.
 	 */
@@ -403,6 +403,9 @@ class GolemShipmates
 						{
 							int x = object.getSceneMinLocation().getX();
 							int y = object.getSceneMinLocation().getY();
+							// The player steers from the tile before the wheel, a step toward the bow,
+							// which is the low end of every hull's own grid.
+							y -= 1;
 							if (hull != null)
 							{
 								x = Math.max(hull[0], Math.min(hull[2], x));

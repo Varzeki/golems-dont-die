@@ -22,7 +22,7 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 128, -1, 13373, 13881),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 64, 0, 192, -1, 13373, 13881),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
