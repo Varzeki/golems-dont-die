@@ -2027,6 +2027,9 @@ public class GolemsDontDiePlugin extends Plugin
 					log.debug("Golem {} was on unwalkable ground at {}; moved to {}",
 						golem.getId(), on, safe);
 					golem.relocate(safe);
+					// Snapped out of a room is out of its instance: left flagged, it was out of view
+					// for good and passed over by the sweep that brings lost golems home.
+					golem.setInInstance(false);
 					golem.noteUnstuck(tick);
 					return;
 				}
@@ -2058,6 +2061,7 @@ public class GolemsDontDiePlugin extends Plugin
 		log.debug("Rescuing stuck golem {} from {} to {} (tier {})",
 			golem.getId(), at, safe, tier);
 		golem.relocate(safe);
+		golem.setInInstance(false);
 		golem.noteUnstuck(tick);
 	}
 
