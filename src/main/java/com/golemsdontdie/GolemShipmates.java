@@ -40,10 +40,21 @@ class GolemShipmates
 	 */
 	private static final int LANDING_TILES = 12;
 
-	/** What stops a tile being deck to stand on. */
+	/** What stops a tile being deck to stand on: something on it, or no floor under it. */
 	static final int NOT_DECK = CollisionDataFlag.BLOCK_MOVEMENT_FULL
 		| CollisionDataFlag.BLOCK_MOVEMENT_OBJECT | CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
 		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
+
+	/**
+	 * The same over the hull, where "no floor" does not count: a skiff's deck carries it down one
+	 * whole side that is open deck. What over the hull is not deck is marked blocked in the tile's
+	 * settings instead; see deckFlags.
+	 */
+	private static final int NOT_DECK_ON_HULL = CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
+		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
+
+	/** A tile setting: nothing may stand here. */
+	private static final int TILE_BLOCKED = 1;
 
 	/** The four ways off a deck tile, and the way a golem at that rail faces: 0 south, 512 west. */
 	private static final int[][] OUTBOARD = {{-1, 0, 512}, {1, 0, 1536}, {0, 1, 1024}, {0, -1, 0}};
@@ -242,14 +253,14 @@ class GolemShipmates
 				// Nor the bow's row, where the hull narrows to its point: not somewhere anyone stands.
 				// The helm is at the other end, the high one, on every hull the game lays out.
 				if (!onHull(hull, x, y) || hull != null && y == hull[1]
-					|| helm.contains((long) x << 32 | y) || !isDeck(flags, x, y, sizeX, sizeY)
+					|| helm.contains((long) x << 32 | y) || !isDeck(flags, hull, x, y, sizeX, sizeY)
 					|| floor != null && !hasTile(floor, x, y) && !hasTile(below, x, y))
 				{
 					continue;
 				}
 				for (int[] way : OUTBOARD)
 				{
-					if (!onHull(hull, x + way[0], y + way[1]) || !isDeck(flags, x + way[0], y + way[1], sizeX, sizeY))
+					if (!onHull(hull, x + way[0], y + way[1]) || !isDeck(flags, hull, x + way[0], y + way[1], sizeX, sizeY))
 					{
 						rail.add(new int[]{x, y, way[2]});
 						break;
@@ -294,11 +305,10 @@ class GolemShipmates
 	}
 
 	/**
-	 * What stands in the way on each tile of a deck, taking bridges into account. A deck is laid out
-	 * a floor above the hull, and where a tile of it is marked a bridge the game keeps what blocks it
-	 * with the floor below: read from the deck's own floor alone, the middle of a skiff was solid
-	 * where it is open and its edges open where they are rail, and golems found three places on a
-	 * boat with five.
+	 * What stands in the way on each tile of a deck: its own collision, and for a tile the deck's
+	 * settings mark blocked — a skiff's bow and helm rows — something standing there too. Read from
+	 * collision alone, a skiff was solid down one side that is open deck and open at the bow where
+	 * nobody can stand, and golems found two places on a boat with five.
 	 */
 	static int[][] deckFlags(WorldView deck, int plane)
 	{
@@ -309,22 +319,16 @@ class GolemShipmates
 		}
 		int[][] own = maps[plane].getFlags();
 		byte[][][] settings = deck.getTileSettings();
-		if (plane == 0 || settings == null || plane >= settings.length || maps[plane - 1] == null)
-		{
-			return own;
-		}
-		int[][] lower = maps[plane - 1].getFlags();
 		int[][] out = new int[own.length][];
 		for (int x = 0; x < own.length; x++)
 		{
 			out[x] = own[x].clone();
 			for (int y = 0; y < own[x].length; y++)
 			{
-				if (x < settings[plane].length && y < settings[plane][x].length
-					&& (settings[plane][x][y] & Constants.TILE_FLAG_BRIDGE) != 0
-					&& x < lower.length && y < lower[x].length)
+				if (settings != null && plane < settings.length && x < settings[plane].length
+					&& y < settings[plane][x].length && (settings[plane][x][y] & TILE_BLOCKED) != 0)
 				{
-					out[x][y] = lower[x][y];
+					out[x][y] |= CollisionDataFlag.BLOCK_MOVEMENT_OBJECT;
 				}
 			}
 		}
@@ -437,9 +441,10 @@ class GolemShipmates
 		return hull == null || x >= hull[0] && y >= hull[1] && x <= hull[2] && y <= hull[3];
 	}
 
-	private static boolean isDeck(int[][] flags, int x, int y, int sizeX, int sizeY)
+	private static boolean isDeck(int[][] flags, int[] hull, int x, int y, int sizeX, int sizeY)
 	{
-		return x >= 0 && y >= 0 && x < sizeX && y < sizeY && (flags[x][y] & NOT_DECK) == 0;
+		int mask = hull != null && onHull(hull, x, y) ? NOT_DECK_ON_HULL : NOT_DECK;
+		return x >= 0 && y >= 0 && x < sizeX && y < sizeY && (flags[x][y] & mask) == 0;
 	}
 
 	/**
