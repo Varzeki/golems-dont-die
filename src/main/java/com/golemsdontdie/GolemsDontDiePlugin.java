@@ -498,7 +498,7 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 			saveGolemsSoon();
 			List<Golem> living = livingGolems();
-			panel.refresh(living, tally.getTotal() - living.size(), true);
+			panel.refresh(living, missingGolems(living.size()), true);
 		});
 		navButton = NavigationButton.builder()
 			.tooltip("Golems")
@@ -813,7 +813,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void reviveMissing()
 	{
-		int missing = tally.getTotal() - livingGolems().size();
+		int missing = missingGolems(countLiving());
 		if (missing <= 0)
 		{
 			return;
@@ -956,6 +956,21 @@ public class GolemsDontDiePlugin extends Plugin
 		detector.markReplaced(npc);
 		hiddenNpcs.add(npc.getIndex());
 		saveGolems();
+	}
+
+	/**
+	 * How many golems reviving would bring back: the gap between golems crafted and golems here,
+	 * but never past the limit when there is one. Offering the whole gap under a limit of 25
+	 * revived four hundred golems, and the next craft culled the oldest of them to pay.
+	 */
+	private int missingGolems(int living)
+	{
+		int missing = tally.getTotal() - living;
+		if (config.limitGolems())
+		{
+			missing = Math.min(missing, Math.max(1, config.maxGolems()) - living);
+		}
+		return Math.max(0, missing);
 	}
 
 	/**
@@ -1993,7 +2008,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			rosterChanged = false;
 			List<Golem> living = livingGolems();
-			panel.refresh(living, tally.getTotal() - living.size());
+			panel.refresh(living, missingGolems(living.size()));
 		}
 
 		if (routesChanged)
@@ -2113,6 +2128,8 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				enforceGolemLimit();
 				saveGolems();
+				// The revive button offers only what the limit leaves room for.
+				rosterChanged = true;
 			});
 		}
 
