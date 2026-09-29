@@ -12,8 +12,8 @@ import net.runelite.api.*;
  * Where a golem may walk, anywhere in the world. Read-only, shipped, never written to.
  *
  * <p>The island map this replaces covered nine regions and fitted in a config value; this
- * covers 1,158, the ocean plus every bit of land reachable from Lumbridge, and at 440 KB
- * belongs in the jar.
+ * covers 2,424 region-planes, the ocean and every floor of the world the collision data holds,
+ * and at about 1.5 MB belongs in the jar.
  *
  * <p>Three bits per tile rather than two. <b>north</b> and <b>east</b> use the packing
  * Shortest Path and {@code IslandMemory} use; south and west are the neighbouring tile's.
@@ -38,7 +38,7 @@ class WorldMesh
 	private static final int COLLISION_BYTES = TILES_PER_PLANE * 2 / 8;
 	private static final int DERIVED_BYTES = TILES_PER_PLANE / 8;
 
-	/** Two bytes a tile: there are 14,288 components, which does not fit in one. */
+	/** Two bytes a tile: there are 18,634 components, which does not fit in one. */
 	private static final int COMPONENT_BYTES = TILES_PER_PLANE * 2;
 
 	/** Impossible as an entry count, so an old file is refused rather than misread. */

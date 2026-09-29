@@ -30,8 +30,8 @@ import net.runelite.api.coords.*;
  * <p>What is persisted is the island and everywhere golems have been found able to reach from
  * it: every instance the player loads, and the ground around the far end of every learned route.
  * That grows as the player plays, deliberately — the shipped data does not cover instances or
- * every shortcut yet, and until it does, what was learned is kept. The 1,158 regions of open world
- * the mesh covers stay in the jar.
+ * every shortcut yet, and until it does, what was learned is kept. The world the mesh covers
+ * stays in the jar.
  */
 @Slf4j
 @Singleton
