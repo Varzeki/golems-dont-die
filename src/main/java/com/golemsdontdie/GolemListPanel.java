@@ -675,7 +675,7 @@ class GolemListPanel extends PluginPanel
 		// is typed, and a field holding it would save it as one.
 		String suggested = names.suggested(golem);
 		JTextField name = new PlaceholderField(golem.getNickname(),
-			suggested == null ? "Unnamed Golem" : suggested);
+			suggested == null ? "Unnamed golem" : suggested);
 		name.setMinimumSize(SQUEEZED);
 		// A field holding more than it can show scrolls to the caret, and a fresh one leaves that
 		// at the end: a golem with a long name showed the last of it with the first off the left
@@ -900,7 +900,7 @@ class GolemListPanel extends PluginPanel
 
 		PlaceholderField(String initial)
 		{
-			this(initial, "Unnamed Golem");
+			this(initial, "Unnamed golem");
 		}
 
 		PlaceholderField(String initial, String prompt)

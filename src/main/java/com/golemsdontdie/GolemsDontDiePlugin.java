@@ -1083,7 +1083,7 @@ public class GolemsDontDiePlugin extends Plugin
 		if (panel != null)
 		{
 			panel.setFinding(finding == null ? null
-				: names.of(finding) != null ? names.of(finding) : "that golem");
+				: names.of(finding) != null ? names.of(finding) : "an unnamed golem");
 		}
 		GolemPage open = page;
 		Golem target = finding;
@@ -1116,7 +1116,7 @@ public class GolemsDontDiePlugin extends Plugin
 			boolean comparable = me != null && me.getPlane() == at.getPlane()
 				&& WorldLayout.sameLayer(me.getY(), at.getY());
 			String name = names.of(finding);
-			findBox.show(name == null ? "a golem" : name, whereabouts.of(finding, roamContext.getTick()),
+			findBox.show(name == null ? "an unnamed golem" : name, whereabouts.of(finding, roamContext.getTick()),
 				comparable ? me.distanceTo2D(at) : -1);
 		}
 		if (me != null && me.getPlane() == at.getPlane() && me.distanceTo2D(at) <= FOUND_TILES)
