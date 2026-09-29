@@ -66,11 +66,19 @@ class IslandMemory
 	 */
 	private static final int SCENE_MARGIN = 6;
 
-	/** Blocked for standing on: an object, a wall filling the tile, or bad ground. */
+	/**
+	 * The client's flag for a tile in a map square that does not exist. RuneLite has no name for
+	 * it. The client never walks onto one; read as open, whole squares of nothing were saved as
+	 * ground, four of them beside Wyrmscraig's caves.
+	 */
+	private static final int NOT_LOADED = 0x1000000;
+
+	/** Blocked for standing on: an object, a wall filling the tile, bad ground, or no square at all. */
 	private static final int UNWALKABLE = CollisionDataFlag.BLOCK_MOVEMENT_FULL
 		| CollisionDataFlag.BLOCK_MOVEMENT_OBJECT
 		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR
-		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION;
+		| CollisionDataFlag.BLOCK_MOVEMENT_FLOOR_DECORATION
+		| NOT_LOADED;
 
 	/**
 	 * Passability per region-and-plane. The key packs both so that a multi-level
@@ -332,17 +340,26 @@ class IslandMemory
 		{
 			return;
 		}
-		int[][] flags = maps[plane].getFlags();
-		if (flags == null)
+		int[][] live = maps[plane].getFlags();
+		if (live == null)
 		{
 			return;
+		}
+		// A copy, so the void can be marked in it without touching the client's own collision.
+		int[][] flags = new int[live.length][];
+		for (int x = 0; x < live.length; x++)
+		{
+			flags[x] = live[x] == null ? new int[0] : live[x].clone();
 		}
 
 		if (wv.isInstance())
 		{
+			markVoid(wv, plane, flags);
 			harvestInstance(wv, plane, flags);
 			return;
 		}
+
+		markVoid(wv, plane, flags);
 
 		int baseX = wv.getBaseX();
 		int baseY = wv.getBaseY();
@@ -509,6 +526,32 @@ class IslandMemory
 			}
 		}
 		dirty = true;
+	}
+
+	/**
+	 * Flags every tile of this plane with no ground drawn as not loaded, in the copy being read.
+	 * The client does not block the void beside an upper floor, where there is nothing to stand
+	 * on, and read as it comes about seven thousand edges of Wyrmscraig's first floor were ground.
+	 */
+	private void markVoid(WorldView wv, int plane, int[][] flags)
+	{
+		Scene scene = wv.getScene();
+		Tile[][][] tiles = scene == null ? null : scene.getTiles();
+		if (tiles == null || plane >= tiles.length)
+		{
+			return;
+		}
+		for (int x = 0; x < flags.length && x < tiles[plane].length; x++)
+		{
+			for (int y = 0; y < flags[x].length && y < tiles[plane][x].length; y++)
+			{
+				Tile tile = tiles[plane][x][y];
+				if (tile == null || tile.getSceneTilePaint() == null && tile.getSceneTileModel() == null)
+				{
+					flags[x][y] |= NOT_LOADED;
+				}
+			}
+		}
 	}
 
 	/** {x, y, plane} of the template tile under a scene tile, or null. Unrotated chunks only. */
@@ -776,9 +819,17 @@ class IslandMemory
 			{
 				long key = data.readLong();
 				long[] words = new long[WORDS_PER_REGION];
+				boolean everyEdgeOpen = true;
 				for (int w = 0; w < WORDS_PER_REGION; w++)
 				{
 					words[w] = data.readLong();
+					everyEdgeOpen &= words[w] == -1L;
+				}
+				// Open on every edge of every tile is no real square: it is one that does not exist,
+				// saved as ground before the not-loaded flag was read. Dropped, to be read again.
+				if (everyEdgeOpen)
+				{
+					continue;
 				}
 				regions.put(key, words);
 				held(key);
@@ -798,7 +849,10 @@ class IslandMemory
 					{
 						words[w] = data.readLong();
 					}
-					seen.put(key, words);
+					if (regions.containsKey(key))
+					{
+						seen.put(key, words);
+					}
 				}
 				masked = true;
 			}
