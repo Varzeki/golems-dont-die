@@ -596,6 +596,8 @@ public class GolemsDontDiePlugin extends Plugin
 			{
 				golem.setNickname(name);
 				saveGolemsSoon();
+				// A golem named gives up the name it went by, and one unnamed may want another's.
+				rosterChanged = true;
 			}),
 			() -> clientThread.invoke(this::reviveMissing),
 			golem -> clientThread.invoke(() -> findGolem(golem)),
@@ -641,6 +643,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			saveGolemsSoon();
+			names.assign(golems);
 			List<Golem> living = nearestFirst();
 			panel.refresh(living, tally.getTotal() - living.size(), true);
 		});
@@ -2772,8 +2775,11 @@ public class GolemsDontDiePlugin extends Plugin
 		if (panel != null && rosterChanged)
 		{
 			rosterChanged = false;
+			// Which of two golems keeps a name they would share is settled once per change, here;
+			// rows already shown are only named again if one of them now answers to something else.
+			boolean renamed = names.assign(golems);
 			List<Golem> living = nearestFirst();
-			panel.refresh(living, tally.getTotal() - living.size());
+			panel.refresh(living, tally.getTotal() - living.size(), renamed);
 		}
 
 		if (routesChanged)

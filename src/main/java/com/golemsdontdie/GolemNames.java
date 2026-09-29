@@ -13,8 +13,9 @@ import lombok.extern.slf4j.*;
  * the rocks — Akrisae Flint, Doris Millstone, Veos Greystone — or, in the ordinal style, the order
  * it was crafted in, in Latin: Primus, Vicesimus Septimus, Bis Millesimus Quingentesimus.
  *
- * <p>No name is written down. It is worked out from the golem's own number, or its craft number
- * for an ordinal, so the same golem is always called the same thing, four hundred golems cost
+ * <p>No name is written down. It is worked out from the golem's own number, and the older golems'
+ * where two would share one, or its craft number for an ordinal, so the same golem is always
+ * called the same thing, no two unnamed golems answer to the same name, four hundred golems cost
  * nothing to name, and turning the setting off leaves nothing behind. A name the player types is a name; this is only what the
  * plugin calls a golem until then, and it gives way the moment one is typed.
  *
@@ -61,6 +62,19 @@ class GolemNames
 	/** The people of Gielinor, harvested offline from the cache. */
 	@Getter
 	private String[] gielinor = new String[0];
+
+	/**
+	 * Each unnamed golem's name as of the last {@link #assign}, by id. Replaced whole rather than
+	 * changed, as the panel reads it from the Swing thread while the client thread assigns.
+	 */
+	private volatile Map<Long, String> assigned = Collections.emptyMap();
+
+	/**
+	 * How many further names a golem tries before settling for a name it shares. A roster of fifty
+	 * thousand fills well over half the names there are, and the last golem made still finds a free
+	 * one within a few tries; this is only so a roster larger than the names can never hang.
+	 */
+	private static final int MOST_TRIES = 64;
 
 	/** Reads the harvested names. Called once at start-up, beside the other data files. */
 	void load()
@@ -155,7 +169,8 @@ class GolemNames
 	/**
 	 * What to call this golem, or null if the player has named it or the setting is off.
 	 *
-	 * <p>Cheap enough to ask every time a row is drawn: one multiply and two array reads.
+	 * <p>Cheap enough to ask every time a row is drawn: one map lookup, the work being done in
+	 * {@link #assign} when the roster changes.
 	 */
 	String suggested(Golem golem)
 	{
@@ -168,7 +183,62 @@ class GolemNames
 		{
 			return ordinal(golem.getCraftNumber());
 		}
-		return nameFor(golem.getId());
+		// A golem made since the last assignment has not been checked against the others yet, and
+		// goes by its own name until it is.
+		String name = assigned.get(golem.getId());
+		return name != null ? name : nameFor(golem.getId());
+	}
+
+	/**
+	 * Settles who answers to what, so no two unnamed golems in the roster share a name. Called on
+	 * the client thread whenever the roster changes or a golem is named, never per frame.
+	 *
+	 * <p>Oldest first, by craft number, each golem takes the first name its own number gives it that
+	 * nobody older has taken, so a name two golems would share stays with the older and the newer
+	 * moves on to its next. Nothing is written down: the same roster always comes out the same, and
+	 * a golem made later never changes the name of one made before it. A golem the player has named
+	 * holds no name here, and one that went without because of it takes it back.
+	 *
+	 * @return whether any golem already assigned a name now has a different one
+	 */
+	boolean assign(List<Golem> roster)
+	{
+		if (gielinor.length == 0)
+		{
+			return false;
+		}
+		List<Golem> unnamed = new ArrayList<>(roster.size());
+		for (Golem golem : roster)
+		{
+			if (golem.getNickname() == null || golem.getNickname().isEmpty())
+			{
+				unnamed.add(golem);
+			}
+		}
+		// Not yet numbered counts as newest: it is a golem restored or made a moment ago.
+		unnamed.sort(Comparator.comparingInt((Golem golem) ->
+				golem.getCraftNumber() > 0 ? golem.getCraftNumber() : Integer.MAX_VALUE)
+			.thenComparingLong(Golem::getId));
+
+		Map<Long, String> before = assigned;
+		Map<Long, String> after = new HashMap<>(unnamed.size() * 2);
+		Set<String> taken = new HashSet<>(unnamed.size() * 2);
+		boolean changed = false;
+		for (Golem golem : unnamed)
+		{
+			Random random = generator(golem.getId());
+			String name = draw(random);
+			for (int tries = 0; taken.contains(name) && tries < MOST_TRIES; tries++)
+			{
+				name = draw(random);
+			}
+			taken.add(name);
+			after.put(golem.getId(), name);
+			String was = before.get(golem.getId());
+			changed |= was != null && !was.equals(name);
+		}
+		assigned = after;
+		return changed;
 	}
 
 	/**
@@ -195,16 +265,27 @@ class GolemNames
 		return rest == 0 ? thousands[thousand] : thousands[thousand] + " " + ordinals[rest];
 	}
 
-	/** The name a golem's own number gives it, or null if there are no names to give. */
+	/**
+	 * The name a golem's own number gives it, or null if there are no names to give. The first of
+	 * the names that number gives, and the one it goes by unless an older golem has it: see assign.
+	 */
 	String nameFor(long id)
 	{
-		if (gielinor.length == 0)
-		{
-			return null;
-		}
-		// Its own generator, so asking a golem its name never disturbs where it walks or what it
-		// is like: those come out of generators of their own. See GolemTrait.of.
-		Random random = new Random(id * 0x9E3779B97F4A7C15L ^ 0x27D4EB2F165667C5L);
+		return gielinor.length == 0 ? null : draw(generator(id));
+	}
+
+	/**
+	 * Its own generator, so asking a golem its name never disturbs where it walks or what it is
+	 * like: those come out of generators of their own. See GolemTrait.of.
+	 */
+	private static Random generator(long id)
+	{
+		return new Random(id * 0x9E3779B97F4A7C15L ^ 0x27D4EB2F165667C5L);
+	}
+
+	/** The next name out of a golem's generator. */
+	private String draw(Random random)
+	{
 		return gielinor[random.nextInt(gielinor.length)] + " " + ROCKS[random.nextInt(ROCKS.length)];
 	}
 }

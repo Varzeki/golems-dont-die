@@ -1,14 +1,19 @@
 package com.golemsdontdie;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.runelite.api.coords.WorldPoint;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -111,6 +116,90 @@ public class GolemNamesTest
 			seen.add(names.nameFor(id * 7919));
 		}
 		assertTrue("only " + seen.size() + " names for a thousand golems", seen.size() > 980);
+	}
+
+	private static Golem crafted(long seed, int craftNumber)
+	{
+		Golem golem = golem(seed, null);
+		golem.setCraftNumber(craftNumber);
+		return golem;
+	}
+
+	/**
+	 * Two golems whose numbers give them the same name: the older by craft number keeps it, whatever
+	 * their ids, and the newer goes by another. The same roster in any order comes out the same, a
+	 * golem made later changes neither, and naming the older hands the name back.
+	 */
+	@Test
+	public void twoGolemsNeverShareAName() throws Exception
+	{
+		setAutoName(true);
+		long[] pair = twoIdsOneName();
+		String shared = names.nameFor(pair[0]);
+		Golem older = crafted(pair[1], 1);
+		Golem newer = crafted(pair[0], 2);
+
+		names.assign(Arrays.asList(newer, older));
+		assertEquals("the older keeps it", shared, names.suggested(older));
+		String other = names.suggested(newer);
+		assertNotNull(other);
+		assertNotEquals("the newer takes another", shared, other);
+
+		assertFalse("the same roster, reordered, changes nobody", names.assign(Arrays.asList(older, newer)));
+		assertEquals(shared, names.suggested(older));
+		assertEquals(other, names.suggested(newer));
+
+		Golem later = crafted(pair[1] + 1, 3);
+		assertFalse("a golem made later renames nobody", names.assign(Arrays.asList(older, newer, later)));
+		assertEquals(other, names.suggested(newer));
+
+		older.setNickname("Kevin");
+		assertTrue(names.assign(Arrays.asList(older, newer, later)));
+		assertEquals("a named golem holds no name, and the newer takes it back", shared, names.suggested(newer));
+	}
+
+	/** Not yet numbered is newest: a golem just restored gives way to the ones already counted. */
+	@Test
+	public void anUnnumberedGolemGivesWay() throws Exception
+	{
+		setAutoName(true);
+		long[] pair = twoIdsOneName();
+		Golem unnumbered = crafted(pair[0], 0);
+		Golem counted = crafted(pair[1], 5);
+		names.assign(Arrays.asList(unnumbered, counted));
+		assertEquals(names.nameFor(pair[0]), names.suggested(counted));
+		assertNotEquals(names.nameFor(pair[0]), names.suggested(unnumbered));
+	}
+
+	/** The first two ids whose own numbers give them the same name, lower first. */
+	private long[] twoIdsOneName()
+	{
+		Map<String, Long> first = new HashMap<>();
+		for (long id = 0; ; id++)
+		{
+			Long seen = first.putIfAbsent(names.nameFor(id), id);
+			if (seen != null)
+			{
+				return new long[]{seen, id};
+			}
+		}
+	}
+
+	/** Fifty thousand golems, fifty thousand names, and settled in one go. */
+	@Test
+	public void aWholeRosterIsNamedOnce()
+	{
+		List<Golem> roster = new ArrayList<>();
+		for (int i = 0; i < 50_000; i++)
+		{
+			roster.add(crafted(i * 7919L, i + 1));
+		}
+		names.assign(roster);
+		Set<String> seen = new HashSet<>();
+		for (Golem golem : roster)
+		{
+			assertTrue("two golems called " + names.suggested(golem), seen.add(names.suggested(golem)));
+		}
 	}
 
 	/** A golem the player has named keeps that name, whatever the setting says. */
