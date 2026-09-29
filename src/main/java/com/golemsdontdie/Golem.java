@@ -312,6 +312,44 @@ class Golem
 	 */
 	private int dyingCycles = -1;
 
+	/**
+	 * Set while the real golem this copy took over is still alive. The real one is hidden, but the
+	 * game still dots it on the minimap, and a copy walking off on its own left two dots going two
+	 * ways. So the copy stands in for it — where it is, which way it faces, walking or not — until
+	 * it is gone. See GolemsDontDiePlugin.followRealGolems.
+	 */
+	private boolean shadowing;
+
+	boolean isShadowing()
+	{
+		return shadowing;
+	}
+
+	/** Stands where the real golem is this frame, facing its way, walking if it is. */
+	void shadow(int fineX, int fineY, int orientation, boolean moving)
+	{
+		shadowing = true;
+		this.fineX = fineX;
+		this.fineY = fineY;
+		this.orientation = orientation;
+		targetOrientation = orientation;
+		walking = moving;
+		path.clear();
+		stepping = false;
+	}
+
+	/** The real golem is gone: carry on from where it was, after a moment. */
+	void stopShadowing()
+	{
+		if (!shadowing)
+		{
+			return;
+		}
+		shadowing = false;
+		walking = false;
+		dwellRemaining = DWELL_MIN + random.nextInt(DWELL_SPREAD);
+	}
+
 	/** True once the crumble has been started. The golem stops walking and cannot path. */
 	boolean isDying()
 	{
@@ -889,6 +927,10 @@ class Golem
 			dyingCycles = 0;
 			return false;
 		}
+		if (shadowing)
+		{
+			return false;
+		}
 
 		int tick = context.getTick();
 
@@ -1018,6 +1060,12 @@ class Golem
 		{
 			// Stands where it is and crumbles. No turning, no walking, no pathing.
 			dyingCycles = Math.max(0, dyingCycles - cycles);
+			return false;
+		}
+
+		// Standing in for the real golem, which moves it.
+		if (shadowing)
+		{
 			return false;
 		}
 

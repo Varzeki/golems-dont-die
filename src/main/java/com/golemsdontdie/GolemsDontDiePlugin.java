@@ -309,6 +309,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			detachRenderer(golem);
 		}
+		releaseShadows();
 		golems.clear();
 		pendingRestore.clear();
 		crews.clear();
@@ -815,6 +816,7 @@ public class GolemsDontDiePlugin extends Plugin
 			crews.clear();
 			census.clear();
 			hiddenNpcs.clear();
+			releaseShadows();
 			detector.reset();
 			modelFactory.clear();
 			saveGolemsAt = -1;
@@ -1458,6 +1460,11 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		hiddenNpcs.remove(npc.getIndex());
+		Golem copy = shadows.remove(npc.getIndex());
+		if (copy != null)
+		{
+			copy.stopShadowing();
+		}
 		detector.forget(npc, client.getTickCount());
 	}
 
@@ -1512,7 +1519,55 @@ public class GolemsDontDiePlugin extends Plugin
 
 		detector.markReplaced(npc);
 		hiddenNpcs.add(npc.getIndex());
+		// Taken over alive, the copy stands in for the original until it is gone. Taken at the
+		// crumble, the original is gone in a moment, and the copy is free at once.
+		if (!detector.isDeathAnimation(npc.getAnimation()))
+		{
+			shadows.put(npc.getIndex(), golem);
+		}
 		saveGolems();
+	}
+
+	/** Copies standing in for real golems still alive, by the real golem's NPC index. */
+	private final Map<Integer, Golem> shadows = new HashMap<>();
+
+	/**
+	 * Keeps each copy on the real golem it took over, for as long as that golem lives. The real one
+	 * is hidden, but the game still dots it on the minimap, and there is no hiding one NPC's dot;
+	 * a copy that walked off on its own left two dots going two ways. Released when the real golem
+	 * despawns or starts to crumble, and the copy carries on from where it stood.
+	 */
+	private void followRealGolems(WorldView wv)
+	{
+		if (shadows.isEmpty() || wv == null)
+		{
+			return;
+		}
+		for (Iterator<Map.Entry<Integer, Golem>> it = shadows.entrySet().iterator(); it.hasNext(); )
+		{
+			Map.Entry<Integer, Golem> entry = it.next();
+			Golem golem = entry.getValue();
+			NPC npc = wv.npcs().byIndex(entry.getKey());
+			LocalPoint at = npc == null ? null : npc.getLocalLocation();
+			if (at == null || golem.isDying() || detector.isDeathAnimation(npc.getAnimation()))
+			{
+				golem.stopShadowing();
+				it.remove();
+				continue;
+			}
+			golem.shadow(at.getX() + wv.getBaseX() * Golem.TILE, at.getY() + wv.getBaseY() * Golem.TILE,
+				npc.getCurrentOrientation(), npc.getPoseAnimation() != npc.getIdlePoseAnimation());
+		}
+	}
+
+	/** Lets every copy go its own way: the real golems are gone, or about to be. */
+	private void releaseShadows()
+	{
+		for (Golem golem : shadows.values())
+		{
+			golem.stopShadowing();
+		}
+		shadows.clear();
 	}
 
 	/**
@@ -1756,6 +1811,7 @@ public class GolemsDontDiePlugin extends Plugin
 		// Resolved once rather than per golem: both were built five hundred times a frame for
 		// the same answer.
 		WorldView wv = client.getTopLevelWorldView();
+		followRealGolems(wv);
 
 		// One context for the whole frame; only the two per-golem knobs change as the
 		// roster is walked.
@@ -1858,7 +1914,9 @@ public class GolemsDontDiePlugin extends Plugin
 			// Only the golems the player can see dance: one three regions away would be standing
 			// still for nobody, and it has walking to be getting on with.
 			golem.setTickNow(tick);
-			golem.setDancing(celebrating && tier == GolemTier.SCENE || golem.isPartying(tick));
+			// Not one standing in for a real golem, which does not dance: it would glide along
+			// under the real one's walk.
+			golem.setDancing(!golem.isShadowing() && (celebrating && tier == GolemTier.SCENE || golem.isPartying(tick)));
 			if (social && tier == GolemTier.SCENE)
 			{
 				beSociable(golem, tick, playerAt);
@@ -3233,6 +3291,7 @@ public class GolemsDontDiePlugin extends Plugin
 			obstacleObserver.resetSession();
 			detector.reset();
 			hiddenNpcs.clear();
+			releaseShadows();
 			lastGameCycle = -1;
 
 			// The levels and the golem count are about to be sent again, and must not be taken for
