@@ -554,6 +554,66 @@ class WorldMesh
 	}
 
 	/**
+	 * Joins spaces the island map walks between. Golems at home walk by the island map, which is
+	 * live collision and has some doorways open that the shipped collision has shut; a golem walked
+	 * through one into a room the mesh counts as a space of its own, and the cut-off sweep carried
+	 * it home from a room beside the plinth. Wherever the island map steps from one space into
+	 * another, the two are joined, both ways, as a transport would join them. Run after the
+	 * transports are admitted, which starts the joins afresh.
+	 */
+	void joinWhereWalked(IslandMemory memory, int[] regions)
+	{
+		int joined = 0;
+		for (int region : regions)
+		{
+			int baseX = (region >> 8) << 6;
+			int baseY = (region & 0xFF) << 6;
+			for (int plane = 0; plane < 4; plane++)
+			{
+				for (int x = baseX; x < baseX + 64; x++)
+				{
+					for (int y = baseY; y < baseY + 64; y++)
+					{
+						int here = componentAt(x, y, plane);
+						if (here == 0)
+						{
+							continue;
+						}
+						if (memory.north(x, y, plane))
+						{
+							joined += join(here, componentAt(x, y + 1, plane));
+						}
+						if (memory.east(x, y, plane))
+						{
+							joined += join(here, componentAt(x + 1, y, plane));
+						}
+					}
+				}
+			}
+		}
+		log.debug("{} spaces joined where the island map walks between them", joined);
+	}
+
+	/** Joins two spaces both ways, once; 1 if they were not already joined. */
+	private int join(int one, int other)
+	{
+		if (other == 0 || one == other)
+		{
+			return 0;
+		}
+		touched.add(one);
+		touched.add(other);
+		java.util.List<Integer> from = leadsTo.computeIfAbsent(one, space -> new ArrayList<>());
+		if (from.contains(other))
+		{
+			return 0;
+		}
+		from.add(other);
+		leadsTo.computeIfAbsent(other, space -> new ArrayList<>()).add(one);
+		return 1;
+	}
+
+	/**
 	 * The spaces a transport's end touches: its own, or — where it stands on blocked ground, as a
 	 * door, a stile or a stepping stone does — the spaces around it. Nearly a third of the ends in
 	 * the tables have no component of their own, and reading those as "leads nowhere" cut whole

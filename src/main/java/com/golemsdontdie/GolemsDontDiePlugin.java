@@ -534,6 +534,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// A new route can lead onto a floor nothing else reaches: ground from now on.
 		worldMesh.admitTransportEnds(transports.all());
+		worldMesh.joinWhereWalked(islandMemory, GolemContent.ISLAND_REGIONS);
 		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		// A new route into an instance can mean a new room golems may stand in.
@@ -663,6 +664,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// Floors reached only by transports the land fill never had. See WorldMesh.
 		worldMesh.admitTransportEnds(transports.all());
+		worldMesh.joinWhereWalked(islandMemory, GolemContent.ISLAND_REGIONS);
 		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		roamContext = new RoamContext(islandMemory, pathfinder, transports, abilities);
