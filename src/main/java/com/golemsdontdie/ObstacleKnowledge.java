@@ -304,6 +304,20 @@ class ObstacleKnowledge
 		here.add(new int[]{sighting.toX, sighting.toY, sighting.toPlane, 1, flags});
 	}
 
+	/** Sightings of one route past which another teaches nothing, and it is no longer recorded. */
+	static final int MOST_SIGHTINGS = 15;
+
+	/**
+	 * True if this route has been seen more than {@link #MOST_SIGHTINGS} times already. Past that a
+	 * sighting only rewrote what was known, and on an agility course that was everything golems had
+	 * learned, saved again at every obstacle.
+	 */
+	boolean wellKnown(ObstacleSighting sighting)
+	{
+		return sightingsFor(sighting.objectId, sighting.fromX, sighting.fromY, sighting.fromPlane,
+			new int[]{sighting.toX, sighting.toY, sighting.toPlane}) > MOST_SIGHTINGS;
+	}
+
 	/** How far apart two origins of the same move can be and still be one obstacle. */
 	private static final int NEIGHBOUR_ORIGIN = 2;
 

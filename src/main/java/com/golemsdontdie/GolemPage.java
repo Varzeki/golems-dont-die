@@ -318,8 +318,16 @@ class GolemPage
 	}
 
 	/** The line under the name: where the golem is, or that it is gone. */
-	void showPlace(String where, boolean living)
+	/**
+	 * @param of the golem the place was worked out for: ignored if the page has moved on to another,
+	 *           as a late picture is
+	 */
+	void showPlace(Golem of, String where, boolean living)
 	{
+		if (of != showing)
+		{
+			return;
+		}
 		place.setText(where == null || where.isEmpty() ? " " : where);
 		find.setEnabled(living);
 	}

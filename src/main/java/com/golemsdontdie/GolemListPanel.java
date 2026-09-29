@@ -391,7 +391,9 @@ class GolemListPanel extends PluginPanel
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			roster = golems;
+			// While a name is being typed the order stands, as it does for reorder: a row moved is a
+			// field that loses the keyboard. Golems still come and go.
+			roster = typing() ? inPlace(golems) : golems;
 			updateRevive(missing);
 			updateSummary(golems.size());
 			relist();
@@ -403,6 +405,29 @@ class GolemListPanel extends PluginPanel
 				}
 			}
 		});
+	}
+
+	/** The golems given, in the order the list has them now, and any new ones after. */
+	private List<Golem> inPlace(List<Golem> golems)
+	{
+		Set<Golem> fresh = Collections.newSetFromMap(new IdentityHashMap<>());
+		fresh.addAll(golems);
+		List<Golem> kept = new ArrayList<>(golems.size());
+		for (Golem golem : roster)
+		{
+			if (fresh.remove(golem))
+			{
+				kept.add(golem);
+			}
+		}
+		for (Golem golem : golems)
+		{
+			if (fresh.contains(golem))
+			{
+				kept.add(golem);
+			}
+		}
+		return kept;
 	}
 
 	/** Works out who is on the page now, and builds the rows for them. */

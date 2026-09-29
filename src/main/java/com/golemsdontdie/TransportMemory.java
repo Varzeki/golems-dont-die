@@ -189,8 +189,10 @@ final class TransportMemory
 	{
 		if (is(GolemTrait.RESTLESS))
 		{
-			// Off again almost as soon as it lands.
-			return tick < restUntil - TRANSPORT_REST_TICKS / 2;
+			// Off again almost as soon as it lands. In longs: before its first shortcut the rest is
+			// Integer.MIN_VALUE, and taking half a rest off that wrapped round to the largest int,
+			// so a restless golem rested until it had used a shortcut, which it then seldom did.
+			return tick < (long) restUntil - TRANSPORT_REST_TICKS / 2;
 		}
 		return tick < restUntil;
 	}

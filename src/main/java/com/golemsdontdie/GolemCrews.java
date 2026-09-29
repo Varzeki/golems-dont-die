@@ -29,6 +29,9 @@ class GolemCrews
 	@Inject
 	private Voyage voyage;
 
+	@Inject
+	private RoamPlanner planner;
+
 	/** Crews being made up, by the dock they are waiting at. */
 	private final Map<Integer, Muster> mustering = new HashMap<>();
 
@@ -138,8 +141,18 @@ class GolemCrews
 		}
 		// Put back on the quayside rather than left where it stands. Crossings begin between game
 		// ticks and this runs on one, so by now the golem is a tile or two out on the water, and
-		// standing it there would leave it on the sea until the watchdog fetched it back.
-		golem.waitAshore(tick, MUSTER_TICKS, dock.getShore());
+		// standing it there would leave it on the sea until the watchdog fetched it back. On a tile
+		// of its own: the whole crew stood on the one quayside tile, one inside another.
+		Set<Long> taken = new HashSet<>();
+		for (Golem other : muster.waiting)
+		{
+			if (other != golem)
+			{
+				WorldPoint there = other.currentTile();
+				taken.add(RoamContext.tileKey(there.getX(), there.getY(), there.getPlane()));
+			}
+		}
+		golem.waitAshore(tick, MUSTER_TICKS, planner.freeTileNear(dock.getShore(), taken));
 		// The crossing it gave up booked shore leave for its whole length; without this the golem
 		// could not sail again for as long as the voyage it is not taking would have lasted.
 		golem.getTransportMemory().clearShoreLeave();
@@ -253,6 +266,14 @@ class GolemCrews
 			return;
 		}
 		golem.disembark();
+		// The crossing ends every one of them on the same tile; each steps off onto one of its own.
+		WorldPoint at = golem.currentTile();
+		WorldPoint own = planner.freeTileNear(at, crew.getAshore());
+		if (!own.equals(at))
+		{
+			golem.relocate(own);
+		}
+		crew.getAshore().add(RoamContext.tileKey(own.getX(), own.getY(), own.getPlane()));
 		if (crews.values().stream().noneMatch(other -> other == crew))
 		{
 			crew.payOff();

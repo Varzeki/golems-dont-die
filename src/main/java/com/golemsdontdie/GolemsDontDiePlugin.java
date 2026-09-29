@@ -259,6 +259,87 @@ public class GolemsDontDiePlugin extends Plugin
 	private GolemMapPoints mapPoints;
 
 
+	/** Reads what golems have been taught from the profile. */
+	private void loadKnowledge()
+	{
+		obstacleKnowledge.deserialise(setting(ObstacleKnowledge.LEARNED_KEY));
+		obstacleKnowledge.deserialiseConfirmed(setting(ObstacleKnowledge.CONFIRMED_KEY));
+		obstacleKnowledge.deserialiseRoutes(setting(ObstacleKnowledge.ROUTES_KEY));
+		obstacleKnowledge.deserialiseCurves(setting(ObstacleKnowledge.CURVES_KEY));
+		obstacleKnowledge.deserialiseLines(setting(ObstacleKnowledge.LINES_KEY));
+	}
+
+	@Subscribe
+	public void onProfileChanged(ProfileChanged event)
+	{
+		// RuneLite leaves a plugin running across a profile switch when both profiles have it on.
+		// Everything held here came from the profile just left, and the next save would have
+		// written it into the new one: one profile's golems, map and lessons over another's.
+		clientThread.invoke(this::reloadProfile);
+	}
+
+	/** Drops everything read from the last profile, unsaved, and reads the new one's. */
+	private void reloadProfile()
+	{
+		if (!running)
+		{
+			return;
+		}
+		saveGolemsAt = -1;
+		shipmates.abandon(client.getTickCount());
+		for (Golem golem : golems)
+		{
+			detachRenderer(golem);
+		}
+		golems.clear();
+		pendingRestore.clear();
+		crews.clear();
+		census.clear();
+		clearProps();
+		clearRafts();
+		findGolem(null);
+		mapPoints.clear();
+
+		loadKnowledge();
+		islandMemory.deserialise(setting(IslandMemory.MAP_KEY));
+		islandMemory.loadBundled();
+		applyLearnedRoutes();
+		pendingRestore.addAll(store.deserialise(setting(GolemsDontDieConfig.SAVED_GOLEMS_KEY)));
+		tally.load();
+		gameCount = -1;
+		rosterChanged = true;
+		// Logged in, the new profile's golems come out now rather than at the next login.
+		restorePending();
+		syncTally();
+	}
+
+	/**
+	 * Brings the list's "where is it" lines up to date, and now and then its order. Only the golems
+	 * on the page: naming a place for every golem of a roster in the thousands, five times a second,
+	 * would be the most expensive thing the plugin does.
+	 */
+	private void placeListed(GolemListPanel list)
+	{
+		List<Golem> listed = list.onScreenGolems();
+		List<String> places = new ArrayList<>(listed.size());
+		List<Integer> away = new ArrayList<>(listed.size());
+		WorldPoint standing = PlayerPosition.of(client);
+		for (Golem golem : listed)
+		{
+			places.add(whereabouts.of(golem, roamContext.getTick()));
+			away.add(standing == null ? -1 : standing.distanceTo2D(golem.currentTile()));
+		}
+		list.showPlaces(listed, places, away);
+
+		// And the order, now and then: nearest first, but not so often that the list shuffles
+		// under a name being typed.
+		if (++placesSinceOrder >= ORDERS_EVERY)
+		{
+			placesSinceOrder = 0;
+			list.reorder(nearestFirst(), tally.getTotal() - countLiving());
+		}
+	}
+
 	/** How often the sidebar's "where is it" lines are brought up to date, in game ticks. */
 	private static final int PLACES_TICKS = 5;
 
@@ -324,6 +405,11 @@ public class GolemsDontDiePlugin extends Plugin
 		if (!obstacle)
 		{
 			log.debug("Not an obstacle: {}", sighting);
+			return;
+		}
+		// Learned already, many times over: nothing more to write down.
+		if (obstacleKnowledge.wellKnown(sighting))
+		{
 			return;
 		}
 
@@ -434,16 +520,7 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Obstacles already taught, and the settings governing learning. Before the transport
 		// network, whose usability gate consults it.
-		obstacleKnowledge.deserialise(
-			setting(ObstacleKnowledge.LEARNED_KEY));
-		obstacleKnowledge.deserialiseConfirmed(
-			setting(ObstacleKnowledge.CONFIRMED_KEY));
-		obstacleKnowledge.deserialiseRoutes(
-			setting(ObstacleKnowledge.ROUTES_KEY));
-		obstacleKnowledge.deserialiseCurves(
-			setting(ObstacleKnowledge.CURVES_KEY));
-		obstacleKnowledge.deserialiseLines(
-			setting(ObstacleKnowledge.LINES_KEY));
+		loadKnowledge();
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
 		obstacleObserver.startUp();
@@ -559,7 +636,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			saveGolemsSoon();
-			List<Golem> living = livingGolems();
+			List<Golem> living = nearestFirst();
 			panel.refresh(living, tally.getTotal() - living.size(), true);
 		});
 		navButton = NavigationButton.builder()
@@ -757,6 +834,11 @@ public class GolemsDontDiePlugin extends Plugin
 
 		detector.track(npc);
 		islandMemory.anchorAt(npc.getWorldLocation());
+		// One already copied, back in view before it crumbled: still hidden, and not copied again.
+		if (detector.returned(npc, client.getTickCount()))
+		{
+			hiddenNpcs.add(npc.getIndex());
+		}
 	}
 
 	@Subscribe
@@ -1041,7 +1123,7 @@ public class GolemsDontDiePlugin extends Plugin
 		{
 			clearOurArrow();
 		}
-		else if (arrowAt != null || !client.hasHintArrow())
+		else if (!client.hasHintArrow() || isOurArrow())
 		{
 			// Never over the game's own: a quest, a clue or a Slayer task pointing somewhere is
 			// worth more than this, and the infobox, the map and the route still say where the
@@ -1049,6 +1131,19 @@ public class GolemsDontDiePlugin extends Plugin
 			client.setHintArrow(at);
 			arrowAt = at;
 		}
+		else
+		{
+			// The game has put up an arrow of its own since: it keeps it.
+			arrowAt = null;
+		}
+	}
+
+	/** True if the hint arrow showing is the one this plugin last put up. */
+	private boolean isOurArrow()
+	{
+		return arrowAt != null && client.hasHintArrow()
+			&& client.getHintArrowType() == HintArrowType.COORDINATE
+			&& arrowAt.equals(client.getHintArrowPoint());
 	}
 
 	/** Where this plugin last put the game's hint arrow, or null if the arrow is not ours. */
@@ -1060,9 +1155,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void clearOurArrow()
 	{
-		if (arrowAt != null && client.hasHintArrow()
-			&& client.getHintArrowType() == HintArrowType.COORDINATE
-			&& arrowAt.equals(client.getHintArrowPoint()))
+		if (isOurArrow())
 		{
 			client.clearHintArrow();
 		}
@@ -1192,8 +1285,19 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		int animation = npc.getAnimation();
+		if (animation == GolemContent.GOLEM_SPAWN_ANIMATION && detector.wasReplaced(npc))
+		{
+			// Not a golem come back after all: a new one, crafted onto an index a copied golem
+			// had, stepping off the plinth. It is taken over like any other.
+			detector.crafted(npc);
+			hiddenNpcs.remove(npc.getIndex());
+		}
 		if (detector.wasReplaced(npc))
 		{
+			if (detector.isDeathAnimation(animation))
+			{
+				detector.noteCrumbling(npc);
+			}
 			return;
 		}
 
@@ -1228,7 +1332,7 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 
 		hiddenNpcs.remove(npc.getIndex());
-		detector.forget(npc);
+		detector.forget(npc, client.getTickCount());
 	}
 
 	/**
@@ -2261,7 +2365,9 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void beSociable(Golem golem, int tick, WorldPoint playerAt)
 	{
-		if (golem.isDancing() || golem.isGreeting(tick) || golem.isDying())
+		// Not mid-climb or at sea either: a golem turned to stare while crossing a log balance
+		// stopped where it was, on nothing.
+		if (!freeToWave(golem, tick))
 		{
 			return;
 		}
@@ -2484,9 +2590,9 @@ public class GolemsDontDiePlugin extends Plugin
 			&& wv != null
 			&& wv.getPlane() == golem.getDrawPlane()
 			&& inScene(wv, golem)
-			// Aboard, a whole crew stands on a boat three tiles long, each in a place of its own
-			// on the deck: the cap is for golems heaped on one tile of land.
-			&& (golem.isAboard() || drawnPerTile.addTo(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
+			// Aboard a boat, the player's or a crew's own, each golem has a place of its own on the
+			// deck however many share the boat's tile: the cap is for golems heaped on one of land.
+			&& (golem.isAboard() || golem.isCrewed() || drawnPerTile.addTo(RoamContext.tileKey(golem.getFineX() / Golem.TILE,
 				golem.getFineY() / Golem.TILE, golem.getPlane()), 1) <= MAX_DRAWN_PER_TILE);
 
 		if (!visible)
@@ -2682,38 +2788,28 @@ public class GolemsDontDiePlugin extends Plugin
 				roamContext.getTick(), finding);
 		}
 
-		if (panel != null && panel.isOnScreen() && ++ticksSincePlaces >= PLACES_TICKS)
+		// Each read once: shutting down on the Swing thread clears them, and a check then a use of
+		// the field could see it go in between.
+		GolemListPanel list = panel;
+		GolemPage open = page;
+		boolean listing = list != null && list.isOnScreen();
+		boolean pageOpen = open != null && open.isOpen();
+		if ((listing || pageOpen) && ++ticksSincePlaces >= PLACES_TICKS)
 		{
 			ticksSincePlaces = 0;
-
-			// Only the golems on the page: naming a place for every golem of a roster in the
-			// thousands, five times a second, would be the most expensive thing the plugin does.
-			List<Golem> listed = panel.onScreenGolems();
-			List<String> places = new ArrayList<>(listed.size());
-			List<Integer> away = new ArrayList<>(listed.size());
-			WorldPoint standing = PlayerPosition.of(client);
-			for (Golem golem : listed)
+			if (listing)
 			{
-				places.add(whereabouts.of(golem, roamContext.getTick()));
-				away.add(standing == null ? -1 : standing.distanceTo2D(golem.currentTile()));
+				placeListed(list);
 			}
-			panel.showPlaces(listed, places, away);
 
-			// And the page, if one is open, which is one golem and may not be among those listed.
-			if (page != null && page.isOpen())
+			// And the page, if one is open, which is one golem and may not be among those listed:
+			// kept up to date whether or not the list is showing, or even enabled.
+			if (pageOpen)
 			{
-				Golem shown = page.getShowing();
+				Golem shown = open.getShowing();
 				String where = whereabouts.of(shown, roamContext.getTick());
 				boolean living = shown != null && golems.contains(shown) && !shown.isDying();
-				SwingUtilities.invokeLater(() -> page.showPlace(living ? where : "Gone", living));
-			}
-
-			// And the order, now and then: nearest first, but not so often that the list shuffles
-			// under a name being typed.
-			if (++placesSinceOrder >= ORDERS_EVERY)
-			{
-				placesSinceOrder = 0;
-				panel.reorder(nearestFirst(), tally.getTotal() - countLiving());
+				SwingUtilities.invokeLater(() -> open.showPlace(shown, living ? where : "Gone", living));
 			}
 		}
 

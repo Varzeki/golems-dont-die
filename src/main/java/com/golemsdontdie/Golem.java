@@ -498,7 +498,15 @@ class Golem
 		walking = false;
 		relocate(quayside);
 		itinerary = RoamPlanner.stayPut(quayside, tick, ticks);
+		waiting = itinerary;
 	}
+
+	/**
+	 * The wait at a quayside this golem is on, if any. In view a route that is not a crossing is
+	 * dropped, and a wait is not one, so without this a golem in sight wandered off the quay the
+	 * frame after it was stood there, and never sailed while anyone watched.
+	 */
+	private Itinerary waiting;
 
 	/**
 	 * Turns the golem to a heading at once, without turning through it: a golem on a boat is
@@ -868,6 +876,13 @@ class Golem
 				followItinerary(cycles, context);
 				return false;
 			}
+			if (itinerary == waiting && context.getTick() >= itinerary.getStartTick()
+				&& !itinerary.isFinished(context.getTick()))
+			{
+				walking = false;
+				turnToward(cycles);
+				return false;
+			}
 			itinerary = null;
 		}
 
@@ -883,8 +898,10 @@ class Golem
 			{
 				// Dancing, or waving at the player: it finishes the step it is on and drops the
 				// rest of the walk. A leg is up to fifty tiles, so a golem that only stopped at the
-				// end of one would still be walking when the celebration was over.
-				boolean stopping = dancing || isGreeting(context.getTick());
+				// end of one would still be walking when the celebration was over. Never partway up
+				// a climb, though: dropping the rest of that left the golem on the cliff face, in its
+				// climbing gait, with no step left to finish the climb on.
+				boolean stopping = (dancing || isGreeting(context.getTick())) && gaitWalk == -1;
 				if (stopping && !path.isEmpty())
 				{
 					path.clear();

@@ -25,6 +25,10 @@ class GolemCrew
 
 	private final List<Golem> members = new ArrayList<>();
 
+	/** The tiles members have already stepped off onto, so each lands on one of its own. */
+	@Getter
+	private final Set<Long> ashore = new HashSet<>();
+
 	GolemCrew(GolemBoat boat, Itinerary crossing)
 	{
 		this.boat = boat;
@@ -70,5 +74,6 @@ class GolemCrew
 			golem.disembark();
 		}
 		members.clear();
+		ashore.clear();
 	}
 }

@@ -27,6 +27,19 @@ class GolemDetector
 	 */
 	private final Set<Integer> leftPlinth = new HashSet<>();
 
+	/** Golems replaced and then seen crumbling: the real thing is on its way out, and done with. */
+	private final Set<Integer> crumbling = new HashSet<>();
+
+	/**
+	 * Replaced golems that went out of view still standing, by NPC index, with the tick until which
+	 * one coming back is the same golem. Forgotten on the way out, one that walked back into view
+	 * before crumbling was taken over a second time: two golems where there had been one.
+	 */
+	private final Map<Integer, Integer> away = new HashMap<>();
+
+	/** Longer than a crafted golem lives: past this, an index seen again is a different golem. */
+	private static final int AWAY_TICKS = 100;
+
 	// ---- identity ----
 
 	boolean isGolem(NPC npc)
@@ -79,11 +92,46 @@ class GolemDetector
 	}
 
 	/** Drops all state for an NPC that has left the scene. */
-	void forget(NPC npc)
+	void forget(NPC npc, int tick)
 	{
-		tracked.remove(npc.getIndex());
+		int index = npc.getIndex();
+		if (replaced.contains(index) && !crumbling.contains(index))
+		{
+			away.put(index, tick + AWAY_TICKS);
+		}
+		tracked.remove(index);
+		replaced.remove(index);
+		leftPlinth.remove(index);
+		crumbling.remove(index);
+	}
+
+	/** Notes a replaced golem playing its crumble, so its despawn is taken as its end. */
+	void noteCrumbling(NPC npc)
+	{
+		crumbling.add(npc.getIndex());
+	}
+
+	/**
+	 * True if a golem just in view is one already replaced, back from out of view, and marks it
+	 * replaced again. A golem newly crafted onto the same index is told apart by stepping off the
+	 * plinth; see {@link #crafted}.
+	 */
+	boolean returned(NPC npc, int tick)
+	{
+		Integer until = away.remove(npc.getIndex());
+		if (until == null || tick > until || tick < until - AWAY_TICKS)
+		{
+			return false;
+		}
+		replaced.add(npc.getIndex());
+		return true;
+	}
+
+	/** A golem stepping off the plinth is new, whatever held its index before. */
+	void crafted(NPC npc)
+	{
 		replaced.remove(npc.getIndex());
-		leftPlinth.remove(npc.getIndex());
+		away.remove(npc.getIndex());
 	}
 
 	/** Drops everything; on logout and plugin stop. */
@@ -92,5 +140,7 @@ class GolemDetector
 		tracked.clear();
 		replaced.clear();
 		leftPlinth.clear();
+		crumbling.clear();
+		away.clear();
 	}
 }

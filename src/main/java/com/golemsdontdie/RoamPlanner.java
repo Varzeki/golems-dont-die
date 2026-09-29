@@ -479,6 +479,40 @@ class RoamPlanner
 		return Itinerary.of(single(at), at.getPlane(), tick, ticks);
 	}
 
+	/** How far from a quayside or a landing golems spread out to find a tile each. */
+	private static final int SPREAD_TILES = 3;
+
+	/**
+	 * The nearest tile to {@code at} a golem can stand on that is not in {@code taken}, joined to it
+	 * on foot and at most a few tiles off; {@code at} itself if there is none. For a crew, which by
+	 * its route's reckoning is all in one place: at the quayside waiting, and on landing.
+	 */
+	WorldPoint freeTileNear(WorldPoint at, Set<Long> taken)
+	{
+		int plane = at.getPlane();
+		for (int ring = 0; ring <= SPREAD_TILES; ring++)
+		{
+			for (int dx = -ring; dx <= ring; dx++)
+			{
+				for (int dy = -ring; dy <= ring; dy++)
+				{
+					if (Math.max(Math.abs(dx), Math.abs(dy)) != ring)
+					{
+						continue;
+					}
+					int x = at.getX() + dx;
+					int y = at.getY() + dy;
+					if (!taken.contains(RoamContext.tileKey(x, y, plane)) && isSafe(x, y, plane)
+						&& (ring == 0 || mesh.sameComponent(at.getX(), at.getY(), x, y, plane)))
+					{
+						return new WorldPoint(x, y, plane);
+					}
+				}
+			}
+		}
+		return at;
+	}
+
 	/** Standing where it is for a while: a golem waiting at a quayside for a crew to make up. */
 	static Itinerary stayPut(WorldPoint at, int tick, int ticks)
 	{
