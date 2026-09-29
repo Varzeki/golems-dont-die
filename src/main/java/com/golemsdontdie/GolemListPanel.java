@@ -371,7 +371,7 @@ class GolemListPanel extends PluginPanel
 	 * @param names   also take names given in game, which leave the roster otherwise unchanged
 	 */
 	/**
-	 * Puts the list back in order, unless the player is typing in it.
+	 * Puts the list back in order, unless the player is typing in it or has the mouse over it.
 	 *
 	 * <p>Reordering moves rows, and a text field taken out of the list and put back loses the keyboard:
 	 * a name half typed carried on into the game. So while a name or the search box has the caret the
@@ -385,7 +385,9 @@ class GolemListPanel extends PluginPanel
 			{
 				return;
 			}
-			roster = golems;
+			// Nor under the mouse: a row moved out from under the pointer gives the click meant for it
+			// to another golem. Golems still come and go; the order waits for the mouse to leave.
+			roster = pointedAt() ? inPlace(golems) : golems;
 			updateRevive(missing);
 			updateSummary(golems.size());
 			relist();
@@ -409,13 +411,35 @@ class GolemListPanel extends PluginPanel
 		return false;
 	}
 
+	/**
+	 * Whether the mouse is anywhere over this panel. Asked of where the pointer is on the screen
+	 * rather than kept from enter and exit events, which each row, button and field has its own of,
+	 * so that moving from one to the next inside the panel is not taken for leaving it.
+	 */
+	private boolean pointedAt()
+	{
+		if (!isShowing())
+		{
+			return false;
+		}
+		PointerInfo pointer = MouseInfo.getPointerInfo();
+		if (pointer == null)
+		{
+			return false;
+		}
+		Point at = pointer.getLocation();
+		SwingUtilities.convertPointFromScreen(at, this);
+		return contains(at);
+	}
+
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
 			// While a name is being typed the order stands, as it does for reorder: a row moved is a
-			// field that loses the keyboard. Golems still come and go.
-			roster = typing() ? inPlace(golems) : golems;
+			// field that loses the keyboard. So too while the mouse is over the list. Golems still
+			// come and go.
+			roster = typing() || pointedAt() ? inPlace(golems) : golems;
 			updateRevive(missing);
 			updateSummary(golems.size());
 			relist();
