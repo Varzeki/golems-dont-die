@@ -212,13 +212,19 @@ class RoamPlanner
 		{
 			return known;
 		}
+		// Not remembered for ground not yet read: asked again once the room's floor is known.
+		boolean remember = memory.isKnownWalkable(x, y, plane);
 		TileMap room = unmeshedRoom(x, y, plane);
 		if (room == null)
 		{
-			unmeshedWays.put(RoamContext.tileKey(x, y, plane), java.util.Collections.emptyList());
+			if (remember)
+			{
+				unmeshedWays.put(RoamContext.tileKey(x, y, plane), java.util.Collections.emptyList());
+			}
 			return java.util.Collections.emptyList();
 		}
 		List<GolemTransport> ways = new ArrayList<>();
+		List<GolemTransport> fromMesh = new ArrayList<>();
 		for (GolemTransport t : transports.all())
 		{
 			if (!transports.isOffered(t) || !abilities.canUse(t))
@@ -227,19 +233,32 @@ class RoamPlanner
 			}
 			boolean fromIn = t.getFromPlane() == plane && inRoom(room, t.getFromX(), t.getFromY());
 			boolean toIn = t.getToPlane() == plane && inRoom(room, t.getToX(), t.getToY());
-			if (fromIn && !toIn)
+			// A way out only if it lands on ground the mesh knows. One into another unmeshed room, as
+			// the Gap leads from the Doom lobby down into the arena, is deeper in, not out: counted as
+			// a way out, it left the lobby with no way home, and golems led up out of the arena jumped
+			// straight back down.
+			if (fromIn && !toIn && componentNear(t.getToX(), t.getToY(), t.getToPlane()) != 0)
 			{
-				// A way out it already knows: not shut in.
 				ways = java.util.Collections.emptyList();
+				fromMesh = ways;
 				break;
 			}
-			// Only what leads in from outside: one part of the room to another is no way home.
+			// Only what leads in from outside: one part of the room to another is no way home. Best,
+			// what came in from ground the mesh knows, so a chain of rooms is left the whole way out.
 			if (toIn && !fromIn)
 			{
 				ways.add(t.backThrough());
+				if (componentNear(t.getFromX(), t.getFromY(), t.getFromPlane()) != 0)
+				{
+					fromMesh.add(t.backThrough());
+				}
 			}
 		}
-		for (int i = 0; i < room.size(); i++)
+		if (!fromMesh.isEmpty())
+		{
+			ways = fromMesh;
+		}
+		for (int i = 0; remember && i < room.size(); i++)
 		{
 			long tile = room.keyAt(i);
 			unmeshedWays.put(RoamContext.tileKey(GolemPathfinder.unpackX(tile), GolemPathfinder.unpackY(tile), plane), ways);
