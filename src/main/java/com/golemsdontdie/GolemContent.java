@@ -94,8 +94,8 @@ final class GolemContent
 	static final WorldPoint RECOVERY = new WorldPoint(2597, 2224, 0);
 
 	/**
-	 * Where a revived golem appears: the tiles a golem steps off onto from each of the two
-	 * plinths, as a crafted one does. Each revived golem takes one at random.
+	 * Where a revived golem appears: the tile beside each of the two plinths that a crafted golem
+	 * steps off onto, not the plinths themselves. Each revived golem takes one at random.
 	 */
 	static final WorldPoint[] REVIVE_TILES = {
 		new WorldPoint(2595, 2254, 0),
