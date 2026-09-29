@@ -524,12 +524,19 @@ class WorldMesh
 		Arrays.fill(landComponents, false);
 		leadsTo.clear();
 		touched.clear();
+		Map<Long, java.util.List<GolemTransport>> starting = new HashMap<>();
+		for (GolemTransport t : transports)
+		{
+			starting.computeIfAbsent(tileKey(t.getFromX(), t.getFromY(), t.getFromPlane()),
+				k -> new ArrayList<>()).add(t);
+		}
 		for (GolemTransport t : transports)
 		{
 			for (int from : spacesAt(t.getFromX(), t.getFromY(), t.getFromPlane()))
 			{
 				touched.add(from);
-				for (int to : spacesAt(t.getToX(), t.getToY(), t.getToPlane()))
+				for (int to : spacesOnward(t.getToX(), t.getToY(), t.getToPlane(),
+					t.getFromX(), t.getFromY(), t.getFromPlane(), TransportNetwork.CHAIN_HOPS, starting))
 				{
 					touched.add(to);
 					if (from != to)
@@ -623,6 +630,42 @@ class WorldMesh
 	 * golem where it stands; refusing to join two that it can carries one home from somewhere it
 	 * belonged.
 	 */
+	/**
+	 * The spaces a transport's end touches, following a chain on from an end that touches none -
+	 * a stepping stone mid-river, all water round it - as TransportNetwork.leadsToGround does.
+	 */
+	private java.util.List<Integer> spacesOnward(int x, int y, int plane, int cameX, int cameY, int camePlane,
+		int hops, Map<Long, java.util.List<GolemTransport>> starting)
+	{
+		java.util.List<Integer> here = spacesAt(x, y, plane);
+		if (!here.isEmpty() || hops <= 0)
+		{
+			return here;
+		}
+		java.util.List<Integer> found = new ArrayList<>(2);
+		for (GolemTransport onward : starting.getOrDefault(tileKey(x, y, plane), Collections.emptyList()))
+		{
+			if (onward.getToX() == cameX && onward.getToY() == cameY && onward.getToPlane() == camePlane)
+			{
+				continue;
+			}
+			for (int space : spacesOnward(onward.getToX(), onward.getToY(), onward.getToPlane(), x, y, plane,
+				hops - 1, starting))
+			{
+				if (!found.contains(space))
+				{
+					found.add(space);
+				}
+			}
+		}
+		return found;
+	}
+
+	private static long tileKey(int x, int y, int plane)
+	{
+		return ((long) plane << 32) | ((long) x << 16) | y;
+	}
+
 	private java.util.List<Integer> spacesAt(int x, int y, int plane)
 	{
 		int own = componentAt(x, y, plane);
