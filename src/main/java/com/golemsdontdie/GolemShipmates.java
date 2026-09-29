@@ -244,7 +244,7 @@ class GolemShipmates
 		// trim round its edge, and nothing there blocks; golems took those tiles for the rail and
 		// stood out beside the ship, over the sea.
 		int[] hull = hullFootprint(deck);
-		Set<Long> helm = helmTiles(deck, hull);
+		Set<Long> helm = helmTiles(deck, hull, plane);
 		List<int[]> rail = new ArrayList<>();
 		for (int x = 0; x < sizeX; x++)
 		{
@@ -439,12 +439,12 @@ class GolemShipmates
 	}
 
 	/**
-	 * Where the player stands to steer, as x << 32 | y: the tile before the helm, toward the bow, which
-	 * on a sloop, whose helm stands off the end of the hull, is the hull's last tile. Only that one: a golem
-	 * was stood at the wheel, but keeping clear of every tile round it left a skiff with five open
-	 * places taking two golems.
+	 * Where the player stands to steer, as x << 32 | y. On the helm itself where it can be stood on,
+	 * as a raft's can; otherwise the tile before it, toward the bow, which is the low end of every
+	 * hull's own grid: a skiff's helm row is blocked, and a sloop's helm stands off the end of the
+	 * hull. Kept clear for the player alone; golems were stood at the wheel.
 	 */
-	static Set<Long> helmTiles(WorldView deck, int[] hull)
+	static Set<Long> helmTiles(WorldView deck, int[] hull, int plane)
 	{
 		Set<Long> out = new HashSet<>();
 		Tile[][][] tiles = deck.getScene() == null ? null : deck.getScene().getTiles();
@@ -452,9 +452,10 @@ class GolemShipmates
 		{
 			return out;
 		}
-		for (Tile[][] plane : tiles)
+		byte[][][] settings = deck.getTileSettings();
+		for (Tile[][] floor : tiles)
 		{
-			for (Tile[] column : plane == null ? new Tile[0][] : plane)
+			for (Tile[] column : floor == null ? new Tile[0][] : floor)
 			{
 				for (Tile tile : column == null ? new Tile[0] : column)
 				{
@@ -464,20 +465,24 @@ class GolemShipmates
 					}
 					for (GameObject object : tile.getGameObjects())
 					{
-						if (object != null && isHelm(object.getId()))
+						if (object == null || !isHelm(object.getId()))
 						{
-							int x = object.getSceneMinLocation().getX();
-							int y = object.getSceneMinLocation().getY();
-							// The player steers from the tile before the wheel, a step toward the bow,
-							// which is the low end of every hull's own grid.
-							y -= 1;
-							if (hull != null)
-							{
-								x = Math.max(hull[0], Math.min(hull[2], x));
-								y = Math.max(hull[1], Math.min(hull[3], y));
-							}
-							out.add((long) x << 32 | y);
+							continue;
 						}
+						int x = object.getSceneMinLocation().getX();
+						int y = object.getSceneMinLocation().getY();
+						boolean blocked = settings != null && plane < settings.length && x < settings[plane].length
+							&& y < settings[plane][x].length && (settings[plane][x][y] & TILE_BLOCKED) != 0;
+						if (!onHull(hull, x, y) || blocked)
+						{
+							y -= 1;
+						}
+						if (hull != null)
+						{
+							x = Math.max(hull[0], Math.min(hull[2], x));
+							y = Math.max(hull[1], Math.min(hull[3], y));
+						}
+						out.add((long) x << 32 | y);
 					}
 				}
 			}

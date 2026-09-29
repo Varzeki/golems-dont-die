@@ -158,4 +158,65 @@ public class GolemSkiffDeckTest
 		// Down the helm's side, and the two either side of the salvaging station.
 		assertEquals(new HashSet<>(java.util.Arrays.asList("4,2", "4,3", "4,4", "3,2", "3,4")), places);
 	}
+
+	/**
+	 * A raft as ::gdeck read one: 1x3, a chest at the bow, the mast in the middle, the helm at the
+	 * stern with the player standing on it to steer. One golem, in the middle.
+	 */
+	private static WorldView raft()
+	{
+		int[][] floor0 = new int[SIZE][SIZE];
+		int[][] floor1 = new int[SIZE][SIZE];
+		for (int y = 2; y <= 4; y++)
+		{
+			floor1[3][y] = 0x200000;
+		}
+		Tile[][][] tiles = new Tile[4][SIZE][SIZE];
+		for (int y = 2; y <= 4; y++)
+		{
+			tiles[0][3][y] = tile();
+		}
+		tiles[0][3][2] = tile(object(59494, 3, 2, 1, 3, 266));
+		tiles[1][3][2] = tile(object(60245, 3, 2, 1, 1, 266));
+		tiles[1][3][3] = tile(object(59530, 3, 3, 1, 1, 10));
+		tiles[1][3][4] = tile(object(59554, 3, 4, 1, 1, 10));
+		tiles[1][3][5] = tile(object(29506, 3, 5, 1, 1, 10));
+		byte[][][] settings = new byte[4][SIZE][SIZE];
+		CollisionData[] maps = {collision(floor0), collision(floor1), collision(new int[SIZE][SIZE]),
+			collision(new int[SIZE][SIZE])};
+		Scene scene = (Scene) Proxy.newProxyInstance(Scene.class.getClassLoader(), new Class<?>[]{Scene.class},
+			(proxy, method, args) -> "getTiles".equals(method.getName()) ? tiles : null);
+		return (WorldView) Proxy.newProxyInstance(WorldView.class.getClassLoader(), new Class<?>[]{WorldView.class},
+			(proxy, method, args) ->
+			{
+				switch (method.getName())
+				{
+					case "getCollisionMaps":
+						return maps;
+					case "getTileSettings":
+						return settings;
+					case "getSizeX":
+					case "getSizeY":
+						return SIZE;
+					case "getScene":
+						return scene;
+					case "getId":
+						return 321;
+					case "getPlane":
+						return 1;
+					default:
+						return null;
+				}
+			});
+	}
+
+	@Test
+	public void oneGolemFitsOnARaftInTheMiddle()
+	{
+		LocalPoint steering = new LocalPoint(3 * Golem.TILE + Golem.TILE / 2, 4 * Golem.TILE + Golem.TILE / 2, 321);
+		List<int[]> rails = GolemShipmates.rails(raft(), 1, steering);
+		assertEquals(1, rails.size());
+		assertEquals(3, rails.get(0)[0] / Golem.TILE);
+		assertEquals(3, rails.get(0)[1] / Golem.TILE);
+	}
 }
