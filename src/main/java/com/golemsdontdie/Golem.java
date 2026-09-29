@@ -238,8 +238,8 @@ class Golem
 	private static final int EDDY_CYCLES = 100;
 
 	/**
-	 * Works a grounded raft free, cheapest first: spin on the spot; reverse along the stored
-	 * waypoints; re-plan from where the boat is; snap to valid water. Only the snap is a
+	 * Works a grounded raft free, cheapest first: back along the stored waypoints, turning on the
+	 * spot a moment before it sets off; re-plan from where the boat is; snap to valid water. Only the snap is a
 	 * cheat, and a grounded golem is unwatched almost by definition, since a watched one
 	 * would be on live collision, not the shipped mesh.
 	 *
@@ -633,13 +633,11 @@ class Golem
 	}
 
 	/**
-	 * Takes on a plan, and keeps the tally with it: a voyage is only ever known about here, the
-	 * planner having worked it out for a golem it was handed the memory of and not the golem.
-	 */
-	/**
 	 * Takes a route, unless it is a crossing and the crews want the golem waiting at the quayside
 	 * for company first. Asked before casting off rather than after: held once it had, a golem in
-	 * view got into its raft and was pulled back out of it onto the quay.
+	 * view got into its raft and was pulled back out of it onto the quay. Keeps the tally with it:
+	 * a voyage is only ever known about here, the planner having worked it out for a golem it was
+	 * handed the memory of and not the golem.
 	 */
 	private void embark(Itinerary plan, RoamContext context)
 	{
@@ -684,16 +682,6 @@ class Golem
 		return new WorldPoint(fineX / TILE, fineY / TILE, plane);
 	}
 
-	/**
-	 * Moves the golem between tiers, doing the one-off work each crossing needs.
-	 *
-	 * <p>Called every frame; most frames the tier is unchanged. Inward, the route resolves to
-	 * a tile snapped onto real walkable ground — which is what makes the straight-line far
-	 * routes safe, correcting them exactly when the error would show. Outward, the renderer
-	 * is dropped and a route is planned.
-	 *
-	 * @return true if the golem changed tier
-	 */
 	/** The tick this golem is next looked at while it is out of view. See {@link #scheduleFarCheck}. */
 	private int nextFarCheck = Integer.MIN_VALUE;
 
@@ -734,6 +722,16 @@ class Golem
 		}
 	}
 
+	/**
+	 * Moves the golem between tiers, doing the one-off work each crossing needs.
+	 *
+	 * <p>Called every frame; most frames the tier is unchanged. Inward, the route resolves to
+	 * a tile snapped onto real walkable ground — which is what makes the straight-line far
+	 * routes safe, correcting them exactly when the error would show. Outward, the renderer
+	 * is dropped and a route is planned.
+	 *
+	 * @return true if the golem changed tier
+	 */
 	boolean setTier(GolemTier now, RoamContext context, RoamPlanner planner)
 	{
 		if (now == tier)
@@ -1353,8 +1351,8 @@ class Golem
 						{
 							continue;
 						}
-						// Adjacent is the full chance, three tiles away a quarter of it, and
-						// more or less again by where it leads. See RoamContext.appeal.
+						// A quarter less for each tile away, three tiles away a quarter of it,
+						// and more or less again by where it leads. See RoamContext.appeal.
 						float chance = TRANSPORT_CHANCE
 							* (TRANSPORT_REACH + 1 - distance) / (TRANSPORT_REACH + 1)
 							* context.appeal(tileX, tileY, plane,

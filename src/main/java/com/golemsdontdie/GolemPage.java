@@ -429,8 +429,9 @@ class GolemPage
 		}
 	}
 
-	/** The line under the name: where the golem is, or that it is gone. */
 	/**
+	 * The line under the name: where the golem is, or that it is gone.
+	 *
 	 * @param of the golem the place was worked out for: ignored if the page has moved on to another,
 	 *           as a late picture is
 	 */
@@ -504,8 +505,10 @@ class GolemPage
 	/** What to call the furthest place the golem has been, or null if nothing knows. */
 	private String furthest;
 
-	/** Told after the page is up, because naming a place is the client thread's business. */
 	/**
+	 * The furthest place the golem has been, told after the page is up because naming a place is
+	 * the client thread's business.
+	 *
 	 * @param of the golem the place was worked out for: ignored if the page has moved on to another,
 	 *           the way {@link #showPicture} ignores a late picture
 	 */

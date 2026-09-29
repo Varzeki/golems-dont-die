@@ -242,11 +242,6 @@ class SeaMesh
 		return (int) (Math.max(dx, dy) * HEURISTIC_WEIGHT);
 	}
 
-	/**
-	 * Distance to a destination by sea, for every tile of open water near a route to it. Travel
-	 * distance, not straight-line: filled outward from the destination round every headland, so from
-	 * any tile some neighbour is one step nearer. Only within {@code band} tiles of the route.
-	 */
 	/** Which tiles a raft may sail on: the ocean, or one enclosed body of water. */
 	interface Water
 	{
@@ -317,6 +312,11 @@ class SeaMesh
 	}
 
 	/** The distance field to the last point of a route, over open water within {@code band} tiles of the route. */
+	/**
+	 * Distance to a destination by sea, for every tile of open water near a route to it. Travel
+	 * distance, not straight-line: filled outward from the destination round every headland, so from
+	 * any tile some neighbour is one step nearer. Only within {@code band} tiles of the route.
+	 */
 	Field fieldAlong(List<int[]> route, int band)
 	{
 		return fieldAlong(route, band, 0, 0);

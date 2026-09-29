@@ -373,17 +373,6 @@ class GolemListPanel extends PluginPanel
 	}
 
 	/**
-	 * Takes the roster as it now stands, in the order the client thread put it: nearest first.
-	 *
-	 * <p>Only a page of it is ever built. One row is half a dozen Swing components, and a player who
-	 * has crafted for months has thousands of golems — sixty thousand components in one scroll pane
-	 * is minutes of laying out and megabytes held for a list nobody can read anyway.
-	 *
-	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
-	 *                only when this is positive
-	 * @param names   also take names given in game, which leave the roster otherwise unchanged
-	 */
-	/**
 	 * Puts the list back in order, unless the player is typing in it or has the mouse over it.
 	 *
 	 * <p>Reordering moves rows, and a text field taken out of the list and put back loses the keyboard:
@@ -445,6 +434,17 @@ class GolemListPanel extends PluginPanel
 		return contains(at);
 	}
 
+	/**
+	 * Takes the roster as it now stands, in the order the client thread put it: nearest first.
+	 *
+	 * <p>Only a page of it is ever built. One row is half a dozen Swing components, and a player who
+	 * has crafted for months has thousands of golems — sixty thousand components in one scroll pane
+	 * is minutes of laying out and megabytes held for a list nobody can read anyway.
+	 *
+	 * @param missing how many fewer golems are roaming than crafted; the revive button shows
+	 *                only when this is positive
+	 * @param names   also take names given in game, which leave the roster otherwise unchanged
+	 */
 	void refresh(List<Golem> golems, int missing, boolean names)
 	{
 		SwingUtilities.invokeLater(() ->

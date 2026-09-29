@@ -89,9 +89,9 @@ enum GolemBoat
 	private final int berths;
 
 	/**
-	 * Where each of them stands, from the middle of the hull: across, then along. The first is the
-	 * helm, and is the offset every other is measured against, so a crew rides where the boat is
-	 * rather than beside it.
+	 * Where each of them stands, across then along, measured from the helm: the first of them, at
+	 * nothing. The boat is drawn under the golem at the helm, so a crew placed from it rides where
+	 * the boat is rather than beside it.
 	 */
 	private final int[][] deck;
 

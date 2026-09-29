@@ -173,10 +173,11 @@ class SailingDocks
 		log.debug("Loaded {} sailing docks of {} rows; {} open to golems at Sailing level {}", docks.size(),
 			rows.size(), openDocks().size(), client.getRealSkillLevel(Skill.SAILING));
 
-		if (docks.isEmpty() && !rows.isEmpty())
+		if (docks.isEmpty() && !rows.isEmpty() && !buoys.isEmpty())
 		{
 			// Every row rejected means the table's shape is not what this code expects, which is
 			// worth saying loudly: silent no-sailing with a healthy row count takes an afternoon.
+			// Not when the buoy table is missing, which has said so already and rejects every row.
 			dumpTable(rows);
 		}
 	}
