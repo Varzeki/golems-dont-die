@@ -239,7 +239,10 @@ class GolemShipmates
 		{
 			for (int y = 0; y < sizeY; y++)
 			{
-				if (!onHull(hull, x, y) || helm.contains((long) x << 32 | y) || !isDeck(flags, x, y, sizeX, sizeY)
+				// Nor the bow's row, where the hull narrows to its point: not somewhere anyone stands.
+				// The helm is at the other end, the high one, on every hull the game lays out.
+				if (!onHull(hull, x, y) || hull != null && y == hull[1]
+					|| helm.contains((long) x << 32 | y) || !isDeck(flags, x, y, sizeX, sizeY)
 					|| floor != null && (x >= floor.length || y >= floor[x].length || floor[x][y] == null))
 				{
 					continue;

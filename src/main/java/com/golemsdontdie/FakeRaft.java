@@ -42,7 +42,14 @@ class FakeRaft extends RuneLiteObjectController
 
 	/** How far the boat rises and falls on the swell, in height units, and how long a swell takes. */
 	private static final int BOB_HEIGHT = 4;
-	private static final int BOB_CYCLES = 160;
+
+	/**
+	 * A swell's length, in client cycles: the game's own boats ride a 240 frame loop (its
+	 * SAILING_WORLDENTITY_BOAT_*_IDLE_01 animations). That motion is a skeletal animation on the
+	 * boat's whole world view, which a plugin cannot play on an object of its own and which pitches
+	 * and rolls as well; an object can only rise and fall, so this rises and falls in its time.
+	 */
+	private static final int BOB_CYCLES = 240;
 
 	/** Which boat this is on the swell, so a fleet does not rise and fall as one. See bob. */
 	private final long seed;

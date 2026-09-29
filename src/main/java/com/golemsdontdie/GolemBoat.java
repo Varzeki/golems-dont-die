@@ -22,7 +22,7 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 0, -1, 13373, 13881),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 0, -1, -1, -1),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
@@ -127,7 +127,8 @@ enum GolemBoat
 	/**
 	 * What the mast and the cloth play while the boat is under way: the sail full. Unanimated, a
 	 * sail stood in its bind pose, which is neither up nor down and in the wrong place, and a skiff's
-	 * foresail was not there at all.
+	 * foresail was not there at all. Not the raft's, -1: its sail is drawn as it has always been,
+	 * where the full-sail animations put it off the raft altogether.
 	 */
 	private final int mastAnimation;
 	private final int clothAnimation;
