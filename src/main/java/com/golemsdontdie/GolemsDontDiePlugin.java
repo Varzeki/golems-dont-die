@@ -1301,6 +1301,9 @@ public class GolemsDontDiePlugin extends Plugin
 						golem.getId(), on, safe);
 					noteRescue(golem, on, safe, "unwalkable");
 					golem.relocate(safe);
+					// Snapped out of a room is out of its instance: left flagged, it was out of view
+					// for good.
+					golem.setInInstance(false);
 					golem.noteUnstuck(tick);
 					return;
 				}
@@ -1333,6 +1336,7 @@ public class GolemsDontDiePlugin extends Plugin
 			golem.getId(), at, safe, tier);
 		noteRescue(golem, at, safe, "stuck");
 		golem.relocate(safe);
+		golem.setInInstance(false);
 		golem.noteUnstuck(tick);
 	}
 
