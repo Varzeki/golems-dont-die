@@ -2795,18 +2795,7 @@ public class GolemsDontDiePlugin extends Plugin
 		// lookup and nothing else.
 		pointAtGolem();
 
-		GolemsDontDieConfig.MapGolems onMap = config.mapGolems();
-		if (onMap == GolemsDontDieConfig.MapGolems.NONE && finding == null)
-		{
-			mapPoints.clear();
-		}
-		else
-		{
-			// The roster itself, not a copy of the living: this runs every tick whether or not the
-			// map is open, and the map skips the dying golems itself once it knows it is.
-			mapPoints.refresh(golems, onMap == GolemsDontDieConfig.MapGolems.NAMED,
-				roamContext.getTick(), finding);
-		}
+		refreshMap();
 
 		// Each read once: shutting down on the Swing thread clears them, and a check then a use of
 		// the field could see it go in between.
@@ -2871,6 +2860,22 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 	}
 
+	private void refreshMap()
+	{
+		GolemsDontDieConfig.MapGolems onMap = config.mapGolems();
+		if (onMap == GolemsDontDieConfig.MapGolems.NONE && finding == null)
+		{
+			mapPoints.clear();
+		}
+		else
+		{
+			// The roster itself, not a copy of the living: this runs every tick whether or not the
+			// map is open, and the map skips the dying golems itself once it knows it is.
+			mapPoints.refresh(golems, onMap == GolemsDontDieConfig.MapGolems.NAMED,
+				roamContext.getTick(), finding);
+		}
+	}
+
 	/**
 	 * Offers the hovered golem's menu entries.
 	 *
@@ -2881,6 +2886,12 @@ public class GolemsDontDiePlugin extends Plugin
 	public void onClientTick(ClientTick event)
 	{
 		obstacleObserver.onClientTick();
+
+		// The map as soon as it opens, and every frame until it knows where it draws a cave.
+		if (mapPoints.wantsFrame())
+		{
+			refreshMap();
+		}
 
 		if (!golems.isEmpty())
 		{

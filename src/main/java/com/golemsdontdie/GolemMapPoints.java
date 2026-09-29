@@ -87,7 +87,23 @@ class GolemMapPoints
 	private int sinceOpen;
 
 	/**
-	 * How long after the map opens the translation may be measured. The first frame is too early —
+	 * Whether the map wants a refresh before the next game tick: while it is shut, so opening it is
+	 * seen on the frame it happens, and while it is open and not yet measured. A tick is 600ms, and
+	 * a golem underground has no place on the map until the measurement is made; asked once a tick,
+	 * the golems in a cave came onto the map a second or more after everything else.
+	 */
+	boolean wantsFrame()
+	{
+		if (wasShut)
+		{
+			Widget window = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
+			return window != null && !window.isHidden();
+		}
+		return !measured && sinceOpen <= MEASURE_FRAMES;
+	}
+
+	/**
+	 * How long after the map opens, in game ticks, the translation may be measured. The first frame is too early —
 	 * the map still holds the position it was left at, and the centre is not the player yet — and
 	 * long after it the player may have panned somewhere else, where the centre means nothing.
 	 */
@@ -191,6 +207,8 @@ class GolemMapPoints
 	 */
 	void refresh(List<Golem> golems, boolean named, int tick, Golem only)
 	{
+		// Refreshed each frame while measuring, so the time allowed for it is counted in ticks.
+		boolean newTick = tick != this.tick;
 		this.tick = tick;
 		if (face == null)
 		{
@@ -223,7 +241,7 @@ class GolemMapPoints
 			offsetX = 0;
 			offsetY = 0;
 		}
-		else
+		else if (newTick)
 		{
 			sinceOpen++;
 		}
