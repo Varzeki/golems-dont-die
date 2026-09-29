@@ -1,7 +1,6 @@
 package com.golemsdontdie;
 
 import java.util.*;
-import java.util.List;
 import lombok.*;
 
 /**
@@ -20,6 +19,7 @@ import lombok.*;
  * golem's page does, a change here is a change to every golem a player thought they knew.
  */
 @Getter
+@AllArgsConstructor
 enum GolemTrait
 {
 	// ------------------------------------------------------------------ what a golem does
@@ -93,14 +93,6 @@ enum GolemTrait
 	GolemTrait(String label, String description, int weight)
 	{
 		this(label, description, weight, 0);
-	}
-
-	GolemTrait(String label, String description, int weight, int clash)
-	{
-		this.label = label;
-		this.description = description;
-		this.weight = weight;
-		this.clash = clash;
 	}
 
 	private static final GolemTrait[] ALL = values();

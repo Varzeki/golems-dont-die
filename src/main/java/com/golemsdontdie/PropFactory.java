@@ -4,7 +4,6 @@ import java.io.*;
 import java.util.*;
 import java.util.zip.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.*;
@@ -40,6 +39,7 @@ class PropFactory
 	private Client client;
 
 	/** What the cache says about one animated object. */
+	@AllArgsConstructor
 	static final class Prop
 	{
 		@Getter
@@ -53,18 +53,6 @@ class PropFactory
 		@Getter
 		private final int sizeY;
 		private final int[] models;
-
-		Prop(int objectId, int animation, int ambient, int contrast,
-			int sizeX, int sizeY, int[] models)
-		{
-			this.objectId = objectId;
-			this.animation = animation;
-			this.ambient = ambient;
-			this.contrast = contrast;
-			this.sizeX = sizeX;
-			this.sizeY = sizeY;
-			this.models = models;
-		}
 	}
 
 	private final Map<Integer, Prop> props = new HashMap<>();

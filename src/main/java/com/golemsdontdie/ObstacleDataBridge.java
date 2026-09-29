@@ -3,7 +3,6 @@ package com.golemsdontdie;
 import com.golemsdontdie.telemetry.*;
 import java.io.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import net.runelite.client.util.*;
 
 /**

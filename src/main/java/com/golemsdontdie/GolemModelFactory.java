@@ -2,7 +2,6 @@ package com.golemsdontdie;
 
 import java.util.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import lombok.extern.slf4j.*;
 import net.runelite.api.*;
 

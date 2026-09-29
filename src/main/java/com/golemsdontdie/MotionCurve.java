@@ -1,7 +1,7 @@
 package com.golemsdontdie;
 
 import java.util.*;
-import java.util.List;
+import lombok.*;
 
 /**
  * A traversal as it actually happened, cycle by cycle, ready to be performed again.
@@ -18,6 +18,7 @@ import java.util.List;
  * <b>sideways</b>, not north and east, so one recording serves every instance of that
  * obstacle whichever way it faces.
  */
+@AllArgsConstructor
 final class MotionCurve
 {
 	/**
@@ -64,17 +65,6 @@ final class MotionCurve
 	 * golem finished the hop before leaving the ground.
 	 */
 	private final short[] keyframes;
-
-	MotionCurve(short[] forward, short[] lateral, int[][] animations, int cycles, int facing,
-		short[] keyframes)
-	{
-		this.forward = forward;
-		this.lateral = lateral;
-		this.animations = animations;
-		this.cycles = cycles;
-		this.facing = facing;
-		this.keyframes = keyframes;
-	}
 
 	boolean hasKeyframes()
 	{

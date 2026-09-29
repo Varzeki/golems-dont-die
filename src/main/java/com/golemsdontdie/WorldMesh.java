@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 import java.util.zip.*;
 import javax.inject.*;
+import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.*;
 
@@ -54,6 +55,7 @@ class WorldMesh
 	 * keyed alike: a walkability check touches several, planning asks millions of times,
 	 * and the boxed lookups were most of the cost.
 	 */
+	@AllArgsConstructor
 	private static final class Region
 	{
 		/** Two bits per tile for passability. */
@@ -80,15 +82,6 @@ class WorldMesh
 		 * starting on land cannot leak.
 		 */
 		final byte[] land;
-
-		Region(byte[] collision, byte[] ocean, byte[] isolated, byte[] components, byte[] land)
-		{
-			this.collision = collision;
-			this.ocean = ocean;
-			this.isolated = isolated;
-			this.components = components;
-			this.land = land;
-		}
 	}
 
 	/** Region and plane to what the mesh holds for it. */

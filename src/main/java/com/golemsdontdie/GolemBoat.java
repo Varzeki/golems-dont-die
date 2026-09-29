@@ -14,6 +14,7 @@ import lombok.*;
  * two larger ones share a palette with each other.
  */
 @Getter
+@AllArgsConstructor
 enum GolemBoat
 {
 	/**
@@ -85,23 +86,6 @@ enum GolemBoat
 	 * rather than beside it.
 	 */
 	private final int[][] deck;
-
-	GolemBoat(int hullModel, int mastModel, int clothModel, short[] hullFrom, short[] hullTo,
-		int helmOffset, int hullMinX, int hullMaxX, int hullMinZ, int hullMaxZ, int berths, int[][] deck)
-	{
-		this.hullModel = hullModel;
-		this.mastModel = mastModel;
-		this.clothModel = clothModel;
-		this.hullFrom = hullFrom;
-		this.hullTo = hullTo;
-		this.helmOffset = helmOffset;
-		this.hullMinX = hullMinX;
-		this.hullMaxX = hullMaxX;
-		this.hullMinZ = hullMinZ;
-		this.hullMaxZ = hullMaxZ;
-		this.berths = berths;
-		this.deck = deck;
-	}
 
 	/**
 	 * How far the boat reaches from its middle, in model units, which is what the client culls and

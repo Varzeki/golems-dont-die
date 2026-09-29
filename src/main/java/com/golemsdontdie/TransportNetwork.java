@@ -2,7 +2,6 @@ package com.golemsdontdie;
 
 import java.io.*;
 import java.util.*;
-import java.util.List;
 import java.util.function.*;
 import java.util.zip.*;
 import javax.inject.*;

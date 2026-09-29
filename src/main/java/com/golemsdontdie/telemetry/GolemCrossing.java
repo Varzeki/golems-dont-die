@@ -1,5 +1,7 @@
 package com.golemsdontdie.telemetry;
 
+import lombok.*;
+
 /**
  * One crossing of an obstacle by a golem the player could see, as it is kept on disk.
  *
@@ -9,6 +11,7 @@ package com.golemsdontdie.telemetry;
  *
  * <p>Positions are world coordinates in 128ths of a tile; times are client cycles (20 ms).
  */
+@AllArgsConstructor
 public final class GolemCrossing
 {
 	/** The scene object crossed. */
@@ -27,18 +30,4 @@ public final class GolemCrossing
 
 	/** True if the route passed over a tile another short hop starts on: a stepping stone skipped. */
 	public final boolean overStone;
-
-	public GolemCrossing(int objectId, int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane,
-		int[][] positions, boolean overStone)
-	{
-		this.objectId = objectId;
-		this.fromX = fromX;
-		this.fromY = fromY;
-		this.fromPlane = fromPlane;
-		this.toX = toX;
-		this.toY = toY;
-		this.toPlane = toPlane;
-		this.positions = positions;
-		this.overStone = overStone;
-	}
 }

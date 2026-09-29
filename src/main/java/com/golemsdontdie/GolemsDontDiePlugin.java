@@ -4,7 +4,6 @@ import com.google.inject.*;
 import java.awt.image.*;
 import java.io.*;
 import java.util.*;
-import java.util.List;
 import java.util.concurrent.*;
 import javax.inject.Inject;
 import javax.swing.*;

@@ -4,7 +4,6 @@ import java.awt.*;
 import java.awt.image.*;
 import java.util.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import net.runelite.api.*;
 
 /**

@@ -2,10 +2,8 @@ package com.golemsdontdie;
 
 import java.io.*;
 import java.util.*;
-import java.util.List;
 import java.util.zip.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.*;
@@ -42,6 +40,7 @@ class SailingDocks
 	private boolean loaded;
 
 	/** One port: where it is, and what it takes to be allowed there. */
+	@AllArgsConstructor
 	static final class Dock
 	{
 		@Getter
@@ -84,19 +83,6 @@ class SailingDocks
 			boolean onOpenSea, WorldPoint shore)
 		{
 			this(rowId, name, levelRequired, questId, mooring, onOpenSea, shore, mooring);
-		}
-
-		Dock(int rowId, String name, int levelRequired, int questId, WorldPoint mooring,
-			boolean onOpenSea, WorldPoint shore, WorldPoint berth)
-		{
-			this.rowId = rowId;
-			this.name = name;
-			this.levelRequired = levelRequired;
-			this.questId = questId;
-			this.mooring = mooring;
-			this.onOpenSea = onOpenSea;
-			this.shore = shore;
-			this.berth = berth;
 		}
 	}
 

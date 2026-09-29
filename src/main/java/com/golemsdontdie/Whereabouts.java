@@ -1,7 +1,6 @@
 package com.golemsdontdie;
 
 import javax.inject.*;
-import javax.inject.Inject;
 import net.runelite.api.coords.*;
 
 /**

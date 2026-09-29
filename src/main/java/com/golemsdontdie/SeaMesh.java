@@ -2,10 +2,9 @@ package com.golemsdontdie;
 
 import java.io.*;
 import java.util.*;
-import java.util.List;
 import java.util.zip.*;
 import javax.inject.*;
-import javax.inject.Inject;
+import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.coords.*;
 
@@ -268,18 +267,12 @@ class SeaMesh
 		return mesh.componentAt(x, y, 0);
 	}
 
+	@AllArgsConstructor
 	static final class Field
 	{
 		private final TileMap distance;
 		private final SeaMesh sea;
 		private final Water water;
-
-		private Field(TileMap distance, SeaMesh sea, Water water)
-		{
-			this.distance = distance;
-			this.sea = sea;
-			this.water = water;
-		}
 
 		/** True if a raft sailing this field may be on this tile. */
 		boolean isWater(int x, int y)

@@ -1,5 +1,7 @@
 package com.golemsdontdie.telemetry;
 
+import lombok.*;
+
 /**
  * One crossing of an obstacle by the player, as it is kept on disk.
  *
@@ -10,6 +12,7 @@ package com.golemsdontdie.telemetry;
  * <p>Distances are in 128ths of a tile and times in client cycles (20 ms) unless a field says
  * otherwise — the units the game animates in.
  */
+@AllArgsConstructor
 public final class PlayerCrossing
 {
 	/** The scene object used. */
@@ -60,29 +63,4 @@ public final class PlayerCrossing
 
 	/** Which way the player faced relative to the way they moved, 0 to 2047 (1024 is backwards); -1 unknown. */
 	public final int facing;
-
-	public PlayerCrossing(int objectId, String name, String menu, int[] animations, int ticks, int moveDelay,
-		int moveSpan, int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane, int lineX, int lineY,
-		boolean instance, int[][] path, int[][] animationChanges, int facing)
-	{
-		this.objectId = objectId;
-		this.name = name;
-		this.menu = menu;
-		this.animations = animations;
-		this.ticks = ticks;
-		this.moveDelay = moveDelay;
-		this.moveSpan = moveSpan;
-		this.fromX = fromX;
-		this.fromY = fromY;
-		this.fromPlane = fromPlane;
-		this.toX = toX;
-		this.toY = toY;
-		this.toPlane = toPlane;
-		this.lineX = lineX;
-		this.lineY = lineY;
-		this.instance = instance;
-		this.path = path;
-		this.animationChanges = animationChanges;
-		this.facing = facing;
-	}
 }

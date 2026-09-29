@@ -3,10 +3,8 @@ package com.golemsdontdie;
 import java.io.*;
 import java.nio.charset.*;
 import java.util.*;
-import java.util.List;
 import java.util.zip.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import lombok.*;
 import lombok.extern.slf4j.*;
 

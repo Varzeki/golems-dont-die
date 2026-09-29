@@ -1,9 +1,8 @@
 package com.golemsdontdie;
 
 import java.util.*;
-import java.util.List;
 import javax.inject.*;
-import javax.inject.Inject;
+import lombok.*;
 import lombok.extern.slf4j.*;
 import net.runelite.api.coords.*;
 
@@ -334,6 +333,7 @@ class RoamPlanner
 	 * Everywhere a golem can walk to from where it stands, within the budget — flooded at most once
 	 * per plan, only after a straight line fails, and underground those almost never exist.
 	 */
+	@RequiredArgsConstructor
 	private static final class Reach
 	{
 		private final WorldPoint from;
@@ -343,13 +343,6 @@ class RoamPlanner
 		private TransportMemory memory;
 		private final int budget;
 		private TileMap cameFrom;
-
-		Reach(WorldPoint from, RoamContext context, int budget)
-		{
-			this.from = from;
-			this.context = context;
-			this.budget = budget;
-		}
 
 		/** The flood, made on first use; empty without a pathfinder. */
 		TileMap tiles()

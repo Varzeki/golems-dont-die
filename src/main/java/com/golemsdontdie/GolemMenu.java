@@ -5,7 +5,6 @@ import java.util.*;
 import java.util.List;
 import java.util.function.*;
 import javax.inject.*;
-import javax.inject.Inject;
 import net.runelite.api.*;
 import net.runelite.api.Point;
 import net.runelite.api.coords.*;
