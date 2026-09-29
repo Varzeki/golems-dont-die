@@ -1507,6 +1507,17 @@ class Golem
 			note(context, "walk refused: plane or span");
 		}
 
+		// Nothing to play: a ladder down, whose shipped clip is not trusted, or an obstacle the
+		// player was seen to cross without one. The golem stands for as long as it takes. A
+		// transition of no cycles never finished, and the golem stayed at the top of the ladder.
+		if (clips.length == 0)
+		{
+			clips = new int[]{snapshot.getIdlePoseAnimation()};
+			phaseClips = clips;
+			phaseCycles = new int[]{wanted};
+			total = wanted;
+		}
+
 		if (phaseCycles.length > 0 && total != wanted)
 		{
 			int loop = phaseCycles.length > 2 ? 1 : phaseCycles.length - 1;
