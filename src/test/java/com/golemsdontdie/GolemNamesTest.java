@@ -1,12 +1,14 @@
 package com.golemsdontdie;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import net.runelite.api.coords.WorldPoint;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -63,6 +65,18 @@ public class GolemNamesTest
 	public void theHarvestedNamesAreThere()
 	{
 		assertTrue("names.gz should hold the people of Gielinor", names.getGielinor().length > 500);
+	}
+
+	/** People, not what they do or what they are: nobody is called Taxidermist Flint. */
+	@Test
+	public void theNamesAreNamesAndNotJobs()
+	{
+		Set<String> gielinor = new HashSet<>(Arrays.asList(names.getGielinor()));
+		for (String job : new String[]{"Taxidermist", "Receptionist", "Oneiromancer", "Sergeant", "Fishmonger",
+			"Gatekeeper", "Dockmaster", "Chemist", "Genie", "Sorceress"})
+		{
+			assertFalse(job + " is not a name", gielinor.contains(job));
+		}
 	}
 
 	/** A name from Gielinor and a surname off the rocks: two words, both of them names. */
