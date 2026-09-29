@@ -37,28 +37,82 @@ public class GolemTraitTest
 			GolemTrait.of(12345), GolemTrait.of(12346));
 	}
 
-	/** A golem is never dealt two traits that pull against each other. See GolemTrait.clash. */
+	/**
+	 * Every pair that contradicts itself, written out here rather than read back from the enum, so
+	 * a clash dropped from the table is caught.
+	 */
+	private static final GolemTrait[][] CONTRADICTIONS = {
+		{GolemTrait.LIKES_THE_COLD, GolemTrait.LIKES_THE_HEAT},
+		{GolemTrait.LIKES_THE_COLD, GolemTrait.TEMPERATE},
+		{GolemTrait.LIKES_THE_COLD, GolemTrait.HOMESICK},
+		{GolemTrait.LIKES_THE_HEAT, GolemTrait.TEMPERATE},
+		{GolemTrait.LIKES_THE_HEAT, GolemTrait.HOMESICK},
+		{GolemTrait.TEMPERATE, GolemTrait.HOMESICK},
+		{GolemTrait.CAUTIOUS, GolemTrait.SURE_FOOTED},
+		{GolemTrait.SPELUNKER, GolemTrait.CLIMBER},
+		{GolemTrait.CROWD_SHY, GolemTrait.SOCIABLE},
+		{GolemTrait.CROWD_SHY, GolemTrait.FRIENDLY},
+		{GolemTrait.CROWD_SHY, GolemTrait.LIFE_OF_THE_PARTY},
+		{GolemTrait.RESTLESS, GolemTrait.PATIENT},
+		{GolemTrait.RESTLESS, GolemTrait.OLD_SOUL},
+		{GolemTrait.RESTLESS, GolemTrait.PONDEROUS},
+		{GolemTrait.OLD_SOUL, GolemTrait.LIFE_OF_THE_PARTY},
+	};
+
+	/** A golem is never dealt two traits that pull against each other. See GolemTrait.CLASHES. */
 	@Test
 	public void nothingIsDrawnAgainstItself()
 	{
-		GolemTrait[][] clashes = {
-			{GolemTrait.LIKES_THE_COLD, GolemTrait.LIKES_THE_HEAT, GolemTrait.TEMPERATE, GolemTrait.HOMESICK},
-			{GolemTrait.CROWD_SHY, GolemTrait.SOCIABLE},
-			{GolemTrait.CAUTIOUS, GolemTrait.SURE_FOOTED},
-			{GolemTrait.SPELUNKER, GolemTrait.CLIMBER},
-		};
-		for (long seed = 0; seed < 20_000; seed++)
+		for (long seed = 0; seed < 200_000; seed++)
 		{
 			int traits = GolemTrait.of(seed);
-			for (GolemTrait[] clash : clashes)
+			for (GolemTrait[] pair : CONTRADICTIONS)
 			{
-				int found = 0;
-				for (GolemTrait trait : clash)
-				{
-					found += trait.in(traits) ? 1 : 0;
-				}
-				Assert.assertTrue("seed " + seed + " drew " + GolemTrait.list(traits), found <= 1);
+				Assert.assertFalse("seed " + seed + " drew " + GolemTrait.list(traits),
+					pair[0].in(traits) && pair[1].in(traits));
 			}
+		}
+	}
+
+	/** The table and the list above agree, both ways round, and nothing else is kept apart. */
+	@Test
+	public void theClashesAreExactlyTheContradictions()
+	{
+		int pairs = 0;
+		for (GolemTrait a : GolemTrait.values())
+		{
+			for (GolemTrait b : GolemTrait.values())
+			{
+				Assert.assertEquals(a + " and " + b + " clash one way only", a.clashesWith(b), b.clashesWith(a));
+				pairs += a.ordinal() < b.ordinal() && a.clashesWith(b) ? 1 : 0;
+			}
+		}
+		Assert.assertEquals(CONTRADICTIONS.length, pairs);
+		for (GolemTrait[] pair : CONTRADICTIONS)
+		{
+			Assert.assertTrue(pair[0] + " and " + pair[1], pair[0].clashesWith(pair[1]));
+		}
+	}
+
+	/** Not over-constrained: the ones that only look alike still turn up together. */
+	@Test
+	public void kindredTraitsStillMeet()
+	{
+		GolemTrait[][] kindred = {
+			{GolemTrait.FRIENDLY, GolemTrait.SOCIABLE},
+			{GolemTrait.FRIENDLY, GolemTrait.LIFE_OF_THE_PARTY},
+			{GolemTrait.PATIENT, GolemTrait.OLD_SOUL},
+			{GolemTrait.PONDEROUS, GolemTrait.OLD_SOUL},
+		};
+		for (GolemTrait[] pair : kindred)
+		{
+			boolean met = false;
+			for (long seed = 0; seed < 20_000 && !met; seed++)
+			{
+				int traits = GolemTrait.of(seed);
+				met = pair[0].in(traits) && pair[1].in(traits);
+			}
+			Assert.assertTrue(pair[0] + " and " + pair[1] + " never met", met);
 		}
 	}
 

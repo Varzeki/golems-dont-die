@@ -24,18 +24,18 @@ enum GolemTrait
 {
 	// ------------------------------------------------------------------ what a golem does
 
-	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice.", 3, Clash.WEATHER),
-	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert.", 3, Clash.WEATHER),
-	TEMPERATE("Temperate", "It keeps to the green places.", 3, Clash.WEATHER),
-	HOMESICK("Homesick", "Never away from Wyrmscraig for long.", 3, Clash.WEATHER),
+	LIKES_THE_COLD("Likes the cold", "Happiest in snow and ice.", 3),
+	LIKES_THE_HEAT("Likes the heat", "Drawn to the desert.", 3),
+	TEMPERATE("Temperate", "It keeps to the green places.", 3),
+	HOMESICK("Homesick", "Never away from Wyrmscraig for long.", 3),
 	SEAFARER("Seafarer", "Takes to the water every chance it gets.", 3),
-	SPELUNKER("Spelunker", "Goes down whenever there is a down to go.", 3, Clash.FLOORS),
-	CLIMBER("Climber", "Ladders, stairs and cliffs: anything that leads up.", 3, Clash.FLOORS),
+	SPELUNKER("Spelunker", "Goes down whenever there is a down to go.", 3),
+	CLIMBER("Climber", "Ladders, stairs and cliffs: anything that leads up.", 3),
 	RESTLESS("Restless", "Can't stand still.", 3),
-	CROWD_SHY("Shy", "Keeps away from other golems.", 3, Clash.CROWDS),
-	SOCIABLE("Sociable", "Loves a crowd.", 3, Clash.CROWDS),
-	CAUTIOUS("Cautious", "Will not risk danger.", 3, Clash.OBSTACLES),
-	SURE_FOOTED("Sure-footed", "Actually likes Agility.", 3, Clash.OBSTACLES),
+	CROWD_SHY("Shy", "Keeps away from other golems.", 3),
+	SOCIABLE("Sociable", "Loves a crowd.", 3),
+	CAUTIOUS("Cautious", "Will not risk danger.", 3),
+	SURE_FOOTED("Sure-footed", "Actually likes Agility.", 3),
 
 	// ------------------------------------------------------------------ what a golem is
 	//
@@ -69,33 +69,51 @@ enum GolemTrait
 	 */
 	private final int weight;
 
-	/**
-	 * Traits that pull against each other share a clash, and a golem is dealt at most one of them:
-	 * somewhere it wants to be, a view on crowds, a view on obstacles, and a direction in a
-	 * stairwell. A golem both homesick and fond of the cold wants to be in the snow on Wyrmscraig,
-	 * which is nowhere, and it would simply stand about.
-	 */
-	private final int clash;
-
-	/**
-	 * The clashes, in a class of their own: an enum constant may not name a field of its own enum,
-	 * and these are wanted in the list above.
-	 */
-	private static final class Clash
-	{
-		/** Where a golem wants to be: the weather it likes, or home. */
-		static final int WEATHER = 1;
-		static final int CROWDS = 2;
-		static final int OBSTACLES = 3;
-		static final int FLOORS = 4;
-	}
-
-	GolemTrait(String label, String description, int weight)
-	{
-		this(label, description, weight, 0);
-	}
-
 	private static final GolemTrait[] ALL = values();
+
+	/**
+	 * For each trait, the traits it pulls against, as a mask, and a golem is never dealt both. A
+	 * golem both homesick and fond of the cold wants to be in the snow on Wyrmscraig, which is
+	 * nowhere, and it would simply stand about; one both shy and the life of the party is two
+	 * golems. Kept as a table rather than a group apiece because a trait can pull against several
+	 * that sit happily together: restless is against patient and against an old soul, and those two
+	 * are the same golem.
+	 */
+	private static final int[] CLASHES = new int[ALL.length];
+
+	static
+	{
+		// Somewhere it wants to be: the weather it likes, or home. Any two are two places at once.
+		clash(LIKES_THE_COLD, LIKES_THE_HEAT, TEMPERATE, HOMESICK);
+		clash(LIKES_THE_HEAT, TEMPERATE, HOMESICK);
+		clash(TEMPERATE, HOMESICK);
+		// A view on obstacles, and a direction in a stairwell.
+		clash(CAUTIOUS, SURE_FOOTED);
+		clash(SPELUNKER, CLIMBER);
+		// Company: a shy golem keeps away from the ones that come looking for it. Friendly and the
+		// life of the party are both sociable in their way, and sit with it and each other.
+		clash(CROWD_SHY, SOCIABLE, FRIENDLY, LIFE_OF_THE_PARTY);
+		// Pace: a golem that can't stand still is none of the ones that wait, nap or think it over.
+		clash(RESTLESS, PATIENT, OLD_SOUL, PONDEROUS);
+		// A golem that just needs a nap is not the one still dancing.
+		clash(OLD_SOUL, LIFE_OF_THE_PARTY);
+	}
+
+	/** The first trait against each of the rest, both ways; the rest may still sit together. */
+	private static void clash(GolemTrait trait, GolemTrait... against)
+	{
+		for (GolemTrait other : against)
+		{
+			CLASHES[trait.ordinal()] |= other.mask();
+			CLASHES[other.ordinal()] |= trait.mask();
+		}
+	}
+
+	/** Whether a golem may never be dealt both of these. */
+	boolean clashesWith(GolemTrait other)
+	{
+		return (CLASHES[ordinal()] & other.mask()) != 0;
+	}
 
 	/** How many traits a golem may have. The draw leans hard on the low end. */
 	static final int MOST_TRAITS = 5;
@@ -142,17 +160,14 @@ enum GolemTrait
 			traits |= drawn.mask();
 			total -= drawn.weight;
 			left.remove(drawn);
-			// Nothing that pulls against what it just drew: see clash.
-			if (drawn.clash != 0)
+			// Nothing that pulls against what it just drew: see CLASHES.
+			for (Iterator<GolemTrait> rest = left.iterator(); rest.hasNext(); )
 			{
-				for (Iterator<GolemTrait> rest = left.iterator(); rest.hasNext(); )
+				GolemTrait trait = rest.next();
+				if (drawn.clashesWith(trait))
 				{
-					GolemTrait trait = rest.next();
-					if (trait.clash == drawn.clash)
-					{
-						total -= trait.weight;
-						rest.remove();
-					}
+					total -= trait.weight;
+					rest.remove();
 				}
 			}
 		}
