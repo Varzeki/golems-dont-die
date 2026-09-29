@@ -20,8 +20,6 @@ Golems now inherit your characters capabilities - they can access the same agili
 
 They can sail, use shortcuts, activate travel systems such as fairy rings or spirit trees, and even enter instances.
 
-**2.0.1:** golems no longer get stuck in the Doom of Mokhaiotl's arena or at the top of ladders down, logging into an alt or a seasonal world no longer culls your main account's golems, and reviving stops at the golem limit.
-
 
 
 
