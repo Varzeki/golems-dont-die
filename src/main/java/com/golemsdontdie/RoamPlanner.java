@@ -447,7 +447,10 @@ class RoamPlanner
 			long tile = tiles.keyAt(half + random.nextInt(reached - half));
 			int x = GolemPathfinder.unpackX(tile);
 			int y = GolemPathfinder.unpackY(tile);
-			if ((x == from.getX() && y == from.getY()) || !isSafe(x, y, from.getPlane()))
+			// In the same connected space as the straight lines above: a tile the walk reaches but
+			// the mesh counts as another space is one the cut-off sweep would carry a golem home from.
+			if ((x == from.getX() && y == from.getY()) || !isSafe(x, y, from.getPlane())
+				|| !mesh.sameComponent(from.getX(), from.getY(), x, y, from.getPlane()))
 			{
 				continue;
 			}
