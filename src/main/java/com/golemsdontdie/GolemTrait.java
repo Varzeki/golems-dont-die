@@ -6,17 +6,16 @@ import lombok.*;
 /**
  * What a golem is like: a handful of traits it keeps for life.
  *
- * <p>Drawn from the golem's own seed, so they are decided the moment it is made, never change, and
- * cost nothing to store — a golem saved before this existed comes back with the traits it always
- * had. Most golems have one or two; five is rare.
+ * <p>Drawn from the golem's own seed when it is made, and saved with it from then on, so they never
+ * change. Most golems have one or two; five is rare.
  *
  * <p>Some lean on the chances the planner already rolls, which is what makes a golem that likes the
  * cold spend its life in the snow. The rest are only true of it, and wait for the golem's own page
  * to be read.
  *
- * <p>Nothing about a golem's traits is stored, so editing this list — adding one, reordering, even
- * changing a weight — deals every golem a fresh hand. Harmless while nothing shows them; once the
- * golem's page does, a change here is a change to every golem a player thought they knew.
+ * <p>A golem's traits are saved as a mask of this list's order, so a trait is only ever added at the
+ * end: reordering the list would give every saved golem somebody else's. Changing a weight or a
+ * clash changes only the hands dealt to golems made after it.
  */
 @Getter
 @AllArgsConstructor
@@ -39,8 +38,8 @@ enum GolemTrait
 
 	// ------------------------------------------------------------------ what a golem is
 	//
-	// Flavour for the golem's own page, with nothing behind it. Nothing here claims anything about
-	// how a golem looks: they are all carved from the same rock, and a page saying otherwise would
+	// Mostly flavour for the golem's own page; Friendly and Life of the party also change what a
+	// golem does, waving and dancing. Nothing here claims anything about how a golem looks: they are all carved from the same rock, and a page saying otherwise would
 	// be contradicted by the golem standing in front of you.
 
 	FRIENDLY("Friendly", "Will probably say hello.", 6),
@@ -129,7 +128,7 @@ enum GolemTrait
 	{
 		Random random = new Random(seed * 0x9E3779B97F4A7C15L ^ 0x5DEECE66DL);
 		int count = 1;
-		// Each further trait is half as likely as the one before: most golems have one or two.
+		// Each further trait is less than half as likely as the one before: most golems have one or two.
 		while (count < MOST_TRAITS && random.nextFloat() < 0.4f)
 		{
 			count++;

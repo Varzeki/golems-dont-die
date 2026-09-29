@@ -36,7 +36,7 @@ final class GolemContent
 	 */
 	static final int GOLEM_DEATH_ANIMATION = 14455;
 
-	/** How long the crumble runs: 18 frames over 90 cycles, matching the 6 ticks seen in game. */
+	/** How long the crumble runs: 18 frames over 90 cycles, three ticks of the six the game leaves. */
 	static final int GOLEM_DEATH_CYCLES = 90;
 
 	/**

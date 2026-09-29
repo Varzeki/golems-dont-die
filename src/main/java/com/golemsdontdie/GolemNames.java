@@ -19,9 +19,9 @@ import lombok.extern.slf4j.*;
  * nothing to name, and turning the setting off leaves nothing behind. A name the player types is a name; this is only what the
  * plugin calls a golem until then, and it gives way the moment one is typed.
  *
- * <p>Shown in the plugin's own places — the list and a golem's page — and nowhere the game draws.
- * A nameplate over a golem's head still means somebody named it, and the right-click menu still
- * says "Golem", because a copy that introduces itself is a copy that gives itself away.
+ * <p>Shown wherever a golem's name is: the list, its page, the map, its nameplate and its menu
+ * entries. Turning auto naming off leaves only the names a player typed, and the rest go back to
+ * being golems.
  */
 @Slf4j
 @Singleton

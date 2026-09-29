@@ -159,9 +159,9 @@ class TransportNetwork
 		}
 		transports.addAll(learned);
 
-		// Indices are assigned once and never move: an index is the key a cooldown is stored
-		// under, so re-indexing on every sighting voided every cooldown and golems ping-ponged
-		// between the two cathedral doors. Learned rows are numbered above the shipped ones.
+		// Learned rows are numbered above the shipped ones. Nothing reads the number for cooldowns
+		// any more — those are kept by a transport's two ends, which survive a rebuild — but it
+		// still tells a learned row from a shipped one in a log.
 		for (int i = 0; i < learned.size(); i++)
 		{
 			learned.get(i).setIndex(shippedCount + i);

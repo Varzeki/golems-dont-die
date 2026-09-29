@@ -80,8 +80,8 @@ class GolemMenu
 			return;
 		}
 
-		// Shown by its name. Every real golem is called "Golem", so this costs some of the
-		// disguise, but a name is only there because the player put it there.
+		// Shown by its name, typed or given by auto naming. Every real golem is called "Golem", so
+		// this costs some of the disguise; with auto naming off, only a typed name shows.
 		String name = names.of(hovered);
 		if (name == null || name.isEmpty())
 		{
@@ -131,7 +131,7 @@ class GolemMenu
 			.onClick(e -> revive.run());
 	}
 
-	/** Opens the chatbox prompt for a golem's name. Left empty, the golem is "Golem" again. */
+	/** Opens the chatbox prompt for a golem's name. Left empty, it goes back to its auto name, or "Golem". */
 	private void askForName(Golem golem)
 	{
 		String current = golem.getNickname();

@@ -33,6 +33,9 @@ class ObstacleIndex
 	 */
 	private final Map<Integer, List<Obstacle> > byRegion = new HashMap<>();
 
+	/** The most tiles any object reaches from its anchor, which is how far a search widens. */
+	private int widest;
+
 	/** Cache traversal time per object id: asked for on the hot path, so kept apart from places. */
 	private final Map<Integer, Integer> ticksByObject = new HashMap<>();
 
@@ -117,6 +120,7 @@ class ObstacleIndex
 					// because the search below widens by the largest footprint any object has.
 					byRegion.computeIfAbsent(region(x, y), k -> new ArrayList<>())
 						.add(new Obstacle(objectId, x, y, plane, sizeX, sizeY, wall, ticks));
+					widest = Math.max(widest, Math.max(sizeX, sizeY));
 					known.add(objectId);
 					if (ticks > 0)
 					{
@@ -143,9 +147,11 @@ class ObstacleIndex
 	{
 		List<Obstacle> found = new ArrayList<>();
 
-		for (int rx = (x - radius) >> 6; rx <= (x + radius) >> 6; rx++)
+		// Widened by the largest object on the westward and southward sides, where an object
+		// anchored in the next region along can still reach into the radius.
+		for (int rx = (x - radius - widest) >> 6; rx <= (x + radius) >> 6; rx++)
 		{
-			for (int ry = (y - radius) >> 6; ry <= (y + radius) >> 6; ry++)
+			for (int ry = (y - radius - widest) >> 6; ry <= (y + radius) >> 6; ry++)
 			{
 				List<Obstacle> here = byRegion.get((rx << 8) | ry);
 				if (here == null)

@@ -9,9 +9,10 @@ import net.runelite.api.coords.*;
 /**
  * Reads and writes the saved golem roster.
  *
- * <p>Only what the cache cannot supply is written: the NPC ID, position, home tile, and the
- * three animation IDs no composition exposes. Everything visual is re-fetched on load, so the
- * save stays about ten numbers per golem. A flat delimited string rather than JSON: the record
+ * <p>Only what the cache cannot supply is written: the NPC ID, position, home tile, the three
+ * animation IDs no composition exposes, and what the golem has been and done — its seed, traits,
+ * history and journal. Everything visual is re-fetched on load, so the save stays a couple of
+ * dozen numbers per golem. A flat delimited string rather than JSON: the record
  * is all numbers, and a save the player can read and edit is worth more than a schema.
  */
 @Slf4j
