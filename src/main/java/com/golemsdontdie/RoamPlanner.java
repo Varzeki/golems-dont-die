@@ -53,6 +53,10 @@ class RoamPlanner
 	@Inject
 	private GolemAbilities abilities;
 
+	/** Floods ground the mesh has no word for; see unmeshedWaysHome. */
+	@Inject
+	private GolemPathfinder pathfinder;
+
 	@Inject
 	private Voyage voyage;
 
@@ -180,13 +184,9 @@ class RoamPlanner
 		{
 			return null;
 		}
-		int component = componentNear(x, y, plane);
-		if (component == 0)
-		{
-			return null;
-		}
 		indexComponents();
-		List<GolemTransport> ways = waysHome.get(component);
+		int component = componentNear(x, y, plane);
+		List<GolemTransport> ways = component == 0 ? unmeshedWaysHome(x, y, plane) : waysHome.get(component);
 		if (ways == null)
 		{
 			ways = findWaysHome(component);
@@ -198,6 +198,78 @@ class RoamPlanner
 		}
 		GolemTransport way = ways.get(random.nextInt(ways.size()));
 		return memory != null && memory.onCooldown(way, tick) ? null : way;
+	}
+
+	/** Tiles a flood of unmeshed ground may fill before it counts as open ground, not a room. */
+	private static final int UNMESHED_ROOM = 4000;
+
+	/** Ways home for ground the mesh has nothing on, by tile, worked out once per change to the network. */
+	private final java.util.Map<Long, List<GolemTransport>> unmeshedWays = new java.util.HashMap<>();
+
+	/**
+	 * The ways back out of a room the mesh knows nothing about, if nothing offered leads out of it.
+	 *
+	 * <p>Content newer than the mesh has no components, so the rule above had nothing to say about
+	 * it: the Doom of Mokhaiotl's arena is entered by jumping down a gap and left by a loot
+	 * interface, a teleport or death, none of which is learned, and golems that followed the player
+	 * in stayed for good. The room is the floor a golem can walk from where it stands on the island
+	 * map; ground that floods past a few thousand tiles is not a room, and is left to wander.
+	 */
+	private List<GolemTransport> unmeshedWaysHome(int x, int y, int plane)
+	{
+		List<GolemTransport> known = unmeshedWays.get(RoamContext.tileKey(x, y, plane));
+		if (known != null || pathfinder == null)
+		{
+			return known == null ? java.util.Collections.emptyList() : known;
+		}
+		TileMap room = pathfinder.flood(x, y, plane, UNMESHED_ROOM);
+		List<GolemTransport> ways = java.util.Collections.emptyList();
+		if (room.size() < UNMESHED_ROOM)
+		{
+			ways = new ArrayList<>();
+			for (GolemTransport t : transports.all())
+			{
+				if (!transports.isOffered(t) || !abilities.canUse(t))
+				{
+					continue;
+				}
+				boolean fromIn = t.getFromPlane() == plane && inRoom(room, t.getFromX(), t.getFromY());
+				boolean toIn = t.getToPlane() == plane && inRoom(room, t.getToX(), t.getToY());
+				if (fromIn && !toIn)
+				{
+					// A way out it already knows: not shut in.
+					ways = java.util.Collections.emptyList();
+					break;
+				}
+				// Only what leads in from outside: one part of the room to another is no way home.
+				if (toIn && !fromIn)
+				{
+					ways.add(t.backThrough());
+				}
+			}
+		}
+		for (int i = 0; i < room.size(); i++)
+		{
+			long tile = room.keyAt(i);
+			unmeshedWays.put(RoamContext.tileKey(GolemPathfinder.unpackX(tile), GolemPathfinder.unpackY(tile), plane), ways);
+		}
+		return ways;
+	}
+
+	/** Whether a transport's end is in a room, or beside it: an end can sit on its object. */
+	private static boolean inRoom(TileMap room, int x, int y)
+	{
+		for (int dx = -1; dx <= 1; dx++)
+		{
+			for (int dy = -1; dy <= 1; dy++)
+			{
+				if (room.containsKey(GolemPathfinder.pack(x + dx, y + dy)))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/** Spaces reachable by shortcuts and still shut in: the open world reaches hundreds. */
@@ -288,6 +360,7 @@ class RoamPlanner
 		exitsFrom.clear();
 		waysBackFrom.clear();
 		waysHome.clear();
+		unmeshedWays.clear();
 		for (GolemTransport t : transports.all())
 		{
 			if (!transports.isOffered(t))
