@@ -346,7 +346,13 @@ class GolemShipmates
 		return out;
 	}
 
-	/** An object's config bit for one that fills the tile it stands on. See deckFlags. */
+	/**
+	 * A placed object's config bit for "supports items", which the client sets from the object's
+	 * own definition: unless the definition says otherwise, whether the object is solid. So it
+	 * holds for any fitting a player builds onto any boat, wherever they put it. Checked over every
+	 * Sailing object in the cache: stations, wind catchers, teleportation foci and the flag are
+	 * solid and set; masts, sails, helms and salvaging hooks are walked through and clear.
+	 */
 	private static final int FILLS_TILE = 0x100;
 
 	/** The tiles of one floor of a ship that an object filling its tile stands on. */
