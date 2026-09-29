@@ -187,12 +187,6 @@ class WorldMesh
 		}
 	}
 
-	/** True if the mesh has anything at all to say about this region and plane. */
-	boolean covers(int regionId, int plane)
-	{
-		return region(regionId, plane) != null;
-	}
-
 	boolean north(int x, int y, int plane)
 	{
 		return flag(x, y, plane, FLAG_NORTH);

@@ -239,12 +239,6 @@ class Golem
 	/** Cycles a stuck raft turns on the spot before trying something with a cost. */
 	private static final int EDDY_CYCLES = 100;
 
-	/** True while the golem is turning on the spot rather than going anywhere. */
-	boolean isDrifting()
-	{
-		return eddyCycles > 0;
-	}
-
 	/**
 	 * Works a grounded raft free, cheapest first: spin on the spot; reverse along the stored
 	 * waypoints; re-plan from where the boat is; snap to valid water. Only the snap is a

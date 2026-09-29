@@ -893,12 +893,6 @@ class ObstacleObserver
 		return tile != null && memory.isKnownWalkable(tile.getX(), tile.getY(), tile.getPlane());
 	}
 
-	private static boolean adjacent(WorldPoint a, WorldPoint b)
-	{
-		return a != null && b != null && a.getPlane() == b.getPlane() && !a.equals(b)
-			&& Math.abs(a.getX() - b.getX()) <= 1 && Math.abs(a.getY() - b.getY()) <= 1;
-	}
-
 	private static WorldPoint tileOf(int[] sample)
 	{
 		return new WorldPoint(Math.floorDiv(sample[1], Golem.TILE),

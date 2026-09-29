@@ -29,12 +29,6 @@ class RaftFactory
 	private final java.util.Map<GolemBoat, Model> models = new java.util.EnumMap<>(GolemBoat.class);
 	private final java.util.Set<GolemBoat> searched = java.util.EnumSet.noneOf(GolemBoat.class);
 
-	/** The raft, which is what a golem sailing alone takes. */
-	Model raftModel()
-	{
-		return boatModel(GolemBoat.RAFT);
-	}
-
 	/**
 	 * A boat's model, or null if it could not be built.
 	 *

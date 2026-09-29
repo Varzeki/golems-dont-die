@@ -58,11 +58,6 @@ class GolemCrew
 		return !members.isEmpty() && members.get(0) == golem;
 	}
 
-	List<Golem> getMembers()
-	{
-		return java.util.Collections.unmodifiableList(members);
-	}
-
 	int size()
 	{
 		return members.size();

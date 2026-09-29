@@ -68,9 +68,4 @@ final class MeasuredShortcuts
 		}
 		return 0;
 	}
-
-	static boolean isMeasured(int objectId)
-	{
-		return animationFor(objectId) != -1;
-	}
 }

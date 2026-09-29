@@ -344,10 +344,4 @@ class GolemShipmates
 		// quay left before a hop or a log out.
 		lastAshore = null;
 	}
-
-	/** Whether any golem is aboard now. */
-	boolean isAnyAboard()
-	{
-		return !aboard.isEmpty();
-	}
 }

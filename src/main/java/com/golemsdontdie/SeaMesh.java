@@ -107,17 +107,6 @@ class SeaMesh
 		}
 	}
 
-	/**
-	 * A cached route, or null if this pair has not been searched yet. Separate from {@link #route}
-	 * so the caller can take the cheap answer on a render frame and defer the expensive one.
-	 */
-	List<int[]> cachedRoute(WorldPoint from, WorldPoint to)
-	{
-		loadShipped();
-		List<int[]> cached = routes.get(key(from, to));
-		return cached == null || cached.isEmpty() ? null : cached;
-	}
-
 	/** True if this pair has already been searched, successfully or not. */
 	boolean isSearched(WorldPoint from, WorldPoint to)
 	{
@@ -253,24 +242,6 @@ class SeaMesh
 		int dx = Math.abs(x - goalX);
 		int dy = Math.abs(y - goalY);
 		return (int) (Math.max(dx, dy) * HEURISTIC_WEIGHT);
-	}
-
-	/** True if every tile a straight line between two points passes over, sampled four times a tile, is open sea. */
-	boolean clearLine(int fromX, int fromY, int toX, int toY)
-	{
-		int dx = toX - fromX;
-		int dy = toY - fromY;
-		int samples = Math.max(1, Math.max(Math.abs(dx), Math.abs(dy)) * 4);
-		for (int s = 0; s <= samples; s++)
-		{
-			int x = (int) Math.floor(fromX + 0.5 + dx * (double) s / samples);
-			int y = (int) Math.floor(fromY + 0.5 + dy * (double) s / samples);
-			if (!mesh.isOcean(x, y, 0))
-			{
-				return false;
-			}
-		}
-		return true;
 	}
 
 	/**

@@ -441,12 +441,6 @@ final class Itinerary
 
 	private WorldPoint walkEnd;
 
-	/** True if this route ends by taking a transport rather than on its last tile. */
-	boolean endsInTransport()
-	{
-		return transport != null;
-	}
-
 	/** True if this is a crossing by sea with legs to sail, rather than a passage or a walk. */
 	boolean isSailed()
 	{
@@ -457,11 +451,6 @@ final class Itinerary
 	GolemTransport transport()
 	{
 		return transport;
-	}
-
-	int waypoints()
-	{
-		return xs.length;
 	}
 
 	/**
@@ -488,16 +477,6 @@ final class Itinerary
 		// walk to a transport went at a tick a tile.
 		int ticksPerTile = landing != null ? 1 : Math.max(1, duration / Math.max(1, length));
 		return of(back, plane, newStartTick, ticksPerTile, 0, voyage);
-	}
-
-	/**
-	 * How far along the route the golem is, for deciding whether interrupting a journey is worth
-	 * it: a golem nine tenths across an ocean should finish even if the reason has evaporated.
-	 */
-	float progress(int tick)
-	{
-		return duration <= 0 ? 1f
-			: Math.min(1f, Math.max(0f, (tick - startTick) / (float) duration));
 	}
 
 	private static int fine(int tile)

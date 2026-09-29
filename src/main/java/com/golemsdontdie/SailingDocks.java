@@ -320,18 +320,6 @@ class SailingDocks
 		return out;
 	}
 
-	Dock byRow(int rowId)
-	{
-		for (Dock dock : docks)
-		{
-			if (dock.getRowId() == rowId)
-			{
-				return dock;
-			}
-		}
-		return null;
-	}
-
 	// ---------------------------------------------------------------- reading
 
 	/**

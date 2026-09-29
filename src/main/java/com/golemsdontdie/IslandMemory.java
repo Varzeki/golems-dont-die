@@ -275,31 +275,6 @@ class IslandMemory
 	}
 
 	/**
-	 * True if the player is close enough to the island for golems to be worth
-	 * simulating. Away from Wyrmscraig the whole plugin should cost nothing.
-	 */
-	boolean playerNearIsland()
-	{
-		if (!hasAnchor())
-		{
-			return false;
-		}
-		WorldView wv = client.getTopLevelWorldView();
-		if (wv == null)
-		{
-			return false;
-		}
-		for (int regionId : wv.getMapRegions())
-		{
-			if (withinIsland(regionId))
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
 	 * True if a region is part of the island. A fixed list rather than a radius: the bundled map
 	 * defines exactly which regions the golems have, so harvesting outside it would accumulate
 	 * ground they can never reach.

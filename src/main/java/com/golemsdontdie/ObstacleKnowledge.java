@@ -359,47 +359,6 @@ class ObstacleKnowledge
 		}
 	}
 
-	/**
-	 * Whether an archetype alone is enough, where no transport row is to hand. Coarser than
-	 * {@link #shippedAnimationKnown}, which sees the plane change and distance: ladders come out
-	 * unknown here, there being no direction to ask about.
-	 */
-	private boolean shippedAnimationForArchetype(int archetype)
-	{
-		switch (archetype)
-		{
-			case GolemTransport.ARCHETYPE_GANGPLANK:
-			case GolemTransport.ARCHETYPE_DITCH:
-			case GolemTransport.ARCHETYPE_CLIMB_OVER:
-			case GolemTransport.ARCHETYPE_CLIMB:
-				return true;
-			default:
-				return false;
-		}
-	}
-
-	/**
-	 * How sure we are about one obstacle standing at one place. Drives the highlight overlay only;
-	 * golem behaviour is decided by {@link #isUnlocked} and {@link #clipsFor}.
-	 */
-	Status statusAt(GolemTransport transport)
-	{
-		if (!isUnlocked(transport))
-		{
-			return Status.UNUSABLE;
-		}
-		// Confirmed means both that this kind of object has been watched enough to be trusted and
-		// that this particular one is what was watched; a single sighting is neither.
-		Learned known = learned.get(transport.getObjectId());
-		if (known != null && known.unlocked()
-			&& isConfirmedAt(transport.getObjectId(), transport.getFromX(),
-				transport.getFromY(), transport.getFromPlane(), 1, 1))
-		{
-			return Status.CONFIRMED;
-		}
-		return Status.INFERRED;
-	}
-
 	private boolean isConfirmedAt(int objectId, int x, int y, int plane,
 		int sizeX, int sizeY)
 	{
@@ -1186,11 +1145,6 @@ class ObstacleKnowledge
 			}
 		}
 		return n;
-	}
-
-	int sightingCount()
-	{
-		return learned.size();
 	}
 
 	// -------------------------------------------------------------- persistence

@@ -3272,16 +3272,6 @@ public class GolemsDontDiePlugin extends Plugin
 		return !hiddenNpcs.contains(((NPC) renderable).getIndex());
 	}
 
-	/**
-	 * The current roster, for the overlays. The live list, not a copy: the minimap overlay reads
-	 * it once per frame and copying would allocate for nothing. Both are touched only on the
-	 * client thread.
-	 */
-	List<Golem> activeGolems()
-	{
-		return golems;
-	}
-
 	/** Golems with a model in the scene this frame. See the end of onBeforeRender. */
 	private final List<Golem> drawnGolems = new ArrayList<>();
 

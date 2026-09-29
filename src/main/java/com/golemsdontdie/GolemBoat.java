@@ -104,16 +104,6 @@ enum GolemBoat
 	}
 
 	/**
-	 * Where a berth stands in the hull's own frame: across, and along with the stern positive. The
-	 * helm is at {@link #helmOffset} and everyone else is forward of it.
-	 */
-	int[] berthInHull(int berth)
-	{
-		int[] slot = deck[berth];
-		return new int[]{slot[0], helmOffset - slot[1]};
-	}
-
-	/**
 	 * How far the boat reaches from its middle, in model units, which is what the client culls and
 	 * sorts it by. Taken from the hull rather than assumed: a sloop is three times the raft's
 	 * length, and at the raft's radius most of it would be clipped away.
