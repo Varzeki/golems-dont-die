@@ -159,6 +159,9 @@ class GolemPage
 		travels.getVerticalScrollBar().setUnitIncrement(16);
 		travels.getViewport().setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+		// One row of tabs whatever the width: wrapping, the tabs asked for a second row when measured
+		// before the window had a width, and the first page opened came out a row taller.
+		tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
 		tabs.setFont(BODY);
 		tabs.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		tabs.setForeground(Color.WHITE);
