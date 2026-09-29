@@ -1928,6 +1928,12 @@ class Golem
 		boatSeed = 0;
 	}
 
+	/** True for a golem sailing alone, or at its crew's helm, whose berth is the boat's 0,0. */
+	boolean isAtHelm()
+	{
+		return !crewed || deckAcross == 0 && deckAlong == 0;
+	}
+
 	/**
 	 * The boat this golem is on, for riding its swell: the helm's id for a crew, this golem's own for
 	 * a raft of its own. See FakeRaft.bob.
@@ -2403,7 +2409,9 @@ class Golem
 		}
 		if (afloat)
 		{
-			return GolemContent.ANIM_GOLEM_HELM;
+			// One pair of hands on the wheel. The rest of a crew stands on deck: every one of them
+			// steering read as eight helmsmen and no helm.
+			return isAtHelm() ? GolemContent.ANIM_GOLEM_HELM : snapshot.getIdlePoseAnimation();
 		}
 		if (gaitWalk != -1)
 		{
