@@ -44,14 +44,24 @@ class FakeRaft extends RuneLiteObjectController
 	private static final int BOB_HEIGHT = 4;
 	private static final int BOB_CYCLES = 160;
 
-	/** Where on the swell this boat is, so a fleet does not rise and fall as one. */
-	private final int bobPhase;
+	/** Which boat this is on the swell, so a fleet does not rise and fall as one. See bob. */
+	private final long seed;
+
+	/**
+	 * How far a boat is lifted by the swell this cycle, for the boat and for everyone standing on it,
+	 * who ride it by asking with the same seed: the golem at the helm's id.
+	 */
+	static int bob(int gameCycle, long seed)
+	{
+		int phase = (int) Math.floorMod(seed * 0x9E3779B1L, (long) BOB_CYCLES);
+		return (int) Math.round(Math.sin((gameCycle + phase) * 2 * Math.PI / BOB_CYCLES) * BOB_HEIGHT);
+	}
 
 	/** The radius the parts share with the hull; see GolemBoat.drawRadius. */
 	private final int radius;
 
 	FakeRaft(Client client, Model model, GolemModelFactory shared, int fineX, int fineY,
-		int orientation, int radius)
+		int orientation, int radius, long seed)
 	{
 		this.client = client;
 		this.model = model;
@@ -60,7 +70,7 @@ class FakeRaft extends RuneLiteObjectController
 		this.orientation = orientation;
 		this.targetOrientation = orientation;
 		this.radius = radius;
-		this.bobPhase = Math.floorMod(fineX * 31 + fineY * 17, BOB_CYCLES);
+		this.seed = seed;
 
 		// The raft's models carry no rig, so it plays nothing; the golem at the helm does.
 		this.animation = new AnimationController(client, -1);
@@ -172,7 +182,7 @@ class FakeRaft extends RuneLiteObjectController
 		setLevel(0);
 		setOrientation(orientation);
 		// A little up and down on the swell, as the game's own boats sit on the water.
-		int bob = (int) Math.round(Math.sin((client.getGameCycle() + bobPhase) * 2 * Math.PI / BOB_CYCLES) * BOB_HEIGHT);
+		int bob = bob(client.getGameCycle(), seed);
 		if (groundZ != Integer.MIN_VALUE)
 		{
 			setZ(groundZ + bob);

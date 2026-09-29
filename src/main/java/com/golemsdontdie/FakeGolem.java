@@ -156,8 +156,11 @@ class FakeGolem extends RuneLiteObjectController
 		{
 			// Terrain height plus whatever the golem is doing above it — mid-jump an arc, so
 			// a hop leaves the ground instead of sliding at ankle height.
+			// And at sea, riding the swell with the boat under it, as golems on the player's ship
+			// ride that ship.
+			int swell = golem.isAfloat() || golem.isCrewed() ? FakeRaft.bob(client.getGameCycle(), golem.getBoatSeed()) : 0;
 			setZ(Perspective.getTileHeight(client, new LocalPoint(localX, localY, wv), golem.getDrawPlane())
-				- golem.jumpArc() - golem.deckLift());
+				- golem.jumpArc() - golem.deckLift() + swell);
 		}
 	}
 

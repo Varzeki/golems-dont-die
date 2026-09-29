@@ -29,7 +29,7 @@ enum GolemBoat
 	 * rest along a deck 324 units across and 714 long.
 	 */
 	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
-		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320, 0, 0, 0, 0, 58209, 13382, 13890),
+		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320, 64, 64, 64, 192, 58209, 13382, 13890),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
@@ -101,7 +101,7 @@ enum GolemBoat
 	 *
 	 * <p>A keel is an object of its own on the boat, a tile off the hull, so its model is moved by
 	 * that much to sit under the hull. The sloop's is as a sloop's world lays its parts out (keel
-	 * on tile 1,3, the 3x8 hull from 2,3); the skiff's is its keel's length centred on its hull.
+	 * on tile 1,3, the 3x8 hull from 2,3; a skiff's keel on 2,1, its 2x6 hull from 3,1).
 	 */
 	private final int keelModel;
 	private final int keelX;
@@ -111,7 +111,7 @@ enum GolemBoat
 	 * Where the mast and the sail's cloth stand from the middle of the hull, across then along. Each
 	 * is an object of its own on a tile of its own; on the raft that is the middle tile, but a
 	 * sloop's rig stands three and a half tiles along and one across, and drawn at the middle it
-	 * stood out over the sea beside its own hull. The skiff's is not measured yet.
+	 * stood out over the sea beside its own hull. Both as the game lays its own boats out.
 	 */
 	private final int mastX;
 	private final int mastZ;

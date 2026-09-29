@@ -2132,7 +2132,7 @@ public class GolemsDontDiePlugin extends Plugin
 				return;
 			}
 			raft = new FakeRaft(client, hull, modelFactory,
-				golem.getFineX(), golem.getFineY(), golem.getOrientation(), kind.drawRadius());
+				golem.getFineX(), golem.getFineY(), golem.getOrientation(), kind.drawRadius(), golem.getBoatSeed());
 			raft.addPart(raftFactory.rigModel(kind, false), kind.getMastAnimation(), kind.getMastX(), kind.getMastZ());
 			raft.addPart(raftFactory.rigModel(kind, true), kind.getClothAnimation(), kind.getClothX(), kind.getClothZ());
 			raft.attach();

@@ -1925,6 +1925,23 @@ class Golem
 		deckAcross = 0;
 		deckAlong = 0;
 		crewed = false;
+		boatSeed = 0;
+	}
+
+	/**
+	 * The boat this golem is on, for riding its swell: the helm's id for a crew, this golem's own for
+	 * a raft of its own. See FakeRaft.bob.
+	 */
+	private long boatSeed;
+
+	void setBoatSeed(long seed)
+	{
+		boatSeed = seed;
+	}
+
+	long getBoatSeed()
+	{
+		return boatSeed != 0 ? boatSeed : id;
 	}
 
 	/**
