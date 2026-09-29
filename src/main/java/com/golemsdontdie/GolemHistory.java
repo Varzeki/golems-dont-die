@@ -1,13 +1,14 @@
 package com.golemsdontdie;
 
+import java.io.*;
 import java.util.*;
 import lombok.*;
 import net.runelite.api.coords.*;
 import static com.golemsdontdie.RouteGeometry.span;
 
 /**
- * What one golem has done, in six numbers: enough for its own page, and little enough to save
- * beside a roster of ten thousand.
+ * What one golem has done, in six numbers and a short journal: enough for its own page, and little
+ * enough to save beside a roster of ten thousand.
  *
  * <p>Distance is sampled rather than counted. Nothing watches a far golem walk — it is moved along
  * a route by the tick — so this takes the ground between one census and the next, a few seconds
@@ -76,14 +77,14 @@ class GolemHistory
 	}
 
 	/**
-	 * The last fifteen regions the golem arrived in, and how it got to each.
+	 * The last twenty places the golem arrived in, and how it got to each.
 	 *
 	 * <p>One int apiece — region, plane and manner packed together — and the array is not made
 	 * until a golem goes somewhere, because ten thousand golems pay for anything kept per golem.
 	 * The names are looked up when the page is opened rather than stored: they are the same
-	 * fifteen strings for every golem that has been to the same place.
+	 * strings for every golem that has been to the same place.
 	 */
-	private static final int KEPT = 15;
+	private static final int KEPT = 20;
 
 	private int[] journal;
 
@@ -152,6 +153,12 @@ class GolemHistory
 		// is, or to somewhere with no name to write, is not a journey; a climb or a crossing is.
 		if (names != null)
 		{
+			if (lastPlace == null && written > 0)
+			{
+				// A journal read back from the save knows its last place by region only.
+				int newest = journal[Math.floorMod(written - 1, KEPT)] >>> 6;
+				lastPlace = names.nameFor((newest >> 8) * 64 + 32, (newest & 0xff) * 64 + 32, plane);
+			}
 			String place = names.nameFor((region >> 8) * 64 + 32, (region & 0xff) * 64 + 32, plane);
 			boolean walked = how == GolemTravel.WALKED || how == GolemTravel.EXPLORED;
 			if (place == null || walked && place.equals(lastPlace))
@@ -193,6 +200,103 @@ class GolemHistory
 			}
 		}
 		return out.toArray(new int[0][]);
+	}
+
+	/**
+	 * The journal for the save file, oldest first: each entry's packed region, plane and manner in
+	 * three bytes, then its minute — the first in full, the rest as minutes since the one before,
+	 * which are small — in base 64. About six characters an entry rather than the twenty the
+	 * numbers written out would take, over a roster of thousands. Empty for no journal.
+	 */
+	String journalCode()
+	{
+		if (journal == null)
+		{
+			return "";
+		}
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		int before = 0;
+		for (int i = Math.min(written, KEPT); i >= 1; i--)
+		{
+			int at = Math.floorMod(written - i, KEPT);
+			int packed = journal[at];
+			if (packed < 0)
+			{
+				continue;
+			}
+			out.write(packed >>> 16);
+			out.write(packed >>> 8);
+			out.write(packed);
+			writeVarint(out, out.size() == 3 ? when[at] : Math.max(0, when[at] - before));
+			before = when[at];
+		}
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(out.toByteArray());
+	}
+
+	/** Puts back a journal written by {@link #journalCode()}; anything unreadable is dropped. */
+	void restoreJournal(String code)
+	{
+		if (code == null || code.isEmpty())
+		{
+			return;
+		}
+		try
+		{
+			ByteArrayInputStream in = new ByteArrayInputStream(Base64.getUrlDecoder().decode(code));
+			int minute = 0;
+			boolean first = true;
+			while (in.available() >= 4)
+			{
+				int packed = in.read() << 16 | in.read() << 8 | in.read();
+				int time = readVarint(in);
+				minute = first ? time : minute + time;
+				first = false;
+				if (journal == null)
+				{
+					journal = new int[KEPT];
+					when = new int[KEPT];
+					Arrays.fill(journal, -1);
+				}
+				journal[written % KEPT] = packed;
+				when[written % KEPT] = minute;
+				written++;
+			}
+		}
+		catch (IllegalArgumentException e)
+		{
+			journal = null;
+			when = null;
+			written = 0;
+		}
+	}
+
+	private static void writeVarint(ByteArrayOutputStream out, int value)
+	{
+		while ((value & ~0x7F) != 0)
+		{
+			out.write(value & 0x7F | 0x80);
+			value >>>= 7;
+		}
+		out.write(value);
+	}
+
+	private static int readVarint(ByteArrayInputStream in)
+	{
+		int value = 0;
+		for (int shift = 0; shift < 35; shift += 7)
+		{
+			int b = in.read();
+			if (b < 0)
+			{
+				throw new IllegalArgumentException("journal ends mid-entry");
+			}
+			value |= (b & 0x7F) << shift;
+			if ((b & 0x80) == 0)
+			{
+				return value;
+			}
+		}
+		throw new IllegalArgumentException("journal time too long");
 	}
 
 	/**

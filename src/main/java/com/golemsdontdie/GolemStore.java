@@ -23,8 +23,8 @@ class GolemStore
 
 	/**
 	 * Ten numbers plus the nickname. The rest are optional: whether the golem is in an instance,
-	 * when it may next sail, its seed, the six of its history, its traits, its star and its craft
-	 * number.
+	 * when it may next sail, its seed, the six of its history, its traits, its star, its craft
+	 * number and its journal.
 	 *
 	 * <p>The format only ever grows at the end, and a reader takes what it knows and ignores the
 	 * rest. So a save written by a later version still loads here, less whatever was added since;
@@ -44,6 +44,9 @@ class GolemStore
 
 	/** Its craft number, after the star. */
 	private static final int CRAFT_AT = FAVOURITE_AT + 1;
+
+	/** Its journal, after the craft number; see GolemHistory#journalCode. */
+	private static final int JOURNAL_AT = CRAFT_AT + 1;
 
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
@@ -83,6 +86,9 @@ class GolemStore
 
 		/** See Golem#getCraftNumber; 0 for a save written before it was kept, numbered on restore. */
 		int craftNumber;
+
+		/** The journal as GolemHistory#journalCode wrote it; null for a save written before it was kept. */
+		String journal;
 
 		/** Its history, in the order GolemHistory.restore takes them; all zero if there was none. */
 		long firstSeen;
@@ -133,7 +139,8 @@ class GolemStore
 				.append(FIELD_SEPARATOR).append(history.getFurthestY())
 				.append(FIELD_SEPARATOR).append(golem.getTraits())
 				.append(FIELD_SEPARATOR).append(golem.isFavourite() ? 1 : 0)
-				.append(FIELD_SEPARATOR).append(golem.getCraftNumber());
+				.append(FIELD_SEPARATOR).append(golem.getCraftNumber())
+				.append(FIELD_SEPARATOR).append(history.journalCode());
 		}
 		return out.toString();
 	}
@@ -192,6 +199,7 @@ class GolemStore
 				saved.traits = fields.length > TRAITS_AT ? Integer.parseInt(fields[TRAITS_AT].trim()) : 0;
 				saved.favourite = fields.length > FAVOURITE_AT && "1".equals(fields[FAVOURITE_AT].trim());
 				saved.craftNumber = fields.length > CRAFT_AT ? Integer.parseInt(fields[CRAFT_AT].trim()) : 0;
+				saved.journal = fields.length > JOURNAL_AT ? fields[JOURNAL_AT].trim() : null;
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -245,6 +253,7 @@ class GolemStore
 			golem.getHistory().restore(saved.firstSeen, saved.transports, saved.voyages, saved.walked,
 				saved.furthestX, saved.furthestY, home);
 		}
+		golem.getHistory().restoreJournal(saved.journal);
 		golem.setInInstance(saved.inInstance);
 		golem.setShoreLeaveUntil(saved.shoreLeaveUntil);
 		return golem;

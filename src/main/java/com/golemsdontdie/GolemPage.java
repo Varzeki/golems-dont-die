@@ -501,12 +501,12 @@ class GolemPage
 	private static final SimpleDateFormat DAY = new SimpleDateFormat("d MMM yyyy");
 
 	/**
-	 * Where the golem has been lately: the last fifteen regions it arrived in, newest first, each
+	 * Where the golem has been lately: the last twenty places it arrived in, newest first, each
 	 * with how it got there.
 	 *
-	 * <p>The regions are named here rather than as they happen — the same fifteen names serve
+	 * <p>The regions are named here rather than as they happen — the same names serve
 	 * every golem that has been to the same places, and a golem that is never looked at should
-	 * cost nothing but the fifteen numbers.
+	 * cost nothing but twenty numbers.
 	 */
 	private void listTravels(Golem golem)
 	{

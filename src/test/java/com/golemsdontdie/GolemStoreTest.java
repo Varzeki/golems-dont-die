@@ -143,6 +143,54 @@ public class GolemStoreTest
 		assertEquals(false, store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0).favourite);
 	}
 
+	/**
+	 * The journal goes with the golem, the newest twenty entries in order with their times, and a
+	 * save from before it was kept reads as no journal.
+	 */
+	@Test
+	public void aJournalSurvivesTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem golem = golem(11L, "Wanderer");
+		GolemHistory history = golem.getHistory();
+		// Twenty-five regions in a row along the map: more than are kept, so the oldest go.
+		for (int i = 0; i <= 25; i++)
+		{
+			if (i % 5 == 3)
+			{
+				history.cameAshore();
+			}
+			history.sample(2596 + i * 64, 2256, 0, PLINTH);
+		}
+		int[][] before = history.travels();
+		assertEquals(20, before.length);
+
+		GolemStore.SavedGolem saved = store.deserialise(store.serialise(
+			java.util.Collections.singletonList(golem))).get(0);
+		GolemHistory back = new GolemHistory();
+		back.restoreJournal(saved.journal);
+		int[][] after = back.travels();
+		assertEquals(before.length, after.length);
+		for (int i = 0; i < before.length; i++)
+		{
+			assertEquals(Arrays.toString(before[i]), Arrays.toString(after[i]));
+		}
+		assertNull(store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0).journal);
+		assertEquals(0, new GolemHistory().travels().length);
+	}
+
+	/** The day a golem was crafted is saved with it, and comes back as that day. */
+	@Test
+	public void aCraftDateSurvivesTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem golem = golem(12L, null);
+		long crafted = golem.getHistory().getFirstSeen();
+		GolemStore.SavedGolem saved = store.deserialise(store.serialise(
+			java.util.Collections.singletonList(golem))).get(0);
+		assertEquals(crafted, saved.firstSeen);
+	}
+
 	/** A craft number is kept, and a golem saved before they were kept has none until restored. */
 	@Test
 	public void aCraftNumberSurvivesTheSaveFile()
