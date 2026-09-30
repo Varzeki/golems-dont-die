@@ -151,7 +151,7 @@ class RoamPlanner
 		if (pressed || penned
 			|| random.nextFloat() < hopping && (memory == null || !memory.restingFromTransports(tick)))
 		{
-			Itinerary toTransport = toNearbyTransport(from, tick, random, memory, reach);
+			Itinerary toTransport = toNearbyTransport(from, tick, random, memory, reach, penned || pressed);
 			if (toTransport != null)
 			{
 				lastOutcome = Outcome.TRANSPORT;
@@ -994,8 +994,24 @@ class RoamPlanner
 	 * golem with a taste in places, which considers the ones that suit it first.
 	 */
 	private Itinerary toNearbyTransport(WorldPoint from, int tick, Random random, TransportMemory memory,
-		Reach reach)
+		Reach reach, boolean mayGoBack)
 	{
+		// The spaces this golem recently came from. Not straight back into one: at Castle Wars three
+		// portals from the lobby lead into two waiting rooms, and golems went lobby, room, lobby,
+		// room for good, each hop through a different portal, so no single cooldown caught it. A
+		// golem penned in may go back, since that is often the only way out.
+		Set<Integer> cameFrom = new HashSet<>();
+		if (!mayGoBack && memory != null)
+		{
+			for (int[] origin : memory.recentOrigins(tick))
+			{
+				int space = mesh.componentAt(origin[0], origin[1], origin[2]);
+				if (space != 0 && space != mesh.componentAt(from.getX(), from.getY(), from.getPlane()))
+				{
+					cameFrom.add(space);
+				}
+			}
+		}
 		List<GolemTransport> near = new ArrayList<>();
 		transports.near(from.getX(), from.getY(), TRANSPORT_SEARCH, near);
 		Collections.shuffle(near, random);
@@ -1021,7 +1037,9 @@ class RoamPlanner
 				|| !mesh.sameComponent(from.getX(), from.getY(), transport.getFromX(), transport.getFromY(),
 					from.getPlane())
 				|| !abilities.canUse(transport)
-				|| !landsSomewhereUseful(transport))
+				|| !landsSomewhereUseful(transport)
+				|| !cameFrom.isEmpty() && cameFrom.contains(mesh.componentAt(transport.getToX(), transport.getToY(),
+					transport.getToPlane())))
 			{
 				continue;
 			}

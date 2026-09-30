@@ -229,6 +229,24 @@ final class TransportMemory
 	private final int[] journeyExpiry = new int[HISTORY];
 	private int nextJourney;
 
+	/**
+	 * Where the golem set off from on each journey still remembered, {x, y, plane}: the planner, which
+	 * knows the ground, keeps golems from going straight back into the space they just left.
+	 */
+	List<int[]> recentOrigins(int tick)
+	{
+		List<int[]> out = new ArrayList<>(HISTORY);
+		for (int i = 0; i < HISTORY; i++)
+		{
+			int[] j = journeys[i];
+			if (j != null && journeyExpiry[i] > tick)
+			{
+				out.add(new int[]{j[0], j[1], j[2]});
+			}
+		}
+		return out;
+	}
+
 	/** True if this transport undoes a recent journey: starts where it ended and ends where it started. */
 	private boolean undoesRecentJourney(GolemTransport transport, int tick)
 	{

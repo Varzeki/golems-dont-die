@@ -85,6 +85,11 @@ class GolemAbilities
 	{
 		for (int ordinal : requirements)
 		{
+			if (ordinal == TransportNetwork.QUEST_UNKNOWN)
+			{
+				// A quest the plugin cannot name cannot be checked, so it is not done.
+				return false;
+			}
 			if (ordinal < 0 || ordinal >= QUESTS.length)
 			{
 				continue;
@@ -138,6 +143,11 @@ class GolemAbilities
 			int op = conditions[i + 1];
 			int wanted = conditions[i + 2];
 
+			if (op == TransportNetwork.OP_UNKNOWN)
+			{
+				// A requirement that could not be read is not a requirement met.
+				return false;
+			}
 			if (op == TransportNetwork.OP_AT)
 			{
 				// A wall-clock countdown, a home teleport cooling down say: a golem is
@@ -156,6 +166,12 @@ class GolemAbilities
 					break;
 				case TransportNetwork.OP_GT:
 					if (actual <= wanted)
+					{
+						return false;
+					}
+					break;
+				case TransportNetwork.OP_LT:
+					if (actual >= wanted)
 					{
 						return false;
 					}

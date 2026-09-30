@@ -128,8 +128,7 @@ class GolemHistory
 		}
 		if (transport != null)
 		{
-			manner = GolemTravel.of(transport.getArchetype(), transport.getFromPlane(),
-				transport.getToPlane());
+			manner = GolemTravel.of(transport);
 			mannerRegion = regionOf(transport.getToX(), transport.getToY());
 		}
 	}

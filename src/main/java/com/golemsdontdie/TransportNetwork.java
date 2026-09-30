@@ -28,6 +28,23 @@ class TransportNetwork
 	static final int OP_GT = 1;
 	static final int OP_AND = 2;
 	static final int OP_AT = 3;
+	static final int OP_LT = 4;
+
+	/**
+	 * A clause that could not be read. Never satisfied: a requirement the plugin does not
+	 * understand is still a requirement, and dropping it made 506 gated rows free.
+	 */
+	static final int OP_UNKNOWN = 5;
+
+	/** A quest the plugin has no entry for, kept so the row stays gated. */
+	static final int QUEST_UNKNOWN = -2;
+
+	/**
+	 * Quest names as the tables spell them where RuneLite spells them otherwise. Shortest Path
+	 * writes "Shadows of the Storm"; the quest is Shadow of the Storm.
+	 */
+	private static final Map<String, String> QUEST_ALIASES = Collections.singletonMap(
+		"shadows of the storm", "shadow of the storm");
 
 	private static final int[] NONE = new int[0];
 
@@ -38,6 +55,19 @@ class TransportNetwork
 
 	/** Quest display name to enum, built once - the tables name quests as players do. */
 	private static Map<String, Quest> questsByName;
+
+	/** Marks the versioned table; must match BuildTransports. */
+	private static final int MAGIC = -0x7472;
+
+	/** 2 added a flags byte per row. */
+	private static final int VERSION = 2;
+
+	/** The row is an inference, locked until golems have seen it used. */
+	private static final int FLAG_LEARN_FIRST = 1;
+
+	/** Which way a climb goes, from its verb: up, or down. Neither set, the plane change says. */
+	private static final int FLAG_UP = 2;
+	private static final int FLAG_DOWN = 4;
 
 	/**
 	 * Reads the bundled table. A missing or corrupt resource is deliberately not fatal: golems
@@ -61,17 +91,33 @@ class TransportNetwork
 			try (GZIPInputStream gz = new GZIPInputStream(raw);
 				 DataInputStream data = new DataInputStream(gz))
 			{
-				int count = data.readInt();
+				// The versioned format opens with a marker no row count can be; the first one
+				// opened with the count and had no flags.
+				int first = data.readInt();
+				boolean flagged = first == MAGIC;
+				if (flagged && data.readInt() != VERSION)
+				{
+					log.warn("Bundled transport table is a newer format than this build reads");
+					return;
+				}
+				int count = flagged ? data.readInt() : first;
 				for (int i = 0; i < count; i++)
 				{
-					transports.add(new GolemTransport(
+					GolemTransport t = new GolemTransport(
 						data.readShort() & 0xFFFF, data.readShort() & 0xFFFF, data.readByte(),
 						data.readShort() & 0xFFFF, data.readShort() & 0xFFFF, data.readByte(),
 						data.readShort() & 0xFFFF, data.readByte(), data.readInt(),
 						parseSkills(data.readUTF()),
 						parseQuests(data.readUTF()),
 						parseConditions(data.readUTF()),
-						parseConditions(data.readUTF())));
+						parseConditions(data.readUTF()));
+					if (flagged)
+					{
+						int flags = data.readByte();
+						t.setLearnFirst((flags & FLAG_LEARN_FIRST) != 0);
+						t.setDirection((flags & FLAG_UP) != 0 ? 1 : (flags & FLAG_DOWN) != 0 ? -1 : 0);
+					}
+					transports.add(t);
 				}
 			}
 
@@ -514,10 +560,16 @@ class TransportNetwork
 		List<Integer> out = new ArrayList<>();
 		for (String name : spec.split(";"))
 		{
-			Quest quest = questsByName.get(name.trim().toLowerCase());
+			String key = name.trim().toLowerCase();
+			if (key.isEmpty())
+			{
+				continue;
+			}
+			Quest quest = questsByName.get(QUEST_ALIASES.getOrDefault(key, key));
 			if (quest == null)
 			{
 				log.debug("Unknown quest requirement: {}", name);
+				out.add(QUEST_UNKNOWN);
 				continue;
 			}
 			out.add(quest.ordinal());
@@ -550,6 +602,10 @@ class TransportNetwork
 			{
 				op = OP_GT;
 			}
+			else if ((at = c.indexOf('<')) >= 0)
+			{
+				op = OP_LT;
+			}
 			else if ((at = c.indexOf('&')) >= 0)
 			{
 				op = OP_AND;
@@ -564,18 +620,27 @@ class TransportNetwork
 			}
 			else
 			{
+				log.debug("Unparseable condition: {}", clause);
+				out.add(-1);
+				out.add(OP_UNKNOWN);
+				out.add(0);
 				continue;
 			}
 
 			try
 			{
-				out.add(Integer.parseInt(c.substring(0, at).trim()));
+				int id = Integer.parseInt(c.substring(0, at).trim());
+				int value = Integer.parseInt(c.substring(at + 1).trim());
+				out.add(id);
 				out.add(op);
-				out.add(Integer.parseInt(c.substring(at + 1).trim()));
+				out.add(value);
 			}
 			catch (NumberFormatException e)
 			{
 				log.debug("Unparseable condition: {}", clause);
+				out.add(-1);
+				out.add(OP_UNKNOWN);
+				out.add(0);
 			}
 		}
 		return toArray(out);

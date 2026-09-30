@@ -37,11 +37,25 @@ enum GolemTravel
 	 * What an obstacle of this kind reads as. The plane says which way a climb went: the same
 	 * ladder is climbed and climbed down.
 	 */
+	static GolemTravel of(GolemTransport transport)
+	{
+		switch (transport.getArchetype())
+		{
+			case GolemTransport.ARCHETYPE_LADDER:
+			case GolemTransport.ARCHETYPE_STAIRS:
+			case GolemTransport.ARCHETYPE_CLIMB:
+				return transport.goesDown() ? DESCENDED : CLIMBED;
+			default:
+				return of(transport.getArchetype(), transport.getFromPlane(), transport.getToPlane());
+		}
+	}
+
 	static GolemTravel of(int archetype, int fromPlane, int toPlane)
 	{
 		switch (archetype)
 		{
 			case GolemTransport.ARCHETYPE_LADDER:
+			case GolemTransport.ARCHETYPE_STAIRS:
 			case GolemTransport.ARCHETYPE_CLIMB:
 				return toPlane < fromPlane ? DESCENDED : CLIMBED;
 			case GolemTransport.ARCHETYPE_SQUEEZE:

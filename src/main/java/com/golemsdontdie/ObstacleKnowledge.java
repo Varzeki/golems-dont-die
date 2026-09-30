@@ -150,11 +150,21 @@ class ObstacleKnowledge
 	 */
 	boolean isUnlocked(GolemTransport transport)
 	{
-		if (isLearned(transport.getObjectId()))
+		int id = transport.getObjectId();
+		if (transport.isLearnFirst())
+		{
+			// Inferred, not calculated: where it leads is the guess, so seeing the same object used
+			// somewhere else proves nothing about this row, and nor does seeing this one lead
+			// somewhere else. It waits for a player seen going this row's own way: a course's nets
+			// unlocked every net-shaped guess before, including ones walking through a net a player
+			// climbs.
+			return isLearned(id) && routeSeen(transport);
+		}
+		if (isLearned(id))
 		{
 			return true;
 		}
-		if (MeasuredShortcuts.animationFor(transport.getObjectId()) != -1)
+		if (MeasuredShortcuts.animationFor(id) != -1)
 		{
 			// Somebody stood in front of this exact object and watched it.
 			return true;
@@ -225,7 +235,11 @@ class ObstacleKnowledge
 			case GolemTransport.ARCHETYPE_LADDER:
 				// Up is 828 and agreed everywhere. Down is 833 here, never measured, and three
 				// server reimplementations say 827, so it plays silently until somebody is seen.
-				return transport.getToPlane() >= transport.getFromPlane();
+				return !transport.goesDown();
+
+			case GolemTransport.ARCHETYPE_STAIRS:
+				// Nothing is played on stairs, so nothing can be played wrongly.
+				return true;
 
 			case GolemTransport.ARCHETYPE_JUMP:
 			{
@@ -303,6 +317,37 @@ class ObstacleKnowledge
 		// Genuinely somewhere else, so a second route from this tile rather than a contradiction
 		// of the first: the middle of a line of stepping stones really does lead two ways.
 		here.add(new int[]{sighting.toX, sighting.toY, sighting.toPlane, 1, flags});
+	}
+
+	/**
+	 * True if a player has been seen using this transport's object from near its origin to near its
+	 * destination: the start within {@link #CONFIRM_TOLERANCE}, the end within
+	 * {@link #DESTINATION_TOLERANCE}, as learned routes are matched.
+	 */
+	private boolean routeSeen(GolemTransport transport)
+	{
+		for (int dx = -CONFIRM_TOLERANCE; dx <= CONFIRM_TOLERANCE; dx++)
+		{
+			for (int dy = -CONFIRM_TOLERANCE; dy <= CONFIRM_TOLERANCE; dy++)
+			{
+				List<int[]> seen = routes.get(routeKey(transport.getObjectId(), transport.getFromX() + dx,
+					transport.getFromY() + dy, transport.getFromPlane()));
+				if (seen == null)
+				{
+					continue;
+				}
+				for (int[] to : seen)
+				{
+					if (to[2] == transport.getToPlane()
+						&& Math.abs(to[0] - transport.getToX()) <= DESTINATION_TOLERANCE
+						&& Math.abs(to[1] - transport.getToY()) <= DESTINATION_TOLERANCE)
+					{
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	/** Sightings of one route past which another teaches nothing, and it is no longer recorded. */
@@ -803,6 +848,12 @@ class ObstacleKnowledge
 	 */
 	int[] clipsFor(GolemTransport transport)
 	{
+		// A door is pushed through whatever the player was seen doing, which is nothing: a player
+		// opens it, a golem cannot, so the golem's own way through is the one played.
+		if (transport.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+		{
+			return transport.animations();
+		}
 		// Only once it has cleared the bar everything else clears: a single sighting can be a
 		// player attacked between clicking a ladder and reaching it.
 		Learned known = learned.get(transport.getObjectId());

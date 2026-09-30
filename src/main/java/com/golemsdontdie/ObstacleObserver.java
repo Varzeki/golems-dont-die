@@ -48,6 +48,10 @@ class ObstacleObserver
 	@Setter
 	private Consumer<ObstacleSighting> onSighting;
 
+	/** The shipped rows starting on a tile, to recognise a door walked through. */
+	@Setter
+	private BiFunction<Integer, Integer, List<GolemTransport>> rowsFrom;
+
 	// ------------------------------------------------------------- what was clicked
 
 	private int clickedObject = -1;
@@ -124,6 +128,18 @@ class ObstacleObserver
 	private String silentName = "";
 	private String silentMenu = "";
 
+	/**
+	 * A shut door the player just clicked: the tile it stands on and the tile across the edge it
+	 * shuts, read while it is still shut. Opening a door plays nothing and moves nobody, so it was
+	 * the one kind of obstacle never learned; the walk through it afterwards is the traversal.
+	 */
+	private WorldPoint doorTile;
+	private WorldPoint doorBeyond;
+	private int doorObject = -1;
+	private String doorName = "";
+	private String doorMenu = "";
+	private int doorTick = -1;
+
 	// ------------------------------------------------------------------ lifecycle
 
 	void startUp()
@@ -197,6 +213,7 @@ class ObstacleObserver
 		clickedMenu = (option + " " + stripTags(event.getMenuTarget())).trim();
 		clickedName = objectName(clickedObject);
 		clickedTick = client.getTickCount();
+		noteDoor(event);
 		hurt = false;
 		ordinaryPoses = local == null ? null : ordinaryPosesOf(local);
 
@@ -333,6 +350,11 @@ class ObstacleObserver
 
 		// A pose the obstacle put the player in, playing nothing. See posedTraversal.
 		if (posedTraversal(local, at, was, wasTemplate, tick))
+		{
+			return;
+		}
+
+		if (startedAt == null && clips.isEmpty() && (doorCrossing(was, at, tick) || walkedThroughDoor(was, at)))
 		{
 			return;
 		}
@@ -492,6 +514,130 @@ class ObstacleObserver
 		{
 			onSighting.accept(sighting);
 		}
+	}
+
+	/**
+	 * True, and reported, when the player steps between the two ends of a door row golems have not
+	 * learned yet, clicked or not. A door someone else left open is walked through without a click,
+	 * and in a busy town that is most of them: learning only from the click would leave those doors
+	 * shut to golems for good. One step, the door's own two tiles, outside instances.
+	 */
+	private boolean walkedThroughDoor(WorldPoint was, WorldPoint now)
+	{
+		if (rowsFrom == null || was == null || now == null || was.getPlane() != now.getPlane()
+			|| Math.max(Math.abs(was.getX() - now.getX()), Math.abs(was.getY() - now.getY())) != 1)
+		{
+			return false;
+		}
+		WorldPoint template = templateOf(was);
+		if (template != null && !template.equals(was))
+		{
+			return false;
+		}
+		for (GolemTransport row : rowsFrom.apply(was.getX(), was.getY()))
+		{
+			if (!row.isLearnFirst() || row.getArchetype() != GolemTransport.ARCHETYPE_DOOR || row.getObjectId() <= 0
+				|| row.getFromPlane() != was.getPlane() || row.getToPlane() != now.getPlane()
+				|| row.getToX() != now.getX() || row.getToY() != now.getY())
+			{
+				continue;
+			}
+			ObstacleSighting sighting = new ObstacleSighting(row.getObjectId(), objectName(row.getObjectId()),
+				"Walk-through", new int[0], 1, was.getX(), was.getY(), was.getPlane(),
+				now.getX(), now.getY(), now.getPlane(), false, 0, 0,
+				silentCurve(was, now), now.getX() - was.getX(), now.getY() - was.getY());
+			if (onSighting != null)
+			{
+				onSighting.accept(sighting);
+			}
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Notes the door behind a click, if it is one: a wall on the clicked tile with the clicked id,
+	 * shutting one straight edge. Its far side is the neighbour across that edge.
+	 */
+	private void noteDoor(MenuOptionClicked event)
+	{
+		doorTile = null;
+		doorBeyond = null;
+		WorldView wv = client.getTopLevelWorldView();
+		Scene scene = wv == null ? null : wv.getScene();
+		if (scene == null)
+		{
+			return;
+		}
+		int x = event.getParam0();
+		int y = event.getParam1();
+		int plane = wv.getPlane();
+		Tile[][][] tiles = scene.getTiles();
+		if (plane < 0 || plane >= tiles.length || x < 0 || x >= tiles[plane].length || y < 0 || y >= tiles[plane][x].length)
+		{
+			return;
+		}
+		Tile tile = tiles[plane][x][y];
+		WallObject wall = tile == null ? null : tile.getWallObject();
+		if (wall == null || wall.getId() != event.getId())
+		{
+			return;
+		}
+		// 1 west, 2 north, 4 east, 8 south; a corner or a diagonal shuts no single edge.
+		int o = wall.getOrientationA();
+		int dx = (o & 1) != 0 ? -1 : (o & 4) != 0 ? 1 : 0;
+		int dy = (o & 2) != 0 ? 1 : (o & 8) != 0 ? -1 : 0;
+		if ((dx == 0) == (dy == 0))
+		{
+			return;
+		}
+		doorTile = WorldPoint.fromScene(wv, x, y, plane);
+		doorBeyond = new WorldPoint(doorTile.getX() + dx, doorTile.getY() + dy, plane);
+		doorObject = event.getId();
+		doorName = clickedName;
+		doorMenu = clickedMenu;
+		doorTick = client.getTickCount();
+	}
+
+	/**
+	 * True, and reported, when the player steps across the edge of the door they clicked, either
+	 * way: a traversal that plays nothing, one tile long.
+	 */
+	private boolean doorCrossing(WorldPoint was, WorldPoint now, int tick)
+	{
+		if (doorTile == null || was == null || now == null)
+		{
+			return false;
+		}
+		if (tick - doorTick > CLAIM_WINDOW)
+		{
+			doorTile = null;
+			return false;
+		}
+		boolean crossed = was.equals(doorTile) && now.equals(doorBeyond) || was.equals(doorBeyond) && now.equals(doorTile);
+		if (!crossed)
+		{
+			return false;
+		}
+		WorldPoint fromTemplate = templateOf(was);
+		WorldPoint toTemplate = templateOf(now);
+		boolean placed = fromTemplate != null && toTemplate != null;
+		WorldPoint start = placed ? fromTemplate : was;
+		WorldPoint end = placed ? toTemplate : now;
+		ObstacleSighting sighting = new ObstacleSighting(doorObject, doorName, doorMenu,
+			new int[0], 1, start.getX(), start.getY(), start.getPlane(),
+			end.getX(), end.getY(), end.getPlane(), !placed, 0, 0,
+			silentCurve(was, now), now.getX() - was.getX(), now.getY() - was.getY(),
+			fromTemplate != null && !fromTemplate.equals(was),
+			toTemplate != null && !toTemplate.equals(now));
+		doorTile = null;
+		clickedObject = -1;
+		clickedTick = -1;
+		if (onSighting != null)
+		{
+			onSighting.accept(sighting);
+		}
+		return true;
 	}
 
 	/**
@@ -869,6 +1015,8 @@ class ObstacleObserver
 		ordinaryPoses = null;
 		clickedName = "";
 		clickedMenu = "";
+		doorTile = null;
+		doorBeyond = null;
 	}
 
 	/** Marks the obstacle under way as failed. Called when the player takes a hit. */

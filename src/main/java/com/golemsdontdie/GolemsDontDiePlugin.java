@@ -640,6 +640,7 @@ public class GolemsDontDiePlugin extends Plugin
 		loadKnowledge();
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
+		obstacleObserver.setRowsFrom(transports::from);
 		obstacleObserver.startUp();
 		// In the plugin's own folder, which RuneLite hands out; a plugin writes nowhere else.
 		Filepath folder = null;

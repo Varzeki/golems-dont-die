@@ -28,6 +28,12 @@ final class GolemTransport
 	static final int ARCHETYPE_STILE = 10;
 	static final int ARCHETYPE_TIGHTROPE = 11;
 
+	/**
+	 * Stairs: walked up or down, nothing played. They were ladders before, so a golem reached up
+	 * for a rung at the foot of every staircase in the game.
+	 */
+	static final int ARCHETYPE_STAIRS = 12;
+
 	@Getter
 	private final int fromX;
 	@Getter
@@ -113,6 +119,44 @@ final class GolemTransport
 	@Getter
 	private int instanceFlags;
 
+	/**
+	 * True for a row the tables infer rather than calculate - a pad's partner worked out by
+	 * nearness, the far side of an agility object - shipped so the ground behind it is known, but
+	 * not used until golems have seen a player use it. See {@link ObstacleKnowledge#isUnlocked}.
+	 */
+	@Getter
+	private boolean learnFirst;
+
+	/**
+	 * Which way a climb goes, from its verb, decided offline: 1 up, -1 down, 0 not said. The plane
+	 * alone cannot say: a ladder out of a dungeon is plane 0 to plane 0, and 617 of them played the
+	 * descent.
+	 */
+	@Getter
+	private int direction;
+
+	void setDirection(int direction)
+	{
+		this.direction = direction;
+	}
+
+	/** True for a climb upward: by its verb where it has one, by the plane change otherwise. */
+	boolean goesUp()
+	{
+		return direction != 0 ? direction > 0 : toPlane > fromPlane;
+	}
+
+	/** True for a climb downward, likewise. */
+	boolean goesDown()
+	{
+		return direction != 0 ? direction < 0 : toPlane < fromPlane;
+	}
+
+	void setLearnFirst(boolean learnFirst)
+	{
+		this.learnFirst = learnFirst;
+	}
+
 	void setInstanceFlags(int flags)
 	{
 		this.instanceFlags = flags;
@@ -140,6 +184,8 @@ final class GolemTransport
 		GolemTransport back = new GolemTransport(toX, toY, toPlane, fromX, fromY, fromPlane, duration, archetype,
 			objectId, new int[0], new int[0], new int[0], new int[0]);
 		back.instanceFlags = (entersInstance() ? OUT_OF_INSTANCE : 0) | (leavesInstance() ? INTO_INSTANCE : 0);
+		back.learnFirst = learnFirst;
+		back.direction = -direction;
 		return back;
 	}
 
@@ -241,12 +287,15 @@ final class GolemTransport
 			case ARCHETYPE_LADDER:
 				// Reaching up for a ladder and reaching down off the top are different
 				// clips; the plane change says which.
-				return new int[]{toPlane > fromPlane
+				return new int[]{goesUp()
 					? GolemContent.ANIM_LADDER_GRAB
 					: GolemContent.ANIM_LADDER_GRAB_TOP};
 
+			case ARCHETYPE_STAIRS:
+				return new int[0];
+
 			case ARCHETYPE_CLIMB:
-				if (toPlane < fromPlane)
+				if (goesDown())
 				{
 					// Going down is its own clip, not the ascent reversed. Measured on
 					// Wyrmscraig: the west approach (62265) plays 740, HUMAN_CLIMBING_DOWN,
@@ -354,7 +403,7 @@ final class GolemTransport
 	boolean isShortcut()
 	{
 		return archetype != ARCHETYPE_NONE && archetype != ARCHETYPE_DOOR
-			&& archetype != ARCHETYPE_LADDER && archetype != ARCHETYPE_GANGPLANK;
+			&& archetype != ARCHETYPE_LADDER && archetype != ARCHETYPE_STAIRS && archetype != ARCHETYPE_GANGPLANK;
 	}
 
 	@Override
