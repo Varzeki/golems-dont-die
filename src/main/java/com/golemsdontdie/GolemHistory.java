@@ -94,6 +94,15 @@ class GolemHistory
 	/** The name of the place the last entry was written for, so walking about inside it writes nothing. */
 	private String lastPlace;
 
+	/** The place the golem left for the last entry: going back there the same way is no journey. */
+	private String cameFrom;
+
+	/** How the golem reached the last entry's place. */
+	private GolemTravel lastWay;
+
+	/** The named place the golem is in now, written or not: where the next entry leaves from. */
+	private transient String here;
+
 	/** Where the last entry went, so the ring can be read back in order. */
 	private int written;
 
@@ -155,7 +164,9 @@ class GolemHistory
 		lastRegion = region;
 		if (first)
 		{
-			// Where it was standing when the plugin first looked is not a journey.
+			// Where it was standing when the plugin first looked is not a journey, but it is where
+			// the first one leaves from.
+			here = names == null ? null : names.nameFor((region >> 8) * 64 + 32, (region & 0xff) * 64 + 32, plane);
 			return;
 		}
 
@@ -174,17 +185,35 @@ class GolemHistory
 		{
 			if (lastPlace == null && written > 0)
 			{
-				// A journal read back from the save knows its last place by region only.
-				int newest = journal[Math.floorMod(written - 1, KEPT)] >>> 6;
-				lastPlace = names.nameFor((newest >> 8) * 64 + 32, (newest & 0xff) * 64 + 32, plane);
+				// A journal read back from the save knows its last two places by region only, and
+				// takes the older for where the newer was left from.
+				int newest = journal[Math.floorMod(written - 1, KEPT)];
+				lastPlace = placeOf(newest, names);
+				lastWay = GolemTravel.byOrdinal(newest & 0xf);
+				cameFrom = written > 1 ? placeOf(journal[Math.floorMod(written - 2, KEPT)], names) : null;
 			}
 			String place = names.nameFor((region >> 8) * 64 + 32, (region & 0xff) * 64 + 32, plane);
-			boolean walked = how == GolemTravel.WALKED || how == GolemTravel.EXPLORED;
-			if (place == null || walked && place.equals(lastPlace))
+			if (place == null)
 			{
 				return;
 			}
+			String from = here;
+			here = place;
+			boolean walked = how == GolemTravel.WALKED || how == GolemTravel.EXPLORED;
+			if (walked && (place.equals(lastPlace) || place.equals(from)))
+			{
+				return;
+			}
+			// Back the way it came, and out again, is no journey either: a golem pacing between
+			// Wyrmscraig and Ardeglais wrote the pair over and over until the journal was nothing
+			// else. The last entry stands until the golem goes somewhere else, or another way.
+			if (sameWay(how, lastWay) && (place.equals(cameFrom) || place.equals(lastPlace)))
+			{
+				return;
+			}
+			cameFrom = from;
 			lastPlace = place;
+			lastWay = how;
 		}
 
 		if (journal == null)
@@ -196,6 +225,39 @@ class GolemHistory
 		journal[written % KEPT] = region << 6 | (plane & 3) << 4 | how.ordinal();
 		when[written % KEPT] = (int) (System.currentTimeMillis() / 60_000L);
 		written++;
+	}
+
+	/** The name of the place a packed journal entry is for. */
+	private static String placeOf(int packed, PlaceNames names)
+	{
+		int region = packed >>> 6;
+		return names.nameFor((region >> 8) * 64 + 32, (region & 0xff) * 64 + 32, packed >> 4 & 3);
+	}
+
+	/**
+	 * Whether two journeys went the same way, one of them perhaps backwards: a walk and a walk, a
+	 * climb and a climb down, a squeeze and a squeeze. Never a voyage: each one is worth a line.
+	 */
+	private static boolean sameWay(GolemTravel a, GolemTravel b)
+	{
+		if (a == null || b == null || a == GolemTravel.SAILED || b == GolemTravel.SAILED)
+		{
+			return false;
+		}
+		return kind(a) == kind(b);
+	}
+
+	private static GolemTravel kind(GolemTravel way)
+	{
+		switch (way)
+		{
+			case EXPLORED:
+				return GolemTravel.WALKED;
+			case DESCENDED:
+				return GolemTravel.CLIMBED;
+			default:
+				return way;
+		}
 	}
 
 	/**

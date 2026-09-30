@@ -71,6 +71,48 @@ public class GolemHistoryTest
 	}
 
 	/**
+	 * Pacing between two places writes the first trip only; going somewhere else, or another way,
+	 * writes again. A voyage is always a line.
+	 */
+	@Test
+	public void backTheWayItCameIsNoJourney()
+	{
+		PlaceNames names = new PlaceNames();
+		names.load();
+		GolemHistory history = new GolemHistory();
+		history.sample(2592, 2272, 0, HOME, names);
+		history.sample(2528, 2208, 0, HOME, names);
+		history.sample(2592, 2272, 0, HOME, names);
+		history.sample(2528, 2208, 0, HOME, names);
+		history.sample(2592, 2272, 0, HOME, names);
+		assertEquals("only the walk to Ardeaglais", 1, history.travels().length);
+
+		history.sample(2592, 2272 + 6400, 0, HOME, names);
+		history.tookTransport(ladder(2592, 2272 + 6400, 0, 2592, 2272, 0));
+		history.sample(2592, 2272, 0, HOME, names);
+		history.tookTransport(ladder(2592, 2272, 1, 2592, 2272 + 6400, 0));
+		history.sample(2592, 2272 + 6400, 0, HOME, names);
+		history.tookTransport(ladder(2592, 2272 + 6400, 0, 2592, 2272, 1));
+		history.sample(2592, 2272, 0, HOME, names);
+		int[][] travels = history.travels();
+		assertEquals("explored the cavern and climbed out, then no more", 3, travels.length);
+		assertEquals(GolemTravel.CLIMBED.ordinal(), travels[0][2]);
+		assertEquals(GolemTravel.EXPLORED.ordinal(), travels[1][2]);
+
+		history.cameAshore(null);
+		history.sample(2528, 2208, 0, HOME, names);
+		history.cameAshore(null);
+		history.sample(2592, 2272, 0, HOME, names);
+		assertEquals("both voyages", 5, history.travels().length);
+	}
+
+	private static GolemTransport ladder(int fromX, int fromY, int fromPlane, int toX, int toY, int toPlane)
+	{
+		return new GolemTransport(fromX, fromY, fromPlane, toX, toY, toPlane, 1,
+			GolemTransport.ARCHETYPE_LADDER, 1, new int[0], new int[0], new int[0], new int[0]);
+	}
+
+	/**
 	 * A gangplank crossed without leaving the region is not how the golem reached the next one it
 	 * walks into: the journal said it took a gangplank to Shilo Village.
 	 */
