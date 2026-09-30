@@ -631,9 +631,10 @@ class IslandMemory
 	/**
 	 * Can something step one tile from (x, y), cardinal or diagonal? A diagonal is a corner and
 	 * the game will not cut one: both ways round must be clear, or a golem would slip between
-	 * two walls meeting at a point. The four-term tests below are the game's own rule, from
-	 * Shortest Path's {@code CollisionMap}. Diagonals matter - Port Tasks' sailing routes are
-	 * 854 perfect diagonals against 817 axis-aligned segments.
+	 * two walls meeting at a point. The four-term tests below are Shortest Path's; the client adds
+	 * the corner of a wall standing at the point, which the edges cannot show, so that comes from
+	 * the mesh, even where the edges are the live harvest's: walls do not move. Diagonals matter -
+	 * Port Tasks' sailing routes are 854 perfect diagonals against 817 axis-aligned segments.
 	 */
 	boolean canStep(int x, int y, int plane, int dx, int dy)
 	{
@@ -656,22 +657,26 @@ class IslandMemory
 		if (dx == 1 && dy == 1)
 		{
 			return north(x, y, plane) && east(x, y + 1, plane)
-				&& east(x, y, plane) && north(x + 1, y, plane);
+				&& east(x, y, plane) && north(x + 1, y, plane)
+				&& !worldMesh.cornerBlocks(x, y, plane, 1, 1);
 		}
 		if (dx == -1 && dy == 1)
 		{
 			return north(x, y, plane) && west(x, y + 1, plane)
-				&& west(x, y, plane) && north(x - 1, y, plane);
+				&& west(x, y, plane) && north(x - 1, y, plane)
+				&& !worldMesh.cornerBlocks(x, y, plane, -1, 1);
 		}
 		if (dx == 1 && dy == -1)
 		{
 			return south(x, y, plane) && east(x, y - 1, plane)
-				&& east(x, y, plane) && south(x + 1, y, plane);
+				&& east(x, y, plane) && south(x + 1, y, plane)
+				&& !worldMesh.cornerBlocks(x, y, plane, 1, -1);
 		}
 		if (dx == -1 && dy == -1)
 		{
 			return south(x, y, plane) && west(x, y - 1, plane)
-				&& west(x, y, plane) && south(x - 1, y, plane);
+				&& west(x, y, plane) && south(x - 1, y, plane)
+				&& !worldMesh.cornerBlocks(x, y, plane, -1, -1);
 		}
 		return false;
 	}
@@ -689,8 +694,7 @@ class IslandMemory
 		// walkable. The mesh's ocean bit marks exactly that sea, so it overrules every source.
 		int toX = flag == FLAG_EAST ? x + 1 : x;
 		int toY = flag == FLAG_NORTH ? y + 1 : y;
-		if (worldMesh.isOcean(x, y, plane) || worldMesh.isOcean(toX, toY, plane)
-			|| worldMesh.isInlandWater(x, y, plane) || worldMesh.isInlandWater(toX, toY, plane))
+		if (worldMesh.isWater(x, y, plane) || worldMesh.isWater(toX, toY, plane))
 		{
 			return false;
 		}
@@ -713,7 +717,7 @@ class IslandMemory
 		// water, lakes and enclosed basins passed the old check, most visibly inside
 		// Wyrmscraig's caves. The live harvest needs no such check, except that the client
 		// does not block water a boat can sail - which is why the sea and the underground lake
-		// are refused first. See WorldMesh.isInlandWater.
+		// are refused first. See WorldMesh.isWater.
 		if (flag == FLAG_NORTH)
 		{
 			return worldMesh.isLandWalkable(x, y, plane)

@@ -15,8 +15,11 @@ import net.runelite.api.*;
  * covers 2,424 region-planes, the ocean and every floor of the world the collision data holds,
  * and at about 1.5 MB belongs in the jar.
  *
- * <p>Three bits per tile rather than two. <b>north</b> and <b>east</b> use the packing
- * Shortest Path and {@code IslandMemory} use; south and west are the neighbouring tile's.
+ * <p>A byte per tile, from the game cache by the client's own rules: <b>north</b> and <b>east</b>
+ * edges as {@code IslandMemory} keeps them (south and west are the neighbouring tile's), whether
+ * the tile can be stood on and has ground under it, the two corners that can refuse a diagonal
+ * step, and which shut edges are doors. Then a bit per tile for each derived map, and <b>water</b>
+ * for every sea and lake the textures say is one.
  * <b>ocean</b> is the single connected sea: two ports are only sailable between if both sit
  * on it, and enclosed water exists - Karamja's inland body is 26,000 tiles leading nowhere.
  * <b>isolated</b> marks components under 50 tiles, computed offline rather than by a flood
@@ -34,8 +37,8 @@ class WorldMesh
 	private static final int REGION_MASK = REGION_SIZE - 1;
 	private static final int TILES_PER_PLANE = REGION_SIZE * REGION_SIZE;
 
-	/** Two bits per tile for passability, one each for the two derived maps. */
-	private static final int COLLISION_BYTES = TILES_PER_PLANE * 2 / 8;
+	/** A byte per tile for passability and what the tile is; a bit per tile for each derived map. */
+	private static final int COLLISION_BYTES = TILES_PER_PLANE;
 	private static final int DERIVED_BYTES = TILES_PER_PLANE / 8;
 
 	/** Two bytes a tile: there are 18,634 components, which does not fit in one. */
@@ -44,11 +47,33 @@ class WorldMesh
 	/** Impossible as an entry count, so an old file is refused rather than misread. */
 	private static final int MAGIC = -0x60137;
 
-	/** 2 added the per-tile component map. */
-	private static final int VERSION = 2;
+	/** 2 added the per-tile component map; 3 a byte a tile (standable, ground, corners, doors) and water. */
+	private static final int VERSION = 3;
 
 	static final int FLAG_NORTH = 0;
 	static final int FLAG_EAST = 1;
+
+	/** The tile can be stood on: nothing solid fills it. */
+	static final int FLAG_STANDABLE = 2;
+
+	/** The tile has ground under it: not the void round an upper floor. */
+	static final int FLAG_GROUND = 3;
+
+	/**
+	 * A corner blocks the diagonal north-east out of the tile, or into it from the north-east:
+	 * a wall's corner post, a diagonal wall. The two-bit map could not say so, and golems cut
+	 * corners the game refuses.
+	 */
+	static final int FLAG_CORNER_NE = 4;
+
+	/** The same for the diagonal north-west. */
+	static final int FLAG_CORNER_NW = 5;
+
+	/** The north edge is shut only by something that opens: a door or a gate. */
+	static final int FLAG_DOOR_NORTH = 6;
+
+	/** The same for the east edge. */
+	static final int FLAG_DOOR_EAST = 7;
 
 	/**
 	 * Everything the mesh holds for one region and plane. One object rather than five maps
@@ -58,7 +83,7 @@ class WorldMesh
 	@AllArgsConstructor
 	private static final class Region
 	{
-		/** Two bits per tile for passability. */
+		/** A byte per tile: the FLAG_ bits. */
 		final byte[] collision;
 
 		/** The single connected sea. */
@@ -68,12 +93,18 @@ class WorldMesh
 		final byte[] isolated;
 
 		/**
-		 * Which connected component each tile belongs to, two bytes per tile, 0 for none.
+		 * Which connected component each tile belongs to, 0 for none, as an index into
+		 * {@link #palette}; null where the whole region-plane is one. Shipped as two bytes a tile
+		 * (there are 18,630 components), held as one: no region-plane has more than 172, and the
+		 * two bytes were more than half the mesh in memory.
 		 * The one thing no per-tile flag can say: whether two tiles are connected <b>to each
 		 * other</b>. Everything else answers "may a golem stand there", and a sealed room is
 		 * good ground. {@code isolated} only caught components under fifty tiles.
 		 */
 		final byte[] components;
+
+		/** The component ids a region-plane's tiles index into. */
+		final int[] palette;
 
 		/**
 		 * Tiles the land fill reached - ground a golem may stand on, on foot. The ocean bit
@@ -82,6 +113,12 @@ class WorldMesh
 		 * starting on land cannot leak.
 		 */
 		final byte[] land;
+
+		/**
+		 * Water, by the cache's own textures: the ocean and every other sea and lake of a hundred
+		 * tiles or more. Passable in the client, never ground.
+		 */
+		final byte[] water;
 	}
 
 	/** Region and plane to what the mesh holds for it. */
@@ -159,7 +196,11 @@ class WorldMesh
 					byte[] ground = new byte[DERIVED_BYTES];
 					data.readFully(ground);
 
-					Region region = new Region(flags, sea, alone, parts, ground);
+					byte[] wet = new byte[DERIVED_BYTES];
+					data.readFully(wet);
+
+					int[] palette = palette(parts);
+					Region region = new Region(flags, sea, alone, indexInto(parts, palette), palette, ground, wet);
 					regions.put(key, region);
 					if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
 					{
@@ -217,9 +258,7 @@ class WorldMesh
 		{
 			return 0;
 		}
-		byte[] parts = region.components;
-		int tile = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
-		return ((parts[tile * 2] & 0xff) << 8) | (parts[tile * 2 + 1] & 0xff);
+		return componentOf(region, x, y);
 	}
 
 	/**
@@ -235,75 +274,54 @@ class WorldMesh
 	}
 
 	/**
-	 * True if this tile is water a boat sails but nobody walks, and is not the sea:
-	 * Wyrmscraig's underground lake, which has no bit of its own. It is passable because
-	 * boats cross it and the client does not block it, so the golems' map read it as ground
-	 * and golems walked on the water. Known by its connected component, bounds-checked
-	 * first so the rest of the world pays one comparison.
+	 * True if this tile is water a boat sails but nobody walks, and is not the sea: Wyrmscraig's
+	 * underground lake, and every other lake. Passable because boats cross it and the client does
+	 * not block it, so the golems' map read it as ground and golems walked on the water. The lake
+	 * used to be found by its component from a hard-coded mouth; the mesh now carries water.
 	 */
 	boolean isInlandWater(int x, int y, int plane)
 	{
-		if (plane != 0)
-		{
-			return false;
-		}
-		if (lakeComponent < 0)
-		{
-			findLake();
-		}
-		return lakeComponent != 0 && x >= lakeMinX && x <= lakeMaxX && y >= lakeMinY && y <= lakeMaxY
-			&& componentAt(x, y, 0) == lakeComponent;
+		return isWater(x, y, plane) && !isOcean(x, y, plane);
 	}
 
-	/** The underground lake's component and bounds; -1 until looked for, 0 if the mesh has none. */
-	private int lakeComponent = -1;
-	private int lakeMinX;
-	private int lakeMaxX;
-	private int lakeMinY;
-	private int lakeMaxY;
-
-	/** How far from its mouth the lake is looked for, in tiles. It is a few dozen across. */
-	private static final int LAKE_SEARCH = 96;
-
-	private synchronized void findLake()
+	/** True if this tile is water by the cache's textures: the ocean, a sea, a lake. Never ground. */
+	boolean isWater(int x, int y, int plane)
 	{
-		if (lakeComponent >= 0)
-		{
-			return;
-		}
-		int lake = componentAt(GolemContent.CAVE_LAKE_MOUTH_X, GolemContent.CAVE_LAKE_MOUTH_Y, 0);
-		int minX = Integer.MAX_VALUE;
-		int maxX = Integer.MIN_VALUE;
-		int minY = Integer.MAX_VALUE;
-		int maxY = Integer.MIN_VALUE;
-		if (lake != 0)
-		{
-			for (int x = GolemContent.CAVE_LAKE_MOUTH_X - LAKE_SEARCH; x <= GolemContent.CAVE_LAKE_MOUTH_X + LAKE_SEARCH; x++)
-			{
-				for (int y = GolemContent.CAVE_LAKE_MOUTH_Y - LAKE_SEARCH; y <= GolemContent.CAVE_LAKE_MOUTH_Y + LAKE_SEARCH; y++)
-				{
-					if (componentAt(x, y, 0) == lake)
-					{
-						minX = Math.min(minX, x);
-						maxX = Math.max(maxX, x);
-						minY = Math.min(minY, y);
-						maxY = Math.max(maxY, y);
-					}
-				}
-			}
-		}
-		lakeMinX = minX;
-		lakeMaxX = maxX;
-		lakeMinY = minY;
-		lakeMaxY = maxY;
-		lakeComponent = lake;
+		Region region = region(regionIdOf(x, y), plane);
+		return region != null && bit(region.water, x, y);
 	}
 
-	/** True if something could stand here - the tile can be left in some direction. */
+	/**
+	 * True if a corner stops the diagonal step (dx, dy) from this tile, as the client's own corner
+	 * test does: a wall's corner post, a diagonal wall. The step's four edges are the caller's.
+	 */
+	boolean cornerBlocks(int x, int y, int plane, int dx, int dy)
+	{
+		if (dy == 1)
+		{
+			return flag(x, y, plane, dx == 1 ? FLAG_CORNER_NE : FLAG_CORNER_NW);
+		}
+		// Southward, the same corner seen from the tile it arrives at.
+		return flag(x + dx, y + dy, plane, dx == 1 ? FLAG_CORNER_NW : FLAG_CORNER_NE);
+	}
+
+	/** True if this tile's north (or east) edge is shut only by something that opens. */
+	boolean isDoorEdge(int x, int y, int plane, boolean northEdge)
+	{
+		return flag(x, y, plane, northEdge ? FLAG_DOOR_NORTH : FLAG_DOOR_EAST);
+	}
+
+	/**
+	 * True if something could walk here: nothing solid fills it, there is ground under it, and it
+	 * can be left in some direction. All three: a tile walled on four sides - the one tile a
+	 * ladder puts you on, atop a platform - is ground to stand on but nowhere to walk, and a golem
+	 * put down there must take the next hop rather than plan a walk; the edges alone let the void
+	 * round an upper floor through.
+	 */
 	boolean isWalkable(int x, int y, int plane)
 	{
-		return north(x, y, plane) || east(x, y, plane)
-			|| north(x, y - 1, plane) || east(x - 1, y, plane);
+		return flag(x, y, plane, FLAG_STANDABLE) && flag(x, y, plane, FLAG_GROUND)
+			&& (north(x, y, plane) || east(x, y, plane) || north(x, y - 1, plane) || east(x - 1, y, plane));
 	}
 
 	/**
@@ -749,9 +767,7 @@ class WorldMesh
 		{
 			return false;
 		}
-		byte[] bits = region.collision;
-		int bit = ((y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK)) * 2 + which;
-		return (bits[bit >> 3] >>> (bit & 7) & 1) != 0;
+		return (region.collision[(y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK)] >>> which & 1) != 0;
 	}
 
 	/** The land fill's bit for this tile. */
@@ -779,7 +795,66 @@ class WorldMesh
 	private static int componentOf(Region region, int x, int y)
 	{
 		int tile = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
-		return ((region.components[tile * 2] & 0xff) << 8) | (region.components[tile * 2 + 1] & 0xff);
+		return region.palette[region.components == null ? 0 : region.components[tile] & 0xFF];
+	}
+
+	/** The distinct component ids in a region-plane's two-byte map, in order of first use. */
+	private static int[] palette(byte[] parts)
+	{
+		int[] ids = new int[256];
+		int count = 0;
+		int last = -1;
+		for (int tile = 0; tile < TILES_PER_PLANE; tile++)
+		{
+			int id = ((parts[tile * 2] & 0xFF) << 8) | (parts[tile * 2 + 1] & 0xFF);
+			// Neighbours along a row are nearly always one space: the scan is for the change.
+			if (id == last)
+			{
+				continue;
+			}
+			last = id;
+			int i = 0;
+			while (i < count && ids[i] != id)
+			{
+				i++;
+			}
+			if (i == count)
+			{
+				if (count == ids.length)
+				{
+					throw new IllegalStateException("more than 256 components in one region-plane");
+				}
+				ids[count++] = id;
+			}
+		}
+		return Arrays.copyOf(ids, count);
+	}
+
+	/** Each tile's index into the palette; null when there is only one id. */
+	private static byte[] indexInto(byte[] parts, int[] palette)
+	{
+		if (palette.length == 1)
+		{
+			return null;
+		}
+		byte[] index = new byte[TILES_PER_PLANE];
+		int last = palette[0];
+		int at = 0;
+		for (int tile = 0; tile < TILES_PER_PLANE; tile++)
+		{
+			int id = ((parts[tile * 2] & 0xFF) << 8) | (parts[tile * 2 + 1] & 0xFF);
+			if (id != last)
+			{
+				at = 0;
+				while (palette[at] != id)
+				{
+					at++;
+				}
+				last = id;
+			}
+			index[tile] = (byte) at;
+		}
+		return index;
 	}
 
 	private static int regionIdOf(int x, int y)
