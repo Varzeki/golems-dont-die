@@ -2960,9 +2960,13 @@ public class GolemsDontDiePlugin extends Plugin
 			: null;
 		if (scene != null)
 		{
-			int drawX = wv.getBaseX() + (scene[0] << 3) + (tileX & 7);
-			int drawY = wv.getBaseY() + (scene[1] << 3) + (tileY & 7);
-			golem.setDrawOffset((drawX - tileX) * Golem.TILE, (drawY - tileY) * Golem.TILE, scene[2]);
+			// A turned chunk turns the golem's place in it with it. See InstanceMap.turn.
+			int[] inChunk = InstanceMap.turn(tileX & 7, tileY & 7, scene[3]);
+			int drawX = wv.getBaseX() + (scene[0] << 3) + inChunk[0];
+			int drawY = wv.getBaseY() + (scene[1] << 3) + inChunk[1];
+			// From the template chunk's corner to the scene chunk's; the turn within it is the golem's.
+			golem.setDrawOffset((wv.getBaseX() + (scene[0] << 3) - (tileX & ~7)) * Golem.TILE,
+				(wv.getBaseY() + (scene[1] << 3) - (tileY & ~7)) * Golem.TILE, scene[2], scene[3]);
 			return playerAt == null ? GolemTier.FAR
 				: GolemTier.of(wv, drawX, drawY, scene[2], playerAt.getX(), playerAt.getY(), playerAt.getPlane());
 		}

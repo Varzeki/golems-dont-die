@@ -48,7 +48,7 @@ class WorldMesh
 	private static final int MAGIC = -0x60137;
 
 	/** 2 added the per-tile component map; 3 a byte a tile (standable, ground, corners, doors) and water. */
-	private static final int VERSION = 3;
+	private static final int VERSION = 4;
 
 	static final int FLAG_NORTH = 0;
 	static final int FLAG_EAST = 1;
@@ -179,35 +179,24 @@ class WorldMesh
 				{
 					int regionId = data.readInt();
 					int plane = data.readByte();
-					long key = key(regionId, plane);
+					put(regionId, plane, readRecord(data));
+				}
 
-					byte[] flags = new byte[COLLISION_BYTES];
-					data.readFully(flags);
-
-					byte[] sea = new byte[DERIVED_BYTES];
-					data.readFully(sea);
-
-					byte[] alone = new byte[DERIVED_BYTES];
-					data.readFully(alone);
-
-					byte[] parts = new byte[COMPONENT_BYTES];
-					data.readFully(parts);
-
-					byte[] ground = new byte[DERIVED_BYTES];
-					data.readFully(ground);
-
-					byte[] wet = new byte[DERIVED_BYTES];
-					data.readFully(wet);
-
-					int[] palette = palette(parts);
-					Region region = new Region(flags, sea, alone, indexInto(parts, palette), palette, ground, wet);
-					regions.put(key, region);
+				// The rest of the world, packed: read the first time a golem asks about it.
+				int packedEntries = data.readInt();
+				for (int i = 0; i < packedEntries; i++)
+				{
+					int regionId = data.readInt();
+					int plane = data.readByte();
+					byte[] blob = new byte[data.readInt()];
+					data.readFully(blob);
+					packed.put(key(regionId, plane), blob);
 					if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
 					{
-						byRegion[regionId << 2 | (plane & 0xF)] = region;
+						packedAt[regionId << 2 | (plane & 0xF)] = true;
 					}
 				}
-				log.debug("Loaded world mesh: {} region-planes", entries);
+				log.debug("Loaded world mesh: {} region-planes, {} more packed", entries, packedEntries);
 			}
 		}
 		catch (IOException | RuntimeException e)
@@ -215,6 +204,8 @@ class WorldMesh
 			log.warn("Bundled world mesh unreadable", e);
 			regions.clear();
 			Arrays.fill(byRegion, null);
+			packed.clear();
+			Arrays.fill(packedAt, false);
 		}
 	}
 
@@ -781,9 +772,79 @@ class WorldMesh
 	{
 		if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
 		{
-			return byRegion[regionId << 2 | (plane & 0xF)];
+			int at = regionId << 2 | (plane & 0xF);
+			Region region = byRegion[at];
+			return region != null || !packedAt[at] ? region : unpack(regionId, plane);
 		}
-		return regions.get(key(regionId, plane));
+		Region region = regions.get(key(regionId, plane));
+		return region != null || !packed.containsKey(key(regionId, plane)) ? region : unpack(regionId, plane);
+	}
+
+	/**
+	 * Region-planes no fill reached, each deflated on its own, by key: most of the world, and
+	 * nowhere a golem goes until a learned route leads there. Unpacked on first use and kept.
+	 */
+	private final Map<Long, byte[]> packed = new HashMap<>();
+
+	/** Whether {@link #packed} holds a region-plane, indexed as {@link #byRegion}. */
+	private final boolean[] packedAt = new boolean[FAST_REGIONS << 2];
+
+	/** Unpacks a packed region-plane into the mesh, once; null if it will not read. */
+	private synchronized Region unpack(int regionId, int plane)
+	{
+		long key = key(regionId, plane);
+		Region region = regions.get(key);
+		byte[] blob = packed.remove(key);
+		if (region != null || blob == null)
+		{
+			return region;
+		}
+		try (DataInputStream data = new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(blob))))
+		{
+			region = readRecord(data);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.warn("World mesh region {} plane {} unreadable", regionId, plane, e);
+			region = null;
+		}
+		if (region != null)
+		{
+			put(regionId, plane, region);
+		}
+		if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
+		{
+			packedAt[regionId << 2 | (plane & 0xF)] = false;
+		}
+		return region;
+	}
+
+	/** One region-plane's record: the tile bytes, ocean, isolated, components, land, water. */
+	private static Region readRecord(DataInputStream data) throws IOException
+	{
+		byte[] flags = new byte[COLLISION_BYTES];
+		data.readFully(flags);
+		byte[] sea = new byte[DERIVED_BYTES];
+		data.readFully(sea);
+		byte[] alone = new byte[DERIVED_BYTES];
+		data.readFully(alone);
+		byte[] parts = new byte[COMPONENT_BYTES];
+		data.readFully(parts);
+		byte[] ground = new byte[DERIVED_BYTES];
+		data.readFully(ground);
+		byte[] wet = new byte[DERIVED_BYTES];
+		data.readFully(wet);
+		int[] palette = palette(parts);
+		return new Region(flags, sea, alone, indexInto(parts, palette), palette, ground, wet);
+	}
+
+	private void put(int regionId, int plane, Region region)
+	{
+		regions.put(key(regionId, plane), region);
+		if (regionId >= 0 && regionId < FAST_REGIONS && (plane & 0xF) < 4)
+		{
+			byRegion[regionId << 2 | (plane & 0xF)] = region;
+		}
 	}
 
 	private static boolean bit(byte[] bits, int x, int y)

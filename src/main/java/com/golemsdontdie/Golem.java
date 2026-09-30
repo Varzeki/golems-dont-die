@@ -2330,7 +2330,9 @@ class Golem
 		}
 		if (!crewed || deckAcross == 0)
 		{
-			return orientation;
+			// In a turned instance chunk, turned with it: a quarter turn takes east to south, and
+			// south (0) round to west (512) is a quarter of the way round.
+			return orientation + 512 * drawQuarters & 2047;
 		}
 		// Right of a golem facing south is west, which is 512 further round.
 		return orientation + (deckAcross > 0 ? 512 : -512) & 2047;
@@ -2438,19 +2440,56 @@ class Golem
 
 	void setDrawOffset(int x, int y, int plane)
 	{
+		setDrawOffset(x, y, plane, 0);
+	}
+
+	/**
+	 * Where the golem is drawn, against where it is simulated: in an instance, from the template
+	 * chunk's corner to the scene chunk's, and the quarter turns the chunk was built with.
+	 */
+	void setDrawOffset(int x, int y, int plane, int quarters)
+	{
 		drawOffsetX = x;
 		drawOffsetY = y;
 		drawPlane = plane;
+		drawQuarters = quarters & 3;
 	}
+
+	/** Quarter turns the instance chunk this golem is drawn in was built with. See InstanceMap.turn. */
+	private int drawQuarters;
+
+	/** An eight-tile chunk, in fine units. */
+	private static final int CHUNK_FINE = 8 * TILE;
 
 	int getDrawFineX()
 	{
-		return fineX + drawOffsetX + deckOffset(true);
+		return drawnInChunk(true) + drawOffsetX + deckOffset(true);
 	}
 
 	int getDrawFineY()
 	{
-		return fineY + drawOffsetY + deckOffset(false);
+		return drawnInChunk(false) + drawOffsetY + deckOffset(false);
+	}
+
+	/**
+	 * The golem's position with its place in the chunk turned as the chunk was, the continuous
+	 * form of InstanceMap.turn: a quarter turn takes (u, v) to (v, S - u), S the chunk's width.
+	 */
+	private int drawnInChunk(boolean acrossX)
+	{
+		if (drawQuarters == 0)
+		{
+			return acrossX ? fineX : fineY;
+		}
+		int u = fineX & (CHUNK_FINE - 1);
+		int v = fineY & (CHUNK_FINE - 1);
+		for (int i = 0; i < drawQuarters; i++)
+		{
+			int turned = v;
+			v = CHUNK_FINE - u;
+			u = turned;
+		}
+		return acrossX ? (fineX & ~(CHUNK_FINE - 1)) + u : (fineY & ~(CHUNK_FINE - 1)) + v;
 	}
 
 	/**
