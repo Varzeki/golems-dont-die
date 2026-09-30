@@ -368,7 +368,8 @@ class WorldMesh
 	 * wrong: the tables hold one-way rows, and a pocket of Wyrmscraig entered by a drop with no
 	 * row back out had golems carried to the plinth and walking straight back into it, twice in
 	 * fifteen seconds. Ground a golem can reach is ground a golem may stand on; a golem that
-	 * cannot get out again is the stuck watchdog's business, not this one's.
+	 * cannot get out again is the stuck watchdog's business, not this one's. Not walking into
+	 * such a pocket in the first place is WaysBack's, over only what golems may use.
 	 */
 	private boolean[] fromHome;
 
@@ -380,6 +381,23 @@ class WorldMesh
 
 	/** Space to the spaces a transport leads to. */
 	private final Map<Integer, java.util.List<Integer>> leadsTo = new HashMap<>();
+
+	/** Space to the spaces the island map walks into from it, both ways. See joinWhereWalked. */
+	private final Map<Integer, java.util.List<Integer>> walkedTo = new HashMap<>();
+
+	/** Goes up whenever the joins above are rebuilt, so anything built from them knows to build again. */
+	private int linkRevision;
+
+	int linkRevision()
+	{
+		return linkRevision;
+	}
+
+	/** Space to the spaces the island map walks into from it. */
+	Map<Integer, java.util.List<Integer>> walkedTo()
+	{
+		return Collections.unmodifiableMap(walkedTo);
+	}
 
 	/**
 	 * True if this tile is in a pocket too small to wander, that no route touches and no dock
@@ -523,7 +541,9 @@ class WorldMesh
 	{
 		Arrays.fill(landComponents, false);
 		leadsTo.clear();
+		walkedTo.clear();
 		touched.clear();
+		linkRevision++;
 		Map<Long, java.util.List<GolemTransport>> starting = new HashMap<>();
 		for (GolemTransport t : transports)
 		{
@@ -598,6 +618,12 @@ class WorldMesh
 				}
 			}
 		}
+		// Only when something was joined: run again after every harvest, most runs add nothing, and
+		// each bump rebuilds what golems can get back from.
+		if (joined > 0)
+		{
+			linkRevision++;
+		}
 		log.debug("{} spaces joined where the island map walks between them", joined);
 	}
 
@@ -610,14 +636,26 @@ class WorldMesh
 		}
 		touched.add(one);
 		touched.add(other);
-		java.util.List<Integer> from = leadsTo.computeIfAbsent(one, space -> new ArrayList<>());
-		if (from.contains(other))
+		// Judged by the walks alone: a one-way transport already leading from one to the other
+		// said nothing about the way back, and the walk back was dropped with it.
+		java.util.List<Integer> walked = walkedTo.computeIfAbsent(one, space -> new ArrayList<>());
+		if (walked.contains(other))
 		{
 			return 0;
 		}
-		from.add(other);
-		leadsTo.computeIfAbsent(other, space -> new ArrayList<>()).add(one);
+		walked.add(other);
+		walkedTo.computeIfAbsent(other, space -> new ArrayList<>()).add(one);
+		addOnce(leadsTo.computeIfAbsent(one, space -> new ArrayList<>()), other);
+		addOnce(leadsTo.computeIfAbsent(other, space -> new ArrayList<>()), one);
 		return 1;
+	}
+
+	private static void addOnce(java.util.List<Integer> spaces, int space)
+	{
+		if (!spaces.contains(space))
+		{
+			spaces.add(space);
+		}
 	}
 
 	/**
@@ -634,7 +672,7 @@ class WorldMesh
 	 * The spaces a transport's end touches, following a chain on from an end that touches none -
 	 * a stepping stone mid-river, all water round it - as TransportNetwork.leadsToGround does.
 	 */
-	private java.util.List<Integer> spacesOnward(int x, int y, int plane, int cameX, int cameY, int camePlane,
+	java.util.List<Integer> spacesOnward(int x, int y, int plane, int cameX, int cameY, int camePlane,
 		int hops, Map<Long, java.util.List<GolemTransport>> starting)
 	{
 		java.util.List<Integer> here = spacesAt(x, y, plane);
@@ -661,12 +699,12 @@ class WorldMesh
 		return found;
 	}
 
-	private static long tileKey(int x, int y, int plane)
+	static long tileKey(int x, int y, int plane)
 	{
 		return ((long) plane << 32) | ((long) x << 16) | y;
 	}
 
-	private java.util.List<Integer> spacesAt(int x, int y, int plane)
+	java.util.List<Integer> spacesAt(int x, int y, int plane)
 	{
 		int own = componentAt(x, y, plane);
 		if (own != 0)

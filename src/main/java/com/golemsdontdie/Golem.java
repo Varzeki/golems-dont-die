@@ -1461,6 +1461,12 @@ class Golem
 						{
 							continue;
 						}
+						// Nowhere with no way back, by choice. Asked after the roll, which turns most
+						// down for less; mid-crossing the next hop is no choice and is not asked.
+						if (!context.mayEnter(transport))
+						{
+							continue;
+						}
 					}
 
 					// Only ever taken from the tile it actually starts on: the radius exists

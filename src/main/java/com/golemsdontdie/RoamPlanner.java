@@ -194,6 +194,14 @@ class RoamPlanner
 			return null;
 		}
 		indexComponents();
+		// Worked out over what golems may use, which changes without the table changing.
+		WaysBack back = waysBack(tick, null);
+		if (waysHomeBuild != back.builds())
+		{
+			waysHome.clear();
+			unmeshedWays.clear();
+			waysHomeBuild = back.builds();
+		}
 		int component = componentNear(x, y, plane);
 		List<GolemTransport> ways;
 		if (component == 0)
@@ -303,10 +311,174 @@ class RoamPlanner
 		return ways;
 	}
 
-	/** Whether a tile, or one beside it, is ground the mesh knows and home reaches. */
+	/** What golems can get back from, built on first use. See WaysBack. */
+	private WaysBack waysBack;
+
+	/** Transports turned down for having no way back, since start: the simulation reports it. */
+	@lombok.Getter
+	private int refusedNoWayBack;
+
+	/**
+	 * True if a golem may take this transport: from where it lands it could get back where it set
+	 * off, or home. A golem goes nowhere it has no way back from; see WaysBack.
+	 *
+	 * <p>Only asked of a choice. A golem leaving a dead end, stepping off a stone mid-river or going
+	 * home the way it came in takes what it must.
+	 */
+	boolean mayEnter(GolemTransport transport, int tick, RoamContext context)
+	{
+		if (mesh == null || transports == null || abilities == null)
+		{
+			return true;
+		}
+		waysBack(tick, context);
+		List<Integer> from = waysBack.setOff(transport);
+		if (from.isEmpty())
+		{
+			// Leaving ground the mesh does not know, which is where the unmeshed ways home lead from.
+			return true;
+		}
+		List<Integer> to = waysBack.landing(transport);
+		if (to.isEmpty())
+		{
+			to = unmeshedExits(transport);
+			if (to == null)
+			{
+				// Its floor runs on into ground the mesh knows, by the island map: nothing to judge by.
+				return true;
+			}
+		}
+		if (waysBack.comesBack(from, to))
+		{
+			return true;
+		}
+		refusedNoWayBack++;
+		return false;
+	}
+
+	/** The spaces of every dock a golem may sail from now; none while golems are kept ashore. */
+	private Set<Integer> openPorts(RoamContext context)
+	{
+		if (docks == null || ambitionRestricted(context))
+		{
+			return Collections.emptySet();
+		}
+		Set<Integer> ports = new HashSet<>();
+		for (SailingDocks.Dock dock : docks.openDocks())
+		{
+			WorldPoint shore = dock.getShore();
+			int space = mesh.componentAt(shore.getX(), shore.getY(), shore.getPlane());
+			if (space != 0)
+			{
+				ports.add(space);
+			}
+		}
+		return ports;
+	}
+
+	/** Landings on ground the mesh has nothing on, by tile, to the spaces usable ways out lead to. */
+	private final Map<Long, List<Integer>> unmeshedExits = new HashMap<>();
+
+	/** The build of the graph the landings above were worked out on. */
+	private int unmeshedExitsBuild = -1;
+
+	/**
+	 * For a transport landing where the mesh knows nothing - content newer than the mesh, an
+	 * instance - the spaces a golem could go on to from the floor it lands on, by the usable ways
+	 * out of it; or null if that floor runs on into ground the mesh knows. The floor is the island
+	 * map's, as unmeshedRoom reads it, so ground never seen has only what starts beside the landing.
+	 */
+	private List<Integer> unmeshedExits(GolemTransport transport)
+	{
+		if (unmeshedExitsBuild != waysBack.builds() || unmeshedExits.size() > UNMESHED_REMEMBERED)
+		{
+			unmeshedExits.clear();
+			unmeshedExitsBuild = waysBack.builds();
+		}
+		int plane = transport.getToPlane();
+		long key = RoamContext.tileKey(transport.getToX(), transport.getToY(), plane);
+		if (unmeshedExits.containsKey(key))
+		{
+			return unmeshedExits.get(key);
+		}
+		TileMap room = unmeshedRoom(transport.getToX(), transport.getToY(), plane);
+		List<Integer> exits = null;
+		if (room != null)
+		{
+			exits = new ArrayList<>();
+			for (GolemTransport t : transports.all())
+			{
+				if (!waysBack.wasUsable(t) || t.getFromPlane() != plane || !inRoom(room, t.getFromX(), t.getFromY()))
+				{
+					continue;
+				}
+				for (int space : waysBack.landing(t))
+				{
+					if (!exits.contains(space))
+					{
+						exits.add(space);
+					}
+				}
+			}
+		}
+		unmeshedExits.put(key, exits);
+		return exits;
+	}
+
+	/**
+	 * True if a golem here stands where it could not get home by anything golems may use: walking,
+	 * climbing, sailing, over shipped and learned rows but never a locked one. Nowhere a golem goes
+	 * by choice, so one found there was put there - a saved position, a lever pulled since, a route
+	 * withdrawn - and is brought home. False where the mesh knows nothing.
+	 */
+	boolean isStranded(int x, int y, int plane, int tick)
+	{
+		if (mesh == null || transports == null || abilities == null)
+		{
+			return false;
+		}
+		int space = mesh.componentAt(x, y, plane);
+		return space != 0 && !waysBack(tick, null).reachesHome(space);
+	}
+
+	/** The graph build the ways home above were worked out on. */
+	private int waysHomeBuild = -1;
+
+	/**
+	 * What golems can get back from, brought up to date.
+	 *
+	 * @param context the asking golem's, for whether it may sail; null to take every open dock
+	 */
+	private WaysBack waysBack(int tick, RoamContext context)
+	{
+		if (waysBack == null)
+		{
+			waysBack = new WaysBack(mesh, transports, abilities::canUse);
+		}
+		waysBack.refresh(tick, () -> openPorts(context));
+		return waysBack;
+	}
+
+	/**
+	 * Whether a tile, or one beside it, is ground the mesh knows from which a golem could get home by
+	 * what it may use: walking, climbing and sailing. Home "reaching" it over every row, locked ones
+	 * too, was not enough: golems were led back through a door they had never seen opened into a
+	 * cell they then could not leave.
+	 */
 	private boolean joinedToHome(int x, int y, int plane)
 	{
-		return componentNear(x, y, plane) != 0 && !mesh.isCutOff(x, y, plane);
+		if (waysBack == null)
+		{
+			return componentNear(x, y, plane) != 0 && !mesh.isCutOff(x, y, plane);
+		}
+		for (int space : mesh.spacesAt(x, y, plane))
+		{
+			if (waysBack.reachesHome(space))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -376,6 +548,29 @@ class RoamPlanner
 	 */
 	private List<GolemTransport> findWaysHome(int start)
 	{
+		// A golem that can get home by what it may use - walking, climbing, sailing - needs no way
+		// back out. Counting shortcuts alone called a courtyard with a dock shut in, and the way back
+		// it was given was a locked cell door: into a cell with no way out.
+		if (waysBack != null)
+		{
+			if (waysBack.reachesHome(start))
+			{
+				return Collections.emptyList();
+			}
+			// Out by a way back that leads somewhere home can be reached from, where there is one.
+			List<GolemTransport> homeward = new ArrayList<>();
+			for (GolemTransport way : waysBackFrom.getOrDefault(start, Collections.emptyList()))
+			{
+				if (joinedToHome(way.getToX(), way.getToY(), way.getToPlane()))
+				{
+					homeward.add(way);
+				}
+			}
+			if (!homeward.isEmpty())
+			{
+				return homeward;
+			}
+		}
 		Set<Integer> reached = new HashSet<>();
 		ArrayDeque<Integer> queue = new ArrayDeque<>();
 		reached.add(start);
@@ -1053,6 +1248,12 @@ class RoamPlanner
 				wanted *= memory.tasteFor(transport);
 			}
 			if (wanted < 1f && random.nextFloat() >= wanted)
+			{
+				continue;
+			}
+			// Nowhere with no way back. After the rolls, which turn most down for less, and before the
+			// crowded fallback is kept, which is taken without asking again.
+			if (!mayEnter(transport, tick, reach.context))
 			{
 				continue;
 			}

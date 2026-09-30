@@ -104,6 +104,25 @@ class IslandMemory
 		}
 	}
 
+	/** Every region the map holds ground for, on any plane: the island and wherever else was read. */
+	int[] knownRegions()
+	{
+		Set<Integer> ids = new TreeSet<>();
+		for (long key : regions.keySet())
+		{
+			ids.add((int) (key >> 8));
+		}
+		for (int island : GolemContent.ISLAND_REGIONS)
+		{
+			ids.add(island);
+		}
+		return ids.stream().mapToInt(Integer::intValue).toArray();
+	}
+
+	/** Goes up each time a harvest reads ground, so walks between spaces can be joined afresh. */
+	@lombok.Getter
+	private int harvests;
+
 	/** Empties {@link #regions}, and what is known about what it holds. */
 	private void clearRegions()
 	{
@@ -445,6 +464,7 @@ class IslandMemory
 			if (tilesSeen > 0)
 			{
 				dirty = true;
+				harvests++;
 			}
 
 			// Only done when every tile was actually in the scene: the scene is 104 tiles

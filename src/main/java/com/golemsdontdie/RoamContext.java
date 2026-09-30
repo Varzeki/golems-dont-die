@@ -134,6 +134,12 @@ final class RoamContext
 	@Setter
 	private RoamPlanner planner;
 
+	/** True if a golem may take this transport by choice: it has a way back. See RoamPlanner.mayEnter. */
+	boolean mayEnter(GolemTransport transport)
+	{
+		return planner == null || planner.mayEnter(transport, tick, this);
+	}
+
 	/** The shared model and animation cache, for clip lengths. Set after construction. */
 	@Setter
 	private GolemModelFactory models;

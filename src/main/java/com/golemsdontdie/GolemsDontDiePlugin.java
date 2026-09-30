@@ -551,7 +551,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// A new route can lead onto a floor nothing else reaches: ground from now on.
 		worldMesh.admitTransportEnds(transports.all());
-		worldMesh.joinWhereWalked(islandMemory, GolemContent.ISLAND_REGIONS);
+		worldMesh.joinWhereWalked(islandMemory, islandMemory.knownRegions());
 		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		// A new route into an instance can mean a new room golems may stand in.
@@ -682,7 +682,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// Floors reached only by transports the land fill never had. See WorldMesh.
 		worldMesh.admitTransportEnds(transports.all());
-		worldMesh.joinWhereWalked(islandMemory, GolemContent.ISLAND_REGIONS);
+		worldMesh.joinWhereWalked(islandMemory, islandMemory.knownRegions());
 		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		roamContext = new RoamContext(islandMemory, pathfinder, transports, abilities);
@@ -2152,6 +2152,15 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private static final float MOST_CUT_OFF = 0.25f;
 
+	/** Ticks swept since logging in. See sendHomeIfCutOff. */
+	private int ticksLoggedIn;
+
+	/** How long after logging in before a golem is judged stranded: a minute. */
+	private static final int STRANDED_GRACE_TICKS = 100;
+
+	/** The island map's harvest count when walks were last joined. */
+	private int joinedAtHarvest = -1;
+
 	/** Set once the warning about an unbelievable world has been given. */
 	private boolean saidWorldUnreadable;
 
@@ -2174,6 +2183,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void sweepForCutOff()
 	{
+		ticksLoggedIn++;
 		int roster = golems.size();
 		for (int i = 0; i < Math.min(SWEEP_PER_TICK, roster); i++)
 		{
@@ -2217,7 +2227,13 @@ public class GolemsDontDiePlugin extends Plugin
 		boolean pocket = worldMesh.isSealedPocket(x, y, golem.getPlane()) && !transports.hasOrigin(x, y);
 
 		sweepSeen++;
-		boolean cutOff = worldMesh.isCutOff(x, y, golem.getPlane());
+		// Stranded is the stricter question: whether it could get home by anything golems may use,
+		// locked rows not counted. Not asked in the first minute after logging in, while levels and
+		// quests may still read as nothing, nor of a golem in view: it walked in by the live scene,
+		// and the joins that scene makes are the next harvest's.
+		boolean cutOff = worldMesh.isCutOff(x, y, golem.getPlane())
+			|| ticksLoggedIn >= STRANDED_GRACE_TICKS && golem.getTier() != GolemTier.SCENE
+				&& roamPlanner.isStranded(x, y, golem.getPlane(), roamContext.getTick());
 		sweepCutOff += cutOff ? 1 : 0;
 
 		// Cut off is counted before it is believed: not acted on until a whole pass has been made,
@@ -3124,6 +3140,13 @@ public class GolemsDontDiePlugin extends Plugin
 			islandMemory.sceneChanged();
 		}
 		islandMemory.harvestLoadedRegions();
+		// Ground just read can join two spaces: a door standing open, which golems in view walk
+		// through. Joined now, or a golem that walked in by it would read as stranded.
+		if (islandMemory.getHarvests() != joinedAtHarvest)
+		{
+			joinedAtHarvest = islandMemory.getHarvests();
+			worldMesh.joinWhereWalked(islandMemory, islandMemory.knownRegions());
+		}
 
 		// Only when the roster has actually changed: copying five hundred golems every tick
 		// to hand the panel an identical list is work for nothing.
@@ -3319,6 +3342,7 @@ public class GolemsDontDiePlugin extends Plugin
 			// Not on every LOGGED_IN, which also follows each loading screen.
 			sailingDocks.forgetQuests();
 			abilities.forgetQuests();
+			ticksLoggedIn = 0;
 			obstacleObserver.resetSession();
 			detector.reset();
 			hiddenNpcs.clear();

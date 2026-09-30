@@ -417,9 +417,17 @@ class SailingDocks
 		return snapToShore(at, true);
 	}
 
-	/** @param piers false to take only ground the land fill reached. See quayside. */
+	/**
+	 * @param piers false to take only ground the land fill reached. See quayside.
+	 *
+	 * <p>A pier is taken only if it is more than a pocket, by the same measure as land. Five docks
+	 * had a pocket of two to thirteen tiles nearer the buoy than the shore it is walled off from (the
+	 * end of a jetty, a nook behind a crate), and golems stepping ashore there were shut in. A pocket
+	 * is the last resort, where nothing larger is in reach.
+	 */
 	private WorldPoint snapToShore(WorldPoint at, boolean piers)
 	{
+		WorldPoint pocket = null;
 		for (int radius = 0; radius <= SNAP_RADIUS; radius++)
 		{
 			WorldPoint pier = null;
@@ -443,7 +451,14 @@ class SailingDocks
 					if (piers && pier == null && mesh.isWalkable(x, y, at.getPlane())
 						&& !mesh.isOcean(x, y, at.getPlane()) && mesh.componentAt(x, y, at.getPlane()) != 0)
 					{
-						pier = new WorldPoint(x, y, at.getPlane());
+						if (!mesh.isIsolated(x, y, at.getPlane()))
+						{
+							pier = new WorldPoint(x, y, at.getPlane());
+						}
+						else if (pocket == null)
+						{
+							pocket = new WorldPoint(x, y, at.getPlane());
+						}
 					}
 				}
 			}
@@ -452,7 +467,7 @@ class SailingDocks
 				return pier;
 			}
 		}
-		return at;
+		return pocket != null ? pocket : at;
 	}
 
 	/**
