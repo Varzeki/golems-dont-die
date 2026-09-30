@@ -80,6 +80,13 @@ final class WaysBack
 		return builds;
 	}
 
+	/** Builds again at the next refresh, whether anything changed or not. */
+	void forget()
+	{
+		builtRevision = -1;
+		checked = false;
+	}
+
 	/** True if this row was usable when the graph was last built. */
 	boolean wasUsable(GolemTransport transport)
 	{
@@ -127,6 +134,7 @@ final class WaysBack
 	{
 		builds++;
 		reaches.clear();
+		deadEnds.clear();
 		edges.clear();
 		fromSpaces = newLists(all.size());
 		toSpaces = newLists(all.size());
@@ -235,6 +243,81 @@ final class WaysBack
 			}
 		}
 		return false;
+	}
+
+	/** Spaces a pocket may run to and still be a dead end: the escape's measure of shut in. */
+	static final int DEAD_END_SPACES = 8;
+
+	/** Whether a landing is a dead end from an origin, asked before; forgotten on each build. */
+	private final Map<Long, Boolean> deadEnds = new HashMap<>();
+
+	/**
+	 * True if landing in these spaces from those leads nowhere but back: everything reachable from
+	 * the landing without passing back through where the golem set off is a pocket of a few spaces,
+	 * no dock among them. Castle Wars' waiting rooms, a tower top, a cellar.
+	 */
+	boolean isDeadEnd(List<Integer> from, List<Integer> to)
+	{
+		if (to.isEmpty() || from.isEmpty())
+		{
+			return false;
+		}
+		// Landing where it set off - a hop within one space - is no dead end: the whole space is
+		// still there. Read as one, every such hop was taken less.
+		for (int space : to)
+		{
+			if (from.contains(space))
+			{
+				return false;
+			}
+		}
+		long key = (long) to.get(0) << 16 | from.get(0);
+		Boolean known = deadEnds.get(key);
+		if (known != null)
+		{
+			return known;
+		}
+		int stamp = ++searches;
+		for (int origin : from)
+		{
+			seenBy[origin] = stamp;
+		}
+		ArrayDeque<Integer> queue = new ArrayDeque<>();
+		int pocket = 0;
+		for (int space : to)
+		{
+			if (seenBy[space] != stamp)
+			{
+				seenBy[space] = stamp;
+				queue.add(space);
+				pocket++;
+			}
+		}
+		boolean dead = true;
+		while (!queue.isEmpty() && dead)
+		{
+			for (int next : edges.getOrDefault(queue.poll(), Collections.emptyList()))
+			{
+				if (seenBy[next] == stamp)
+				{
+					continue;
+				}
+				seenBy[next] = stamp;
+				// The sea goes everywhere a boat does; more than a few spaces is somewhere else.
+				if (next == SEA || ++pocket > DEAD_END_SPACES)
+				{
+					dead = false;
+					break;
+				}
+				queue.add(next);
+			}
+		}
+		if (deadEnds.size() >= MOST_REMEMBERED)
+		{
+			deadEnds.clear();
+		}
+		deadEnds.put(key, dead);
+		return dead;
 	}
 
 	/** True if a golem in this space could get home. */

@@ -52,15 +52,26 @@ class GolemCrew
 		return true;
 	}
 
-	/** The golem at the helm, which is the one the boat itself is drawn under. */
+	/**
+	 * The golem at the helm, which is the one the boat itself is drawn under: the first of the crew
+	 * still standing. Fixed as the first, a helm crumbling mid-crossing took the boat with it, and
+	 * the rest finished the crossing on open water.
+	 */
 	Golem helm()
 	{
-		return members.isEmpty() ? null : members.get(0);
+		for (Golem member : members)
+		{
+			if (!member.isDying())
+			{
+				return member;
+			}
+		}
+		return null;
 	}
 
 	boolean isHelm(Golem golem)
 	{
-		return !members.isEmpty() && members.get(0) == golem;
+		return golem != null && helm() == golem;
 	}
 
 	int size()

@@ -140,6 +140,12 @@ final class RoamContext
 		return planner == null || planner.mayEnter(transport, tick, this);
 	}
 
+	/** How much a golem wants this transport for where it leads. See RoamPlanner.wayOnAppeal. */
+	float wayOnAppeal(GolemTransport transport)
+	{
+		return planner == null ? 1f : planner.wayOnAppeal(transport, tick, this);
+	}
+
 	/** The shared model and animation cache, for clip lengths. Set after construction. */
 	@Setter
 	private GolemModelFactory models;

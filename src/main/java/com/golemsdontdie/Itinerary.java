@@ -451,6 +451,12 @@ final class Itinerary
 
 	private WorldPoint walkEnd;
 
+	/** True if the golem stays where it is for this route's length: a pause, not a journey. */
+	boolean isStationary()
+	{
+		return xs.length == 1 && landing == null && transport == null && !voyage;
+	}
+
 	/** True if this is a crossing by sea with legs to sail, rather than a passage or a walk. */
 	boolean isSailed()
 	{

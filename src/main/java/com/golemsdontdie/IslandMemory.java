@@ -98,10 +98,31 @@ class IslandMemory
 	private void held(long key)
 	{
 		int regionId = (int) (key >> 8);
+		fresh.add(regionId);
 		if (regionId >= 0 && regionId < mayHold.length)
 		{
 			mayHold[regionId] = true;
 		}
+	}
+
+	/**
+	 * Regions read into the map since {@link #takeFreshRegions} was last asked: where walks between
+	 * spaces may have changed, and nowhere else.
+	 */
+	private final Set<Integer> fresh = new LinkedHashSet<>();
+
+	/** The regions read since last asked, and forgets them. */
+	int[] takeFreshRegions()
+	{
+		int[] out = fresh.stream().mapToInt(Integer::intValue).toArray();
+		fresh.clear();
+		return out;
+	}
+
+	/** True if the map holds anything of its own for this region and plane. */
+	boolean holds(int regionId, int plane)
+	{
+		return regionId >= 0 && regionId < mayHold.length && mayHold[regionId] && regions.containsKey(key(regionId, plane));
 	}
 
 	/** Every region the map holds ground for, on any plane: the island and wherever else was read. */
@@ -118,10 +139,6 @@ class IslandMemory
 		}
 		return ids.stream().mapToInt(Integer::intValue).toArray();
 	}
-
-	/** Goes up each time a harvest reads ground, so walks between spaces can be joined afresh. */
-	@lombok.Getter
-	private int harvests;
 
 	/** Empties {@link #regions}, and what is known about what it holds. */
 	private void clearRegions()
@@ -464,7 +481,6 @@ class IslandMemory
 			if (tilesSeen > 0)
 			{
 				dirty = true;
-				harvests++;
 			}
 
 			// Only done when every tile was actually in the scene: the scene is 104 tiles
@@ -767,6 +783,9 @@ class IslandMemory
 		return ((worldX >> 6) << 8) | (worldY >> 6);
 	}
 
+	/** Where instances begin, in x: coordinates past it are rebuilt each visit and name no square. */
+	private static final int INSTANCE_X = 6400;
+
 	private static long key(int regionId, int plane)
 	{
 		return ((long) regionId << 8) | (plane & 0xFF);
@@ -852,6 +871,15 @@ class IslandMemory
 				// Open on every edge of every tile is no real square: it is one that does not exist,
 				// saved as ground before the not-loaded flag was read. Dropped, to be read again.
 				if (everyEdgeOpen)
+				{
+					continue;
+				}
+				// Nor is a square the game does not have. The mesh holds every square with anything to
+				// stand on, so one it has never heard of is one read as ground from nothing, and a
+				// square only partly read that way escaped the test above.
+				int regionId = (int) (key >> 8);
+				if (worldMesh != null && worldMesh.holdsAnySquare() && (regionId >> 8) << 6 < INSTANCE_X
+					&& !worldMesh.hasSquare(regionId))
 				{
 					continue;
 				}

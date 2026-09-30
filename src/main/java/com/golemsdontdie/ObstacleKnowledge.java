@@ -27,6 +27,12 @@ class ObstacleKnowledge
 	/** Consistent sightings before an obstacle is trusted enough for a golem to use. */
 	private static final int SIGHTINGS_TO_UNLOCK = 2;
 
+	/**
+	 * Consistent sightings after which an obstacle is set in stone: its animation, timing, line and
+	 * motion are kept as they are, and later sightings no longer change them.
+	 */
+	static final int SIGHTINGS_TO_SETTLE = 5;
+
 	/** Where learned obstacles are kept between sessions. */
 	static final String LEARNED_KEY = "learnedObstacles";
 
@@ -151,6 +157,14 @@ class ObstacleKnowledge
 	boolean isUnlocked(GolemTransport transport)
 	{
 		int id = transport.getObjectId();
+		// A golem goes through a door its own way, pushed through and out the far side, not as a
+		// player does, who opens it. So there is nothing to learn from the player: a door is known
+		// from the start, whatever the table says, and nothing a player is seen doing changes it.
+		// Its requirements (a quest, a lever) are still GolemAbilities'.
+		if (transport.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+		{
+			return true;
+		}
 		if (transport.isLearnFirst())
 		{
 			// Inferred, not calculated: where it leads is the guess, so seeing the same object used
@@ -878,12 +892,21 @@ class ObstacleKnowledge
 	/** The recorded motion for this obstacle, or null if nobody has been watched doing it. */
 	MotionCurve curveFor(GolemTransport transport)
 	{
+		// A door is the golem's own push, never the player's recording. See isUnlocked.
+		if (transport.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+		{
+			return null;
+		}
 		return chosenCurves.get(transport.getObjectId());
 	}
 
 	/** Cycles a golem should stand still before moving, or 0 if unknown. */
 	int moveDelayFor(GolemTransport transport)
 	{
+		if (transport.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+		{
+			return 0;
+		}
 		Learned known = learned.get(transport.getObjectId());
 		return known != null && known.unlocked() ? known.moveDelay : 0;
 	}
@@ -891,6 +914,10 @@ class ObstacleKnowledge
 	/** Cycles the movement itself should take, or 0 if unknown. */
 	int moveSpanFor(GolemTransport transport)
 	{
+		if (transport.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+		{
+			return 0;
+		}
 		Learned known = learned.get(transport.getObjectId());
 		return known != null && known.unlocked() ? known.moveSpan : 0;
 	}
@@ -904,6 +931,10 @@ class ObstacleKnowledge
 	 */
 	int ticksFor(GolemTransport transport)
 	{
+		if (transport.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+		{
+			return 0;
+		}
 		Learned known = learned.get(transport.getObjectId());
 		if (known != null && known.unlocked() && known.ticks > 0 && known.clips.length != 1)
 		{
@@ -924,6 +955,29 @@ class ObstacleKnowledge
 		// An empty clip set is not a failed observation but the observation that this obstacle
 		// animates nobody, as a staircase and fifteen hundred other rows do.
 		noteConfirmed(sighting);
+
+		// Well learned is set in stone: what it plays, how long, the line it moves along and the
+		// motion are no longer touched. A new place for the same kind of object is still a new
+		// route to learn, along the line already known.
+		Learned settled = learned.get(sighting.objectId);
+		if (settled != null && settled.sightings >= SIGHTINGS_TO_SETTLE)
+		{
+			// Only a sighting like the others: one that played something else ended who knows where.
+			if (followsLine(sighting) && sameClips(settled.clips, collapseRepeats(sighting.clips)))
+			{
+				noteRoute(sighting);
+			}
+			return false;
+		}
+		// Once unlocked, a sighting that plays something else is the odd one out - a player hit between
+		// the click and the obstacle, moved by a boss - not a correction, and nothing of it is kept: not
+		// its route, which may end anywhere, nor its line or motion. It used to reset the count, locking
+		// every row that waited on this object again, and golems beyond them read stranded.
+		if (settled != null && settled.unlocked() && !sameClips(settled.clips, collapseRepeats(sighting.clips)))
+		{
+			log.debug("Ignored a sighting of {} unlike what is learned: {}", sighting.objectId, sighting);
+			return false;
+		}
 		noteLine(sighting);
 
 		// Only a route lying along the obstacle is learned - along this traversal's movement and the

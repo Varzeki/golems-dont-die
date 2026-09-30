@@ -193,7 +193,20 @@ class Golem
 	 */
 	boolean isEstimated(int tick)
 	{
-		return tier == GolemTier.FAR && itinerary != null && !itinerary.isFinished(tick);
+		if (tier != GolemTier.FAR || itinerary == null || itinerary.isStationary())
+		{
+			// Standing still is exactly where it stands.
+			return false;
+		}
+		if (!itinerary.isFinished(tick))
+		{
+			return true;
+		}
+		// Finished, but not yet put on its destination: that happens at the next frame, and until
+		// then the position is the last estimate, up to a few tiles back along the line - the very
+		// case of the golem carried home from a sealed room its line passed over.
+		WorldPoint end = itinerary.destination();
+		return fineX / TILE != end.getX() || fineY / TILE != end.getY() || plane != end.getPlane();
 	}
 
 	/** True while the golem is on a crossing: afloat, or waiting out a passage. */
@@ -602,6 +615,7 @@ class Golem
 			walking = !path.isEmpty();
 			// Whatever it was walking to use is given up with the crossing.
 			queuedTransport = null;
+			wayOffDeadEnd = null;
 			queuedDock = null;
 			itinerary = RoamPlanner.stayPut(quayside, tick, ticks);
 			waiting = itinerary;
@@ -673,7 +687,9 @@ class Golem
 	/** Turns the golem, at its own pace, to look toward something this far east and north. */
 	void faceToward(int dx, int dy)
 	{
-		if (dx != 0 || dy != 0)
+		// Not while turning to an obstacle: a wave or a look took the turn over, and the golem went
+		// over the stile facing the player.
+		if ((dx != 0 || dy != 0) && facingObstacle == null)
 		{
 			targetOrientation = headingFor(dx, dy);
 		}
@@ -835,6 +851,7 @@ class Golem
 			}
 			// Walking to a shortcut or a dock is something only a golem in view does.
 			queuedTransport = null;
+			wayOffDeadEnd = null;
 			queuedDock = null;
 			facingObstacle = null;
 			// A crossing keeps going, out of view as into it. Planning afresh from the open
@@ -1247,7 +1264,11 @@ class Golem
 						// but on ground it can stand on, only a fresh way out is taken.
 						// Going back is how golems ping-ponged up and down the tower ladder
 						// a hundred and sixty times, each shut-in floor sending them back.
-						if (failedSearches >= 2 && (takeWayOut(context, false) || walkToWayOut(context)))
+						// Only on a floor too small to walk, though: in a crowd, or anywhere a search
+						// happens to fail, it took any row in reach and walked golems into pockets.
+						if (failedSearches >= 2
+							&& context.enclosedArea(fineX / TILE, fineY / TILE, plane) < PENNED_TILES
+							&& (takeWayOut(context, false) || walkToWayOut(context)))
 						{
 							failedSearches = 0;
 							return searched;
@@ -1467,6 +1488,12 @@ class Golem
 						{
 							continue;
 						}
+						// A dead end now and then, not as often as anywhere that leads on.
+						float onward = context.wayOnAppeal(transport);
+						if (onward < 1f && random.nextFloat() >= onward)
+						{
+							continue;
+						}
 					}
 
 					// Only ever taken from the tile it actually starts on: the radius exists
@@ -1485,6 +1512,7 @@ class Golem
 						if (walkTo(transport.getFromX(), transport.getFromY(), context))
 						{
 							queuedTransport = transport;
+							wayOffDeadEnd = null;
 							return true;
 						}
 						continue;
@@ -1587,6 +1615,8 @@ class Golem
 		{
 			return false;
 		}
+		// A fresh way that leads somewhere with a way back, by preference; then any fresh way.
+		GolemTransport fresh = null;
 		GolemTransport back = null;
 		for (GolemTransport transport : network.from(fineX / TILE, fineY / TILE))
 		{
@@ -1598,13 +1628,26 @@ class Golem
 			}
 			if (!transportMemory.onCooldown(transport, context.getTick()))
 			{
-				take(transport, context);
-				return true;
+				if (context.mayEnter(transport))
+				{
+					take(transport, context);
+					return true;
+				}
+				if (fresh == null)
+				{
+					fresh = transport;
+				}
+				continue;
 			}
 			if (back == null)
 			{
 				back = transport;
 			}
+		}
+		if (fresh != null)
+		{
+			take(fresh, context);
+			return true;
 		}
 		if (back == null || !evenBack)
 		{
@@ -1635,8 +1678,12 @@ class Golem
 		}
 		int tileX = fineX / TILE;
 		int tileY = fineY / TILE;
+		// The nearest that leads somewhere with a way back and is not on its cooldown, by preference;
+		// failing that the nearest of any, since a golem on a lookout must get down somehow.
 		GolemTransport best = null;
 		int bestSpan = Integer.MAX_VALUE;
+		GolemTransport fallback = null;
+		int fallbackSpan = Integer.MAX_VALUE;
 		for (int dx = -WAY_OUT_REACH; dx <= WAY_OUT_REACH; dx++)
 		{
 			for (int dy = -WAY_OUT_REACH; dy <= WAY_OUT_REACH; dy++)
@@ -1648,15 +1695,29 @@ class Golem
 				}
 				for (GolemTransport transport : network.from(tileX + dx, tileY + dy))
 				{
-					if (transport.getFromPlane() == plane && arrivesSomewhereKnown(transport, context)
-						&& context.getAbilities().canUse(transport))
+					if (transport.getFromPlane() != plane || !arrivesSomewhereKnown(transport, context)
+						|| !context.getAbilities().canUse(transport))
+					{
+						continue;
+					}
+					if (!transportMemory.onCooldown(transport, context.getTick()) && context.mayEnter(transport))
 					{
 						best = transport;
 						bestSpan = span;
 						break;
 					}
+					if (span < fallbackSpan)
+					{
+						fallback = transport;
+						fallbackSpan = span;
+					}
 				}
 			}
+		}
+		if (best == null)
+		{
+			best = fallback;
+			bestSpan = fallbackSpan;
 		}
 		if (best == null)
 		{
@@ -1839,6 +1900,10 @@ class Golem
 		if (walkTo(home.getFromX(), home.getFromY(), context))
 		{
 			queuedTransport = home;
+			// Taken on arrival as the way off a dead end is, whatever its lock: the way back through
+			// what it came in by, which a learned-first row turned round would otherwise refuse, and
+			// the golem stood at it until another roll.
+			wayOffDeadEnd = home;
 		}
 		else
 		{
@@ -1869,6 +1934,7 @@ class Golem
 			if (path.isEmpty() && !stepping)
 			{
 				queuedTransport = null;
+				wayOffDeadEnd = null;
 			}
 			return false;
 		}
@@ -1881,6 +1947,8 @@ class Golem
 			leaveDeadEnd(transport, context);
 			return true;
 		}
+		// Any other: the way out belonged to a plan since dropped, and must not excuse a later one.
+		wayOffDeadEnd = null;
 		if (transportMemory.onCooldown(transport, context.getTick())
 			|| !context.getAbilities().canUse(transport))
 		{
@@ -1928,7 +1996,11 @@ class Golem
 		int dy = transport.getToY() - transport.getFromY();
 		int tick = context.getTick();
 		boolean hopping = lastHopTick != Integer.MIN_VALUE && tick >= lastHopTick && tick - lastHopTick <= CROSSING_TICKS;
-		if (tier == GolemTier.SCENE && (dx != 0 || dy != 0) && !hopping)
+		// Only a crossing: the same floor and a few tiles. A dungeon ladder's far end is 6,400 tiles
+		// north and a fairy ring's anywhere, and golems turned to face those before climbing.
+		boolean crossing = transport.getFromPlane() == transport.getToPlane()
+			&& Math.max(Math.abs(dx), Math.abs(dy)) <= FACE_REACH;
+		if (tier == GolemTier.SCENE && (dx != 0 || dy != 0) && crossing && !hopping)
 		{
 			int heading = headingFor(dx, dy);
 			if (Math.abs(((heading - orientation + 1024) & 2047) - 1024) > FACE_FIRST_OFF)
@@ -1948,6 +2020,9 @@ class Golem
 	/** An obstacle the golem is turning to face before it uses it, or null. See take. */
 	private GolemTransport facingObstacle;
 	private int facingCycles;
+
+	/** The furthest an obstacle's far side can be and still be faced first, in tiles. */
+	private static final int FACE_REACH = 12;
 
 	/** How far off facing an obstacle a golem turns first, and the longest it takes to. */
 	private static final int FACE_FIRST_OFF = 256;

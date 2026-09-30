@@ -129,6 +129,10 @@ class TransportNetwork
 				if (t.getObjectId() > 0)
 				{
 					shippedObjects.add(t.getObjectId());
+					if (t.getArchetype() == GolemTransport.ARCHETYPE_DOOR)
+					{
+						doorObjects.add(t.getObjectId());
+					}
 				}
 			}
 			link();
@@ -198,6 +202,9 @@ class TransportNetwork
 					r.length > 7 ? r[7] : 1,
 					twin.getObjectId() == r[0] ? twin.getArchetype() : GolemTransport.ARCHETYPE_NONE,
 					r[0], twin.skills(), twin.quests(), twin.varbits(), twin.varps());
+				// And its way up or down, from the verb: without it a dungeon ladder, which changes no
+				// floor, was told apart by the floor and played the wrong way.
+				route.setDirection(twin.getDirection());
 				suppressed.add(twin);
 			}
 			route.setInstanceFlags(r.length > 8 ? r[8] : 0);
@@ -258,6 +265,17 @@ class TransportNetwork
 	}
 
 	private final Set<Integer> shippedObjects = new HashSet<>();
+
+	/**
+	 * True if a shipped row calls this object a door. A golem goes through a door its own way, so
+	 * nothing the player is seen doing with one is learned. See ObstacleKnowledge.isUnlocked.
+	 */
+	boolean isDoorObject(int objectId)
+	{
+		return doorObjects.contains(objectId);
+	}
+
+	private final Set<Integer> doorObjects = new HashSet<>();
 
 	/**
 	 * Every transport, for callers that sweep the whole table. Immutable and shared, like

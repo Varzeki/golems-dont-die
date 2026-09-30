@@ -94,6 +94,34 @@ public class WaysBackTest
 		assertTrue("the way out was learned", comesBack(back, mesh, row(network, HOME, 6)));
 	}
 
+	/**
+	 * A room whose only way out is back is a dead end; one that leads on through more than a few
+	 * spaces is not, nor one with a dock.
+	 */
+	@Test
+	public void aRoomWithOnlyTheWayBackIsADeadEnd()
+	{
+		WorldMesh mesh = new Spaces();
+		TransportNetwork network = network(new int[]{HOME, 5}, new int[]{5, HOME}, new int[]{HOME, 6},
+			new int[]{6, HOME}, new int[]{6, 7}, new int[]{7, 6}, new int[]{7, 8}, new int[]{8, 7},
+			new int[]{8, 9}, new int[]{9, 8}, new int[]{9, 10}, new int[]{10, 9}, new int[]{10, 11},
+			new int[]{11, 10}, new int[]{11, 12}, new int[]{12, 11}, new int[]{12, 13}, new int[]{13, 12},
+			new int[]{13, 14}, new int[]{14, 13}, new int[]{14, 15}, new int[]{15, 14}, new int[]{HOME, 16},
+			new int[]{16, HOME});
+		WaysBack back = new WaysBack(mesh, network, t -> true);
+		Set<Integer> ports = new HashSet<>(Arrays.asList(16, 3));
+		back.refresh(0, () -> ports);
+		assertTrue("a waiting room", deadEnd(back, row(network, HOME, 5)));
+		assertFalse("a passage on through ten spaces", deadEnd(back, row(network, HOME, 6)));
+		assertFalse("a quay", deadEnd(back, row(network, HOME, 16)));
+		assertFalse("a hop within one space", back.isDeadEnd(Collections.singletonList(HOME), Collections.singletonList(HOME)));
+	}
+
+	private static boolean deadEnd(WaysBack back, GolemTransport t)
+	{
+		return back.isDeadEnd(back.setOff(t), back.landing(t));
+	}
+
 	/** An island with a dock is no trap while the golem may sail; kept ashore, it is. */
 	@Test
 	public void anIslandWithADockIsAWayBack()

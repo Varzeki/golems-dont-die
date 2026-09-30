@@ -86,6 +86,14 @@ class SailingDocks
 		}
 	}
 
+	/**
+	 * True once the dock table has been asked for while logged in, read or not (a client older than
+	 * Sailing has none). Until then no island reached only by sea joins up with home, and the
+	 * cut-off sweep waits.
+	 */
+	@lombok.Getter
+	private boolean tried;
+
 	/** Reads the dock table, once, on the client thread. Safe to call repeatedly. */
 	void load()
 	{
@@ -93,6 +101,8 @@ class SailingDocks
 		{
 			return;
 		}
+		// Asked while logged in: whatever the answer, the ports are as known as they will be.
+		tried |= client.getGameState() == GameState.LOGGED_IN;
 
 		loadBuoys();
 

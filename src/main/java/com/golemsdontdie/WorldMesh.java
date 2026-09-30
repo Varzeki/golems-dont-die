@@ -107,6 +107,12 @@ class WorldMesh
 		final int[] palette;
 
 		/**
+		 * Each tile's component id outright, for the rare region-plane with more than 256 of them,
+		 * which no palette of a byte can index; null otherwise. None does today (the most is 172).
+		 */
+		final char[] wide;
+
+		/**
 		 * Tiles the land fill reached - ground a golem may stand on, on foot. The ocean bit
 		 * marks only the one connected sea, so cave water, lakes and enclosed basins read as
 		 * passable and golems walked out across them. Shoreline edges are blocked, so a fill
@@ -342,7 +348,7 @@ class WorldMesh
 				return false;
 			}
 			int component = componentOf(region, x, y);
-			if (!landComponents[component] && !dockFloors[component])
+			if (!landComponents[component] && !dockFloors[component] && !instanceFloors[component])
 			{
 				return false;
 			}
@@ -357,6 +363,37 @@ class WorldMesh
 	 * them, so a golem sailing there could not step off.
 	 */
 	private final boolean[] dockFloors = new boolean[1 << 16];
+
+	/**
+	 * Floors counted as land because the instance the player stands in is built from them: the
+	 * template rooms golems in it walk, in template coordinates. Only the room a learned route led
+	 * into was admitted before, and a golem that wandered further into the instance found nowhere
+	 * to walk and was carried home in front of the player. Kept until the next instance.
+	 */
+	private final boolean[] instanceFloors = new boolean[1 << 16];
+
+	/** The components admitted as {@link #instanceFloors}, to take back when the instance changes. */
+	private final Set<Integer> instanceFloorList = new HashSet<>();
+
+	/** Admits these components as the loaded instance's floors, in place of the last instance's. */
+	void admitInstanceFloors(Set<Integer> components)
+	{
+		for (int component : instanceFloorList)
+		{
+			instanceFloors[component] = false;
+			admittedFloors -= landComponents[component] || dockFloors[component] ? 0 : 1;
+		}
+		instanceFloorList.clear();
+		for (int component : components)
+		{
+			if (component != 0 && !instanceFloors[component])
+			{
+				instanceFloors[component] = true;
+				instanceFloorList.add(component);
+				admittedFloors += landComponents[component] || dockFloors[component] ? 0 : 1;
+			}
+		}
+	}
 
 	/** How many floors either kind of admission holds, so a check can skip reading the component. */
 	private int admittedFloors;
@@ -549,10 +586,8 @@ class WorldMesh
 	void admitTransportEnds(java.util.List<GolemTransport> transports)
 	{
 		Arrays.fill(landComponents, false);
-		leadsTo.clear();
-		walkedTo.clear();
-		touched.clear();
-		linkRevision++;
+		transportLeads.clear();
+		transportTouched.clear();
 		Map<Long, java.util.List<GolemTransport>> starting = new HashMap<>();
 		for (GolemTransport t : transports)
 		{
@@ -563,14 +598,14 @@ class WorldMesh
 		{
 			for (int from : spacesAt(t.getFromX(), t.getFromY(), t.getFromPlane()))
 			{
-				touched.add(from);
+				transportTouched.add(from);
 				for (int to : spacesOnward(t.getToX(), t.getToY(), t.getToPlane(),
 					t.getFromX(), t.getFromY(), t.getFromPlane(), TransportNetwork.CHAIN_HOPS, starting))
 				{
-					touched.add(to);
+					transportTouched.add(to);
 					if (from != to)
 					{
-						leadsTo.computeIfAbsent(from, space -> new ArrayList<>()).add(to);
+						transportLeads.computeIfAbsent(from, space -> new ArrayList<>()).add(to);
 					}
 				}
 			}
@@ -581,12 +616,68 @@ class WorldMesh
 		{
 			admittedFloors += dock ? 1 : 0;
 		}
+		// Only ever asked whether it is nought, so an instance floor that is also a dock's counts twice.
+		admittedFloors += instanceFloorList.size();
 		for (GolemTransport t : transports)
 		{
 			admit(t.getFromX(), t.getFromY(), t.getFromPlane());
 			admit(t.getToX(), t.getToY(), t.getToPlane());
 		}
+		// The walks between spaces are the island map's, not the tables': kept as they were, and laid
+		// back over the rebuilt graph, so a route learned does not mean scanning the map again.
+		composeLinks();
 		log.debug("{} floors admitted as land from transport ends", transportFloors);
+	}
+
+	/** Space to the spaces a transport leads to, and every space one touches: the tables' half. */
+	private final Map<Integer, java.util.List<Integer>> transportLeads = new HashMap<>();
+	private final Set<Integer> transportTouched = new HashSet<>();
+
+	/**
+	 * The pairs of spaces each region's walks join, as {@link #pair} keys, and how many regions join
+	 * each pair: a region read again replaces what it said, so a door found shut again un-joins its
+	 * two spaces. Kept only in addition, a doorway seen open once stayed a way through all session.
+	 */
+	private final Map<Integer, Set<Long>> joinsByRegion = new HashMap<>();
+	private final Map<Long, Integer> joinCount = new HashMap<>();
+
+	private static long pair(int one, int other)
+	{
+		return (long) Math.min(one, other) << 16 | Math.max(one, other);
+	}
+
+	/**
+	 * Lays the tables' links and the island map's walks together into {@link #leadsTo} and
+	 * {@link #touched}, which linkSpaces reads, and {@link #walkedTo}, which WaysBack reads.
+	 */
+	private void composeLinks()
+	{
+		walkedTo.clear();
+		for (long joined : joinCount.keySet())
+		{
+			int one = (int) (joined >> 16);
+			int other = (int) (joined & 0xFFFF);
+			walkedTo.computeIfAbsent(one, space -> new ArrayList<>()).add(other);
+			walkedTo.computeIfAbsent(other, space -> new ArrayList<>()).add(one);
+		}
+		leadsTo.clear();
+		for (Map.Entry<Integer, java.util.List<Integer>> e : transportLeads.entrySet())
+		{
+			leadsTo.put(e.getKey(), new ArrayList<>(e.getValue()));
+		}
+		touched.clear();
+		touched.addAll(transportTouched);
+		// Judged by the walks alone: a one-way transport already leading from one to the other says
+		// nothing about the way back, which the walk does.
+		for (Map.Entry<Integer, java.util.List<Integer>> walked : walkedTo.entrySet())
+		{
+			touched.add(walked.getKey());
+			for (int to : walked.getValue())
+			{
+				addOnce(leadsTo.computeIfAbsent(walked.getKey(), space -> new ArrayList<>()), to);
+			}
+		}
+		linkRevision++;
 	}
 
 	/**
@@ -594,18 +685,27 @@ class WorldMesh
 	 * live collision and has some doorways open that the shipped collision has shut; a golem walked
 	 * through one into a room the mesh counts as a space of its own, and the cut-off sweep carried
 	 * it home from a room beside the plinth. Wherever the island map steps from one space into
-	 * another, the two are joined, both ways, as a transport would join them. Run after the
-	 * transports are admitted, which starts the joins afresh.
+	 * another, the two are joined, both ways, as a transport would join them. Run over the regions
+	 * just read, each of which replaces what it joined before.
+	 *
+	 * @return how many pairs of spaces were joined or parted
 	 */
-	void joinWhereWalked(IslandMemory memory, int[] regions)
+	int joinWhereWalked(IslandMemory memory, int[] regions)
 	{
-		int joined = 0;
+		int changed = 0;
 		for (int region : regions)
 		{
 			int baseX = (region >> 8) << 6;
 			int baseY = (region & 0xFF) << 6;
+			Set<Long> now = new HashSet<>();
 			for (int plane = 0; plane < 4; plane++)
 			{
+				// Where the island map holds nothing, it answers from this mesh, whose own edges made
+				// the spaces: nothing there can join two.
+				if (!memory.holds(region, plane))
+				{
+					continue;
+				}
 				for (int x = baseX; x < baseX + 64; x++)
 				{
 					for (int y = baseY; y < baseY + 64; y++)
@@ -615,48 +715,60 @@ class WorldMesh
 						{
 							continue;
 						}
-						if (memory.north(x, y, plane))
+						int north = memory.north(x, y, plane) ? componentAt(x, y + 1, plane) : 0;
+						if (north != 0 && north != here)
 						{
-							joined += join(here, componentAt(x, y + 1, plane));
+							now.add(pair(here, north));
 						}
-						if (memory.east(x, y, plane))
+						int east = memory.east(x, y, plane) ? componentAt(x + 1, y, plane) : 0;
+						if (east != 0 && east != here)
 						{
-							joined += join(here, componentAt(x + 1, y, plane));
+							now.add(pair(here, east));
 						}
 					}
 				}
 			}
+			Set<Long> before = joinsByRegion.getOrDefault(region, Collections.emptySet());
+			for (long joined : now)
+			{
+				if (!before.contains(joined) && joinCount.merge(joined, 1, Integer::sum) == 1)
+				{
+					changed++;
+				}
+			}
+			for (long joined : before)
+			{
+				if (!now.contains(joined) && joinCount.merge(joined, -1, Integer::sum) == 0)
+				{
+					joinCount.remove(joined);
+					changed++;
+				}
+			}
+			if (now.isEmpty())
+			{
+				joinsByRegion.remove(region);
+			}
+			else
+			{
+				joinsByRegion.put(region, now);
+			}
 		}
-		// Only when something was joined: run again after every harvest, most runs add nothing, and
-		// each bump rebuilds what golems can get back from.
-		if (joined > 0)
+		// Only when something changed: run after every harvest, most runs change nothing, and each
+		// change rebuilds what golems can get back from.
+		if (changed > 0)
 		{
-			linkRevision++;
+			composeLinks();
 		}
-		log.debug("{} spaces joined where the island map walks between them", joined);
+		log.debug("{} pairs of spaces joined or parted where the island map walks between them", changed);
+		return changed;
 	}
 
-	/** Joins two spaces both ways, once; 1 if they were not already joined. */
-	private int join(int one, int other)
+	/** Forgets every walk joined, for a fresh start from the whole island map. */
+	void forgetWalks()
 	{
-		if (other == 0 || one == other)
-		{
-			return 0;
-		}
-		touched.add(one);
-		touched.add(other);
-		// Judged by the walks alone: a one-way transport already leading from one to the other
-		// said nothing about the way back, and the walk back was dropped with it.
-		java.util.List<Integer> walked = walkedTo.computeIfAbsent(one, space -> new ArrayList<>());
-		if (walked.contains(other))
-		{
-			return 0;
-		}
-		walked.add(other);
-		walkedTo.computeIfAbsent(other, space -> new ArrayList<>()).add(one);
-		addOnce(leadsTo.computeIfAbsent(one, space -> new ArrayList<>()), other);
-		addOnce(leadsTo.computeIfAbsent(other, space -> new ArrayList<>()), one);
-		return 1;
+		joinsByRegion.clear();
+		joinCount.clear();
+		composeLinks();
 	}
 
 	private static void addOnce(java.util.List<Integer> spaces, int space)
@@ -789,6 +901,30 @@ class WorldMesh
 	/** Whether {@link #packed} holds a region-plane, indexed as {@link #byRegion}. */
 	private final boolean[] packedAt = new boolean[FAST_REGIONS << 2];
 
+	/** True once the mesh holds any square at all: a mesh that failed to load knows nothing. */
+	boolean holdsAnySquare()
+	{
+		return !regions.isEmpty() || !packed.isEmpty();
+	}
+
+	/**
+	 * True if the game has this map square on any floor: it is in the mesh, read or packed. Under the
+	 * lock unpack holds, which moves a region-plane from packed to read: asked mid-move, a square
+	 * was in neither, and the saved map dropped real ground as a square that does not exist.
+	 */
+	synchronized boolean hasSquare(int regionId)
+	{
+		for (int plane = 0; plane < 4; plane++)
+		{
+			long key = key(regionId, plane);
+			if (regions.containsKey(key) || packed.containsKey(key))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Unpacks a packed region-plane into the mesh, once; null if it will not read. */
 	private synchronized Region unpack(int regionId, int plane)
 	{
@@ -835,7 +971,16 @@ class WorldMesh
 		byte[] wet = new byte[DERIVED_BYTES];
 		data.readFully(wet);
 		int[] palette = palette(parts);
-		return new Region(flags, sea, alone, indexInto(parts, palette), palette, ground, wet);
+		if (palette == null)
+		{
+			char[] wide = new char[TILES_PER_PLANE];
+			for (int tile = 0; tile < TILES_PER_PLANE; tile++)
+			{
+				wide[tile] = (char) (((parts[tile * 2] & 0xFF) << 8) | (parts[tile * 2 + 1] & 0xFF));
+			}
+			return new Region(flags, sea, alone, null, new int[1], wide, ground, wet);
+		}
+		return new Region(flags, sea, alone, indexInto(parts, palette), palette, null, ground, wet);
 	}
 
 	private void put(int regionId, int plane, Region region)
@@ -856,10 +1001,14 @@ class WorldMesh
 	private static int componentOf(Region region, int x, int y)
 	{
 		int tile = (y & REGION_MASK) * REGION_SIZE + (x & REGION_MASK);
+		if (region.wide != null)
+		{
+			return region.wide[tile];
+		}
 		return region.palette[region.components == null ? 0 : region.components[tile] & 0xFF];
 	}
 
-	/** The distinct component ids in a region-plane's two-byte map, in order of first use. */
+	/** The distinct component ids in a region-plane's two-byte map, in order of first use; null past 256. */
 	private static int[] palette(byte[] parts)
 	{
 		int[] ids = new int[256];
@@ -883,7 +1032,8 @@ class WorldMesh
 			{
 				if (count == ids.length)
 				{
-					throw new IllegalStateException("more than 256 components in one region-plane");
+					// More than a byte can index: this region-plane keeps its ids outright.
+					return null;
 				}
 				ids[count++] = id;
 			}

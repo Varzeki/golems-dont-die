@@ -507,6 +507,12 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	private void onObstacleSighting(ObstacleSighting sighting)
 	{
+		// A door is the golems' own: pushed through, not opened, so nothing the player does with one
+		// is learned or changes how golems use it. See ObstacleKnowledge.isUnlocked.
+		if (transports.isDoorObject(sighting.objectId))
+		{
+			return;
+		}
 		// Only obstacles: chopping a tree, using a bank booth and picking sweetcorn were all
 		// learned as shortcuts, since an object clicked, an animation and the player elsewhere
 		// afterwards is all a watcher can see.
@@ -551,7 +557,7 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// A new route can lead onto a floor nothing else reaches: ground from now on.
 		worldMesh.admitTransportEnds(transports.all());
-		worldMesh.joinWhereWalked(islandMemory, islandMemory.knownRegions());
+		// The walks between spaces are kept through it; see WorldMesh.joinWhereWalked.
 		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
 		// A new route into an instance can mean a new room golems may stand in.
@@ -562,6 +568,12 @@ public class GolemsDontDiePlugin extends Plugin
 	/** {@link #isObstacle}, remembered per route for the session. */
 	private boolean isObstacleRoute(int[] r)
 	{
+		// Never a door's: a door is the golems' own, and a route a player was once seen taking through
+		// one, saved before that was the rule, would play the player's way or pass a locked door.
+		if (transports.isDoorObject(r[0]))
+		{
+			return false;
+		}
 		String key = r[0] + "," + r[1] + "," + r[2] + "," + r[3] + ">" + r[4] + "," + r[5] + "," + r[6];
 		Boolean known = obstacleVerdicts.get(key);
 		if (known == null)
@@ -640,7 +652,7 @@ public class GolemsDontDiePlugin extends Plugin
 		loadKnowledge();
 
 		obstacleObserver.setOnSighting(this::onObstacleSighting);
-		obstacleObserver.setRowsFrom(transports::from);
+
 		obstacleObserver.startUp();
 		// In the plugin's own folder, which RuneLite hands out; a plugin writes nowhere else.
 		Filepath folder = null;
@@ -682,6 +694,9 @@ public class GolemsDontDiePlugin extends Plugin
 		transports.setLearnedRoutes(obstacleKnowledge.learnedRoutes());
 		// Floors reached only by transports the land fill never had. See WorldMesh.
 		worldMesh.admitTransportEnds(transports.all());
+		// Every walk the island map knows, from scratch; afterwards only what each harvest reads.
+		worldMesh.forgetWalks();
+		islandMemory.takeFreshRegions();
 		worldMesh.joinWhereWalked(islandMemory, islandMemory.knownRegions());
 		worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		setHomeRegions(transports.homeRegions());
@@ -695,8 +710,17 @@ public class GolemsDontDiePlugin extends Plugin
 		roamContext.setMuster(crews::offer);
 		roamContext.setModels(modelFactory);
 
-		// Golems are the account's, so they are read at login; enabling mid-session skips the login.
-		clientThread.invokeLater(this::loadAccount);
+		// Golems are the account's, so they are read at login; enabling mid-session skips the login,
+		// and with it the dock table, which is game data. Read both now, docks first: without them
+		// every island reached only by sea read as cut off, and a Plugin Hub update did exactly this.
+		clientThread.invokeLater(() ->
+		{
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				sailingDocks.load();
+			}
+			loadAccount();
+		});
 
 		// All three panel callbacks arrive on the Swing thread and touch the roster, which the
 		// client thread owns, so each hops across.
@@ -1845,6 +1869,8 @@ public class GolemsDontDiePlugin extends Plugin
 		// Read once for the frame rather than through the config proxy for every golem.
 		boolean restrictAmbition = config.restrictGolemAmbition();
 		roamContext.setAmbitionRestricted(restrictAmbition);
+		// One port set for everything the planner works out, whoever asks. See RoamPlanner.openPorts.
+		roamPlanner.setKeptAshore(restrictAmbition);
 
 		// In the main world even aboard a boat, whose coordinates would put golems out of range.
 		WorldPoint playerAt = PlayerPosition.of(client);
@@ -1867,7 +1893,8 @@ public class GolemsDontDiePlugin extends Plugin
 
 		// Inside an instance: which template chunks it is built from, and where the player is in
 		// template terms. Golems live in the template; see tierFor.
-		Map<Long, int[]> sceneChunks = wv != null && wv.isInstance() ? InstanceMap.sceneChunks(wv) : null;
+		Map<Long, List<int[]>> sceneChunks = wv != null && wv.isInstance() ? InstanceMap.sceneChunks(wv) : null;
+		admitInstanceFloors(sceneChunks);
 		WorldPoint playerTemplate = sceneChunks == null ? playerAt : InstanceMap.templateOf(wv, playerAt);
 
 		// Golems out of view are looked at every few ticks; see Golem.scheduleFarCheck. All at
@@ -1959,6 +1986,12 @@ public class GolemsDontDiePlugin extends Plugin
 				{
 					searchBudget--;
 				}
+			}
+
+			// Moved this frame, perhaps into the next chunk: placed again from where it is now.
+			if (sceneChunks != null && golem.isInInstance())
+			{
+				placeInInstance(golem, wv, playerAt, sceneChunks);
 			}
 
 			if (restrictAmbition)
@@ -2124,45 +2157,51 @@ public class GolemsDontDiePlugin extends Plugin
 		homeRegions = regions;
 	}
 
-	/** Golems asked whether they are cut off this tick. See sendHomeIfCutOff. */
+	/** Golems asked whether they are cut off this tick. See sweepForCutOff. */
 	private static final int SWEEP_PER_TICK = 32;
 
 	/** Where the sweep has got to in the roster. */
 	private int sweptTo;
 
-	/** Golems seen and golems cut off, over the pass being made now. */
+	/** Golems seen over the pass being made now, and those found cut off or stranded in it. */
 	private int sweepSeen;
-	private int sweepCutOff;
+	private final List<Golem> sweepCutOff = new ArrayList<>();
+	private final List<Golem> sweepStranded = new ArrayList<>();
 
 	/**
-	 * What share of the roster the last full pass found cut off, or -1 before the first pass has
-	 * finished. Nothing is moved until a pass has been made, and nothing is moved at all while
-	 * that share is absurd.
-	 */
-	private float cutOffShare = -1;
-
-	/**
-	 * The share of golems that may be cut off before the answer is disbelieved rather than acted
-	 * on. Whether a space joins up with home rests on the transport tables and the docks, and a
-	 * missing piece can strand whole countries: measured against the shipped tables alone, with
-	 * no docks to sail between them, ninety-nine per cent of the world's standable ground came
-	 * out unreachable - Varrock and Falador included. A world that answers like that is a world
-	 * the plugin has misread, and emptying it onto the island would be the worst of the two
-	 * mistakes. So the sweep counts first and moves nobody.
+	 * The share of golems that may be cut off, or stranded, before the answer is disbelieved rather
+	 * than acted on. Whether a space joins up with home rests on the transport tables and the docks,
+	 * and a missing piece can strand whole countries: measured against the shipped tables alone,
+	 * with no docks to sail between them, ninety-nine per cent of the world's standable ground came
+	 * out unreachable - Varrock and Falador included. A world that answers like that is a world the
+	 * plugin has misread, and emptying it onto the island would be the worst of the two mistakes.
+	 * Judged apart: an account whose quests leave many golems stranded still has its cut-off ones
+	 * brought home.
 	 */
 	private static final float MOST_CUT_OFF = 0.25f;
 
-	/** Ticks swept since logging in. See sendHomeIfCutOff. */
+	/** When learned routes were last put into the network, and how often at most. */
+	private int routesAppliedTick = Integer.MIN_VALUE / 2;
+	private static final int ROUTE_APPLY_TICKS = 10;
+
+	/** Ticks swept since logging in. See sweepForCutOff. */
 	private int ticksLoggedIn;
 
-	/** How long after logging in before a golem is judged stranded: a minute. */
-	private static final int STRANDED_GRACE_TICKS = 100;
+	/**
+	 * Whether quest states have been read afresh since logging in: once, the first tick the sweep
+	 * may judge, which is the minute's end or later if the docks were read late.
+	 */
+	private boolean settledSinceLogin;
 
-	/** The island map's harvest count when walks were last joined. */
-	private int joinedAtHarvest = -1;
+	/**
+	 * How long after logging in before the sweep judges anyone: a minute, while levels and quests
+	 * may still read as nothing and the docks may not be read yet.
+	 */
+	private static final int SETTLE_TICKS = 100;
 
-	/** Set once the warning about an unbelievable world has been given. */
-	private boolean saidWorldUnreadable;
+	/** Set once the warning about an unbelievable world has been given, for each question. */
+	private boolean saidCutOffUnreadable;
+	private boolean saidStrandedUnreadable;
 
 	/**
 	 * Brings a golem home from ground that does not join up with home.
@@ -2184,70 +2223,147 @@ public class GolemsDontDiePlugin extends Plugin
 	private void sweepForCutOff()
 	{
 		ticksLoggedIn++;
+		// Nobody is judged until the world is read: in the first minute after logging in, or before
+		// the docks have been asked for, which a plugin enabled mid-session had not done. Every
+		// island reached only by sea read as cut off, and its golems were carried home and saved so.
+		if (ticksLoggedIn < SETTLE_TICKS || !sailingDocks.isTried())
+		{
+			return;
+		}
+		if (!settledSinceLogin)
+		{
+			settledSinceLogin = true;
+			// Quest states read in the first seconds can be the empty ones the client starts with,
+			// and are trusted for five minutes; read again now the account has arrived.
+			abilities.forgetQuests();
+			sailingDocks.forgetQuests();
+			roamPlanner.forgetWaysBack();
+		}
 		int roster = golems.size();
 		for (int i = 0; i < Math.min(SWEEP_PER_TICK, roster); i++)
 		{
 			if (sweptTo >= roster)
 			{
-				// A pass finished: what it counted is what the next pass may act on.
-				sweptTo = 0;
-				if (sweepSeen > 0)
-				{
-					cutOffShare = sweepCutOff / (float) sweepSeen;
-					if (cutOffShare > MOST_CUT_OFF && !saidWorldUnreadable)
-					{
-						saidWorldUnreadable = true;
-						log.warn("{} of {} golems stand on ground that does not join up with home."
-							+ " The world has been misread; none will be moved.",
-							sweepCutOff, sweepSeen);
-					}
-				}
-				sweepSeen = 0;
-				sweepCutOff = 0;
+				finishSweep();
 			}
-			sendHomeIfCutOff(golems.get(sweptTo++));
+			judge(golems.get(sweptTo++));
 		}
 	}
 
-	private void sendHomeIfCutOff(Golem golem)
+	/**
+	 * A pass is over: each question's share is judged on this pass's own count, and those found
+	 * are moved only if it is believable, each asked again first, since the pass took a while.
+	 */
+	private void finishSweep()
 	{
-		// Nor one out of view partway along a route, whose position is only an estimate; it is
-		// judged when it gets where it was going.
-		if (golem.isDying() || golem.inTransition() || golem.isAboard()
-			|| golem.isSailing(roamContext.getTick()) || golem.isInInstance()
-			|| golem.isEstimated(roamContext.getTick()))
+		sweptTo = 0;
+		if (sweepSeen > 0)
+		{
+			bringHome(sweepCutOff, "cut off", false);
+			bringHome(sweepStranded, "stranded", true);
+		}
+		sweepSeen = 0;
+		sweepCutOff.clear();
+		sweepStranded.clear();
+	}
+
+	private void bringHome(List<Golem> found, String what, boolean stranded)
+	{
+		if (found.isEmpty())
+		{
+			return;
+		}
+		if (found.size() > MOST_CUT_OFF * sweepSeen)
+		{
+			boolean said = stranded ? saidStrandedUnreadable : saidCutOffUnreadable;
+			if (!said)
+			{
+				log.warn("{} of {} golems stand {}. The world has been misread; none will be moved.",
+					found.size(), sweepSeen, what);
+				if (stranded)
+				{
+					saidStrandedUnreadable = true;
+				}
+				else
+				{
+					saidCutOffUnreadable = true;
+				}
+			}
+			return;
+		}
+		for (Golem golem : found)
+		{
+			// Not one the player has come into sight of since it was found: it is judged next time.
+			if (golems.contains(golem) && mayJudge(golem) && golem.getTier() != GolemTier.SCENE
+				&& (stranded ? isStranded(golem) : isCutOff(golem)))
+			{
+				sendHome(golem, what);
+			}
+		}
+	}
+
+	/** Counts one golem into the pass, and brings it home at once if it is shut in a pocket. */
+	private void judge(Golem golem)
+	{
+		if (!mayJudge(golem))
 		{
 			return;
 		}
 		int x = golem.getFineX() / Golem.TILE;
 		int y = golem.getFineY() / Golem.TILE;
+		sweepSeen++;
 		// A pocket too small to wander with nothing leading in or out is a trap on the geometry
 		// alone, and is acted on whatever the wider question has answered. A stepping stone is the
 		// exception it always is: a golem between hops stands on one legitimately.
-		boolean pocket = worldMesh.isSealedPocket(x, y, golem.getPlane()) && !transports.hasOrigin(x, y);
-
-		sweepSeen++;
-		// Stranded is the stricter question: whether it could get home by anything golems may use,
-		// locked rows not counted. Not asked in the first minute after logging in, while levels and
-		// quests may still read as nothing, nor of a golem in view: it walked in by the live scene,
-		// and the joins that scene makes are the next harvest's.
-		boolean cutOff = worldMesh.isCutOff(x, y, golem.getPlane())
-			|| ticksLoggedIn >= STRANDED_GRACE_TICKS && golem.getTier() != GolemTier.SCENE
-				&& roamPlanner.isStranded(x, y, golem.getPlane(), roamContext.getTick());
-		sweepCutOff += cutOff ? 1 : 0;
-
-		// Cut off is counted before it is believed: not acted on until a whole pass has been made,
-		// and not while that pass says most of the world is unreachable, which means the tables are
-		// missing rather than the golems are lost.
-		boolean believable = cutOffShare >= 0 && cutOffShare <= MOST_CUT_OFF;
-		if (!pocket && !(cutOff && believable))
+		if (worldMesh.isSealedPocket(x, y, golem.getPlane()) && !transports.hasOrigin(x, y))
+		{
+			sendHome(golem, "shut in a pocket");
+			return;
+		}
+		// Not a golem in view for the wider questions: it walked in by the live scene, and the joins
+		// that scene makes are the next harvest's. It is judged once the player has gone.
+		if (golem.getTier() == GolemTier.SCENE)
 		{
 			return;
 		}
+		if (isCutOff(golem))
+		{
+			sweepCutOff.add(golem);
+		}
+		else if (isStranded(golem))
+		{
+			sweepStranded.add(golem);
+		}
+	}
 
-		WorldPoint at = golem.currentTile();
-		log.debug("Golem {} was {} at {}; brought home", golem.getId(),
-			pocket ? "shut in a pocket" : "cut off", at);
+	/** Whether a golem is where the sweep may judge it: settled, and somewhere it truly is. */
+	private boolean mayJudge(Golem golem)
+	{
+		// Nor one out of view partway along a route, whose position is only an estimate; it is
+		// judged when it gets where it was going.
+		return !golem.isDying() && !golem.inTransition() && !golem.isAboard()
+			&& !golem.isSailing(roamContext.getTick()) && !golem.isInInstance()
+			&& !golem.isEstimated(roamContext.getTick());
+	}
+
+	private boolean isCutOff(Golem golem)
+	{
+		return worldMesh.isCutOff(golem.getFineX() / Golem.TILE, golem.getFineY() / Golem.TILE, golem.getPlane());
+	}
+
+	/**
+	 * Stranded is the stricter question: whether it could get home by anything golems may use,
+	 * locked rows not counted.
+	 */
+	private boolean isStranded(Golem golem)
+	{
+		return roamPlanner.isStranded(golem.getFineX() / Golem.TILE, golem.getFineY() / Golem.TILE, golem.getPlane(),
+			roamContext.getTick());
+	}
+
+	private void sendHome(Golem golem, String why)
+	{
+		log.debug("Golem {} was {} at {}; brought home", golem.getId(), why, golem.currentTile());
 		golem.relocate(GolemContent.RECOVERY);
 		golem.setInInstance(false);
 		golem.noteUnstuck(roamContext.getTick());
@@ -2921,7 +3037,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * which puts the overworld out of range.
 	 */
 	private GolemTier tierFor(Golem golem, WorldView wv, WorldPoint playerAt, WorldPoint playerTemplate,
-		Map<Long, int[]> sceneChunks)
+		Map<Long, List<int[]>> sceneChunks)
 	{
 		int tileX = golem.getFineX() / Golem.TILE;
 		int tileY = golem.getFineY() / Golem.TILE;
@@ -2953,26 +3069,78 @@ public class GolemsDontDiePlugin extends Plugin
 				: GolemTier.of(wv, tileX, tileY, golem.getPlane(), playerAt.getX(), playerAt.getY(), playerAt.getPlane());
 		}
 
-		// The instance is built from the chunks around the room as well as the room, and golems
-		// on the island in those chunks were drawn inside it; the rest wait out of range.
-		int[] scene = golem.isInInstance()
-			? sceneChunks.get(InstanceMap.chunkKey(tileX >> 3, tileY >> 3, golem.getPlane()))
-			: null;
-		if (scene != null)
+		int[] drawn = placeInInstance(golem, wv, playerAt, sceneChunks);
+		if (drawn != null)
 		{
-			// A turned chunk turns the golem's place in it with it. See InstanceMap.turn.
-			int[] inChunk = InstanceMap.turn(tileX & 7, tileY & 7, scene[3]);
-			int drawX = wv.getBaseX() + (scene[0] << 3) + inChunk[0];
-			int drawY = wv.getBaseY() + (scene[1] << 3) + inChunk[1];
-			// From the template chunk's corner to the scene chunk's; the turn within it is the golem's.
-			golem.setDrawOffset((wv.getBaseX() + (scene[0] << 3) - (tileX & ~7)) * Golem.TILE,
-				(wv.getBaseY() + (scene[1] << 3) - (tileY & ~7)) * Golem.TILE, scene[2], scene[3]);
 			return playerAt == null ? GolemTier.FAR
-				: GolemTier.of(wv, drawX, drawY, scene[2], playerAt.getX(), playerAt.getY(), playerAt.getPlane());
+				: GolemTier.of(wv, drawn[0], drawn[1], drawn[2], playerAt.getX(), playerAt.getY(), playerAt.getPlane());
 		}
-
-		golem.setDrawOffset(0, 0, -1);
 		return GolemTier.FAR;
+	}
+
+	/** The template chunks of the instance whose floors were last admitted; see admitInstanceFloors. */
+	private Set<Long> admittedInstance = Collections.emptySet();
+
+	/**
+	 * Counts the spaces of every template chunk the loaded instance is built from as ground golems
+	 * may stand on, once per instance. See WorldMesh.admitInstanceFloors.
+	 */
+	private void admitInstanceFloors(Map<Long, List<int[]>> sceneChunks)
+	{
+		if (sceneChunks == null || sceneChunks.keySet().equals(admittedInstance))
+		{
+			return;
+		}
+		admittedInstance = new HashSet<>(sceneChunks.keySet());
+		Set<Integer> floors = new HashSet<>();
+		for (long chunk : admittedInstance)
+		{
+			int plane = (int) (chunk >> 40);
+			int baseX = (int) (chunk >> 20 & 0xFFFFF) << 3;
+			int baseY = (int) (chunk & 0xFFFFF) << 3;
+			for (int dx = 0; dx < 8; dx++)
+			{
+				for (int dy = 0; dy < 8; dy++)
+				{
+					if (worldMesh.isWalkable(baseX + dx, baseY + dy, plane) && !worldMesh.isWater(baseX + dx, baseY + dy, plane))
+					{
+						floors.add(worldMesh.componentAt(baseX + dx, baseY + dy, plane));
+					}
+				}
+			}
+		}
+		worldMesh.admitInstanceFloors(floors);
+	}
+
+	/**
+	 * Where a golem in an instance is drawn, {x, y, plane} in the loaded scene, setting its draw
+	 * offset and turn to match; null, with no offset, if it is not in a chunk the instance was built
+	 * from. The instance is built from the chunks around the room as well as the room, and golems on
+	 * the island in those chunks were drawn inside it; the rest wait out of range. Asked again after
+	 * the golem moves: set only before, a golem crossing into the next chunk of a turned room was
+	 * drawn for a frame with the old chunk's offset, up to eight tiles away.
+	 */
+	private int[] placeInInstance(Golem golem, WorldView wv, WorldPoint playerAt, Map<Long, List<int[]>> sceneChunks)
+	{
+		int tileX = golem.getFineX() / Golem.TILE;
+		int tileY = golem.getFineY() / Golem.TILE;
+		// A chunk the instance uses twice is drawn in the copy nearest the player.
+		int[] scene = golem.isInInstance() && sceneChunks != null
+			? InstanceMap.nearest(sceneChunks.get(InstanceMap.chunkKey(tileX >> 3, tileY >> 3, golem.getPlane())),
+				playerAt == null ? 0 : (playerAt.getX() - wv.getBaseX()) >> 3,
+				playerAt == null ? 0 : (playerAt.getY() - wv.getBaseY()) >> 3)
+			: null;
+		if (scene == null)
+		{
+			golem.setDrawOffset(0, 0, -1);
+			return null;
+		}
+		// A turned chunk turns the golem's place in it with it. See InstanceMap.turn.
+		int[] inChunk = InstanceMap.turn(tileX & 7, tileY & 7, scene[3]);
+		// From the template chunk's corner to the scene chunk's; the turn within it is the golem's.
+		golem.setDrawOffset((wv.getBaseX() + (scene[0] << 3) - (tileX & ~7)) * Golem.TILE,
+			(wv.getBaseY() + (scene[1] << 3) - (tileY & ~7)) * Golem.TILE, scene[2], scene[3]);
+		return new int[]{wv.getBaseX() + (scene[0] << 3) + inChunk[0], wv.getBaseY() + (scene[1] << 3) + inChunk[1], scene[2]};
 	}
 
 	/**
@@ -3144,12 +3312,14 @@ public class GolemsDontDiePlugin extends Plugin
 			islandMemory.sceneChanged();
 		}
 		islandMemory.harvestLoadedRegions();
-		// Ground just read can join two spaces: a door standing open, which golems in view walk
-		// through. Joined now, or a golem that walked in by it would read as stranded.
-		if (islandMemory.getHarvests() != joinedAtHarvest)
+		// Ground just read, by a harvest or from the saved map at login, can join two spaces: a door
+		// standing open, which golems in view walk through. Only the regions just read are looked
+		// at, and home's reach is worked out again if anything was joined: the cut-off test asked an
+		// old answer, and a golem that walked through a door opened this session was carried home.
+		int[] read = islandMemory.takeFreshRegions();
+		if (read.length > 0 && worldMesh.joinWhereWalked(islandMemory, read) > 0)
 		{
-			joinedAtHarvest = islandMemory.getHarvests();
-			worldMesh.joinWhereWalked(islandMemory, islandMemory.knownRegions());
+			worldMesh.linkSpaces(GolemContent.PLINTH_X, GolemContent.PLINTH_Y, 0);
 		}
 
 		// Only when the roster has actually changed: copying five hundred golems every tick
@@ -3169,8 +3339,14 @@ public class GolemsDontDiePlugin extends Plugin
 			}
 		}
 
-		if (routesChanged)
+		// At most once every few ticks: each application rebuilds the network, the floors it admits and
+		// what golems can get back from, some sixty milliseconds, and on an agility course a sighting
+		// comes every few ticks. What arrives meanwhile goes in with the next.
+		// The tick count starts again at login, so a count gone backwards is time enough.
+		int sinceApplied = client.getTickCount() - routesAppliedTick;
+		if (routesChanged && (sinceApplied < 0 || sinceApplied >= ROUTE_APPLY_TICKS))
 		{
+			routesAppliedTick = client.getTickCount();
 			applyLearnedRoutes();
 			obstacleData.save();
 		}
@@ -3347,6 +3523,12 @@ public class GolemsDontDiePlugin extends Plugin
 			sailingDocks.forgetQuests();
 			abilities.forgetQuests();
 			ticksLoggedIn = 0;
+			// A pass half made belongs to the session just left, perhaps another account's.
+			settledSinceLogin = false;
+			sweptTo = 0;
+			sweepSeen = 0;
+			sweepCutOff.clear();
+			sweepStranded.clear();
 			obstacleObserver.resetSession();
 			detector.reset();
 			hiddenNpcs.clear();

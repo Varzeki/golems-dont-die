@@ -85,11 +85,12 @@ final class InstanceMap
 	/**
 	 * Where each template chunk sits in the loaded instance, as {sceneChunkX, sceneChunkY,
 	 * scenePlane, rotation}, keyed by {@link #chunkKey} of the template chunk. Rotated chunks too:
-	 * a golem walks the template as it is and is drawn turned. See turn.
+	 * a golem walks the template as it is and is drawn turned. See turn. A template chunk the
+	 * instance uses more than once has every copy listed; see nearest.
 	 */
-	static Map<Long, int[]> sceneChunks(WorldView wv)
+	static Map<Long, List<int[]>> sceneChunks(WorldView wv)
 	{
-		Map<Long, int[]> out = new HashMap<>();
+		Map<Long, List<int[]>> out = new HashMap<>();
 		int[][][] chunks = wv.getInstanceTemplateChunks();
 		if (chunks == null)
 		{
@@ -106,12 +107,37 @@ final class InstanceMap
 					{
 						continue;
 					}
-					out.putIfAbsent(chunkKey(templateChunkX(data), templateChunkY(data), templatePlane(data)),
-						new int[]{cx, cy, z, rotation(data)});
+					out.computeIfAbsent(chunkKey(templateChunkX(data), templateChunkY(data), templatePlane(data)),
+						k -> new ArrayList<>(1)).add(new int[]{cx, cy, z, rotation(data)});
 				}
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * The copy of a template chunk nearest a scene chunk, for a golem drawn in an instance built
+	 * from the same chunk twice or more: where the player is, so a golem is drawn where it can be
+	 * seen. Null for no copies.
+	 */
+	static int[] nearest(List<int[]> copies, int sceneChunkX, int sceneChunkY)
+	{
+		if (copies == null || copies.isEmpty())
+		{
+			return null;
+		}
+		int[] best = copies.get(0);
+		int bestSpan = Integer.MAX_VALUE;
+		for (int[] copy : copies)
+		{
+			int span = Math.max(Math.abs(copy[0] - sceneChunkX), Math.abs(copy[1] - sceneChunkY));
+			if (span < bestSpan)
+			{
+				best = copy;
+				bestSpan = span;
+			}
+		}
+		return best;
 	}
 
 	static long chunkKey(int chunkX, int chunkY, int plane)

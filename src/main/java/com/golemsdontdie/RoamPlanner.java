@@ -356,10 +356,37 @@ class RoamPlanner
 		return false;
 	}
 
+	/**
+	 * How much less a golem wants a transport into a dead end: somewhere that leads nowhere but
+	 * back. Still taken, as a player might look in; less often, as there is nothing beyond. At
+	 * Castle Wars the lobby's portals lead into two waiting rooms whose only way out is back, and
+	 * golems spent the day going in and out of them.
+	 */
+	static final float DEAD_END_APPEAL = 0.6f;
+
+	/** How much a golem wants this transport for where it leads: less into a dead end. See WaysBack.isDeadEnd. */
+	float wayOnAppeal(GolemTransport transport, int tick, RoamContext context)
+	{
+		if (mesh == null || transports == null || abilities == null)
+		{
+			return 1f;
+		}
+		waysBack(tick, context);
+		return waysBack.isDeadEnd(waysBack.setOff(transport), waysBack.landing(transport)) ? DEAD_END_APPEAL : 1f;
+	}
+
+	/**
+	 * True while "Restrict golem ambition" keeps golems off the sea. Set by the plugin each frame,
+	 * and read here rather than from whichever golem's context asks: asked both ways, the graph
+	 * flipped between no ports and every port depending on who asked first.
+	 */
+	@lombok.Setter
+	private boolean keptAshore;
+
 	/** The spaces of every dock a golem may sail from now; none while golems are kept ashore. */
 	private Set<Integer> openPorts(RoamContext context)
 	{
-		if (docks == null || ambitionRestricted(context))
+		if (docks == null || keptAshore)
 		{
 			return Collections.emptySet();
 		}
@@ -439,6 +466,18 @@ class RoamPlanner
 		}
 		int space = mesh.componentAt(x, y, plane);
 		return space != 0 && !waysBack(tick, null).reachesHome(space);
+	}
+
+	/**
+	 * Works out what golems can get back from afresh at the next question, whatever changed or not:
+	 * after the minute following login, once quests and levels have been read.
+	 */
+	void forgetWaysBack()
+	{
+		if (waysBack != null)
+		{
+			waysBack.forget();
+		}
 	}
 
 	/** The graph build the ways home above were worked out on. */
@@ -1125,7 +1164,15 @@ class RoamPlanner
 		// A golem already waiting to sail has made its decision and does not roll again, but only at
 		// the dock it is waiting at. See TransportMemory.holdPending.
 		boolean waiting = memory != null && memory.getPendingPort() >= 0;
-		if (memory == null || voyage == null || ambitionRestricted(context) || memory.onShoreLeave()
+		// Kept ashore now, or on shore leave: a golem waiting for its crossing gives up waiting. Left
+		// pending, it stood at the plinth for good, each plan another pause for a boat that could not
+		// come, and a pause counts as a route, so the watchdog never looked.
+		if (waiting && (voyage == null || keptAshore || ambitionRestricted(context) || memory.onShoreLeave()))
+		{
+			memory.clearPending();
+			waiting = false;
+		}
+		if (memory == null || voyage == null || keptAshore || ambitionRestricted(context) || memory.onShoreLeave()
 			|| !waiting && random.nextFloat() >= chance)
 		{
 			return null;
@@ -1254,6 +1301,12 @@ class RoamPlanner
 			// Nowhere with no way back. After the rolls, which turn most down for less, and before the
 			// crowded fallback is kept, which is taken without asking again.
 			if (!mayEnter(transport, tick, reach.context))
+			{
+				continue;
+			}
+			// A dead end now and then, not as often as anywhere that leads on.
+			float onward = wayOnAppeal(transport, tick, reach.context);
+			if (onward < 1f && random.nextFloat() >= onward)
 			{
 				continue;
 			}
