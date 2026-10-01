@@ -22,22 +22,26 @@ enum GolemBoat
 	 * have sailed since sailing was added, and still what one leaving on its own takes.
 	 */
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
-		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 256, -1, 13373, 13881),
+		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 256, -1, 13373, 13881,
+		GolemContent.RAFT_HELM_MODEL, GolemContent.RAFT_HELM_RECOLOUR_FROM, GolemContent.RAFT_HELM_RECOLOUR_TO, 128,
+		GolemContent.ANIM_GOLEM_HELM),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
 	 * rest along a deck 324 units across and 714 long.
 	 */
 	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
-		new int[][]{{0, 0}, {-80, 170}, {80, 300}, {-40, 430}}, 58227, -192, -320, 64, 64, 64, 192, 58209, 13382, 13890),
+		new int[][]{{0, 0}, {-80, 42}, {80, 172}, {-40, 302}}, 58227, -192, -320, 64, 64, 64, 192, 58209, 13382, 13890,
+		58204, Palette.HELM_FROM, Palette.HELM_TO, 92, 13352),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
 	 * 1,090 long.
 	 */
 	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, -240, 240, -554, 536, 8,
-		new int[][]{{0, 0}, {-120, 180}, {120, 180}, {-120, 400}, {120, 400}, {-120, 620},
-			{120, 620}, {0, 830}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899);
+		new int[][]{{0, 0}, {-120, 52}, {120, 52}, {-120, 272}, {120, 272}, {-120, 492},
+			{120, 492}, {0, 702}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
+		58206, Palette.HELM_FROM, Palette.HELM_TO, 332, 13363);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -58,6 +62,10 @@ enum GolemBoat
 		/** The Merchants' trim, the gold one: the same model as the wooden trim, painted gold. */
 		static final short[] TRIM_FROM = {-31833, -31813, -31784};
 		static final short[] TRIM_TO = {7104, 7104, 7114};
+
+		/** The larger helms' own swap, as their basic wood objects paint them: wood, bronze fittings. */
+		static final short[] HELM_FROM = {-11322, -11333, -11343, 21464, 21435, -31784, -31813, -31833};
+		static final short[] HELM_TO = {6581, 6573, 6569, 5656, 5652, 6581, 6573, 6569};
 	}
 
 	/** The hull, the mast, and the sail's cloth, which is a separate object from the mast. */
@@ -71,7 +79,7 @@ enum GolemBoat
 
 	/**
 	 * Where the helm sits from the middle of the hull, along its length, in model units. Behind is
-	 * +z, a model facing -z, and the golem steering stands on it.
+	 * +z, a model facing -z. Only a raft's is stood on; see steerOffset.
 	 */
 	private final int helmOffset;
 
@@ -133,6 +141,25 @@ enum GolemBoat
 	 */
 	private final int mastAnimation;
 	private final int clothAnimation;
+
+	/**
+	 * The helm, and the colours its object swaps in. A raft's is a stub at the stern; a skiff's and
+	 * a sloop's are tillers whose pole reaches a tile forward, to whoever is steering. Drawn with the
+	 * raft's stub, a skiff's helmsman stood on the stern holding nothing.
+	 */
+	private final int helmModel;
+	private final short[] helmFrom;
+	private final short[] helmTo;
+
+	/**
+	 * Where the golem steering stands from the middle of the hull, along its length: on a raft's
+	 * helm, and a tile before a tiller, toward the bow, where a player stands to steer one. The rest
+	 * of the deck is measured from here.
+	 */
+	private final int steerOffset;
+
+	/** The pose a player steers this boat in, which the golem at the helm takes: one per helm. */
+	private final int helmPose;
 
 	static short[] trimFrom()
 	{

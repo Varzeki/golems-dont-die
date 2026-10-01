@@ -204,6 +204,20 @@ final class TransportMemory
 	void used(GolemTransport transport, int tick, int cooldownTicks)
 	{
 		restUntil = tick + TRANSPORT_REST_TICKS;
+		note(transport, tick, cooldownTicks);
+	}
+
+	/**
+	 * A door walked through standing open: remembered as a use, so the golem is not turned straight
+	 * back through it, but no rest from shortcuts after it. It was a step like any other.
+	 */
+	void walkedThrough(GolemTransport transport, int tick)
+	{
+		note(transport, tick, COOLDOWN_TICKS);
+	}
+
+	private void note(GolemTransport transport, int tick, int cooldownTicks)
+	{
 		remember(transport.endpointKey(), tick, cooldownTicks);
 		remember(transport.reverseKey(), tick, cooldownTicks);
 		journeys[nextJourney] = new int[]{transport.getFromX(), transport.getFromY(), transport.getFromPlane(),

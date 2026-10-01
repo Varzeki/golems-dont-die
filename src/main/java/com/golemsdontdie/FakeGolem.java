@@ -76,46 +76,123 @@ class FakeGolem extends RuneLiteObjectController
 	@Override
 	public Model getModel()
 	{
-		if (animation.getAnimation() == null)
+		Model drawn = baseModel;
+		if (animation.getAnimation() != null)
 		{
-			return baseModel;
+			Model posed = animation.animate(baseModel);
+			drawn = posed == null ? baseModel : posed;
 		}
-		Model posed = animation.animate(baseModel);
-		return posed == null ? baseModel : posed;
+		measure(drawn);
+		return drawn;
 	}
 
 	/**
-	 * The shape the mouse has to be inside for this golem to be hovered. A
-	 * {@link RuneLiteObjectController} is drawn but not clickable, the client building its menu
-	 * from real entities, so the hit test is done by hand.
-	 *
-	 * <p>Tested against the <b>rest pose</b>, so the box ignores a swinging arm:
-	 * {@link #getModel()} meant a skeletal transform per golem per tick on top of the
-	 * projection, which stalled the client whenever the cursor sat over the scene, and was
-	 * unsound, that model being a shared buffer the API forbids holding across another
-	 * transformation.
-	 *
-	 * @return the clickbox, or null if it cannot be computed this frame
+	 * The pose last drawn, as far out from the golem's middle as it reaches and from its lowest point
+	 * to its highest, in model units. Read as the client draws it: the box these make holds the pose
+	 * whichever way the golem faces, so the mouse outside it is not over the golem.
 	 */
-	Shape clickbox()
+	private int reach = -1;
+	private int lowest;
+	private int highest;
+
+	/** The rest pose's measurement, which never changes, so it is taken once. */
+	private boolean restMeasured;
+
+	private void measure(Model model)
+	{
+		if (model == baseModel && restMeasured)
+		{
+			return;
+		}
+		float[] xs = model.getVerticesX();
+		float[] ys = model.getVerticesY();
+		float[] zs = model.getVerticesZ();
+		float far = 0;
+		float low = 0;
+		float high = 0;
+		for (int i = 0; i < model.getVerticesCount(); i++)
+		{
+			far = Math.max(far, xs[i] * xs[i] + zs[i] * zs[i]);
+			low = Math.min(low, ys[i]);
+			high = Math.max(high, ys[i]);
+		}
+		reach = (int) Math.ceil(Math.sqrt(far));
+		lowest = (int) Math.floor(low);
+		highest = (int) Math.ceil(high);
+		restMeasured = model == baseModel;
+	}
+
+	/**
+	 * Whether the mouse is over this golem, tested as the game tests a model it draws: inside the
+	 * bounds, then inside the faces drawn this frame, by RuneLite's own reproduction of the game's
+	 * picking (Perspective.getClickbox). A {@link RuneLiteObjectController} is drawn but not picked,
+	 * the client building its menu from real entities, so it is done here.
+	 *
+	 * <p>The pose is only struck again for a golem whose bounds hold the mouse: striking every golem
+	 * near the cursor each tick stalled the client. The model it returns is a shared buffer, used
+	 * here at once and not kept.
+	 */
+	boolean isUnder(int mouseX, int mouseY)
 	{
 		// The world it is drawn in: aboard the player's ship, the ship's own.
 		WorldView wv = golem.isAboard() ? client.getWorldView(golem.getAboardView()) : client.getTopLevelWorldView();
-		if (wv == null || baseModel == null)
+		if (wv == null || reach < 0)
 		{
-			return null;
+			return false;
+		}
+		float[] across = BOX_ACROSS;
+		float[] along = BOX_ALONG;
+		float[] up = BOX_UP;
+		int[] screenX = BOX_X;
+		int[] screenY = BOX_Y;
+		for (int i = 0; i < 8; i++)
+		{
+			across[i] = (i & 1) == 0 ? -reach : reach;
+			along[i] = (i & 2) == 0 ? -reach : reach;
+			up[i] = i < 4 ? lowest : highest;
+		}
+		Perspective.modelToCanvas(client, wv, 8, getX(), getY(), getZ(), 0, across, along, up, screenX, screenY);
+		int left = Integer.MAX_VALUE;
+		int right = Integer.MIN_VALUE;
+		int top = Integer.MAX_VALUE;
+		int bottom = Integer.MIN_VALUE;
+		boolean whole = true;
+		for (int i = 0; i < 8; i++)
+		{
+			whole &= screenX[i] != Integer.MIN_VALUE && screenY[i] != Integer.MIN_VALUE;
+			left = Math.min(left, screenX[i]);
+			right = Math.max(right, screenX[i]);
+			top = Math.min(top, screenY[i]);
+			bottom = Math.max(bottom, screenY[i]);
+		}
+		// The game lets a face out by this many pixels each way; a corner behind the camera bounds
+		// nothing, so the faces are asked.
+		if (whole && (mouseX < left - FACE_MARGIN || mouseX > right + FACE_MARGIN
+			|| mouseY < top - FACE_MARGIN || mouseY > bottom + FACE_MARGIN))
+		{
+			return false;
 		}
 		try
 		{
-			return Perspective.getClickbox(client, wv, baseModel, getOrientation(), getX(), getY(), getZ());
+			Shape box = Perspective.getClickbox(client, wv, getModel(), getOrientation(), getX(), getY(), getZ());
+			return box != null && box.contains(mouseX, mouseY);
 		}
 		catch (RuntimeException e)
 		{
-			// Off-screen or degenerate geometry; not being hoverable for a frame is
-			// not worth propagating.
-			return null;
+			// Degenerate geometry; not being hoverable for a frame is not worth propagating.
+			return false;
 		}
 	}
+
+	/** The bounds' corners and where they are drawn, shared: every golem is tested on the client thread. */
+	private static final float[] BOX_ACROSS = new float[8];
+	private static final float[] BOX_ALONG = new float[8];
+	private static final float[] BOX_UP = new float[8];
+	private static final int[] BOX_X = new int[8];
+	private static final int[] BOX_Y = new int[8];
+
+	/** Pixels the game lets each face out by when picking. See Perspective.getClickbox. */
+	private static final int FACE_MARGIN = 5;
 
 	/** Copies the simulation's position and heading onto the drawn object. */
 	private void syncTransform()

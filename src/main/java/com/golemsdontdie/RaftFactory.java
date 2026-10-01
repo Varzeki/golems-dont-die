@@ -46,7 +46,7 @@ class RaftFactory
 			ModelData hull = client.loadModelData(boat.getHullModel());
 			ModelData mast = client.loadModelData(boat.getMastModel());
 			ModelData cloth = client.loadModelData(boat.getClothModel());
-			ModelData helm = client.loadModelData(GolemContent.RAFT_HELM_MODEL);
+			ModelData helm = client.loadModelData(boat.getHelmModel());
 			if (hull == null || mast == null || cloth == null || helm == null)
 			{
 				log.debug("{} models not loaded yet", boat);
@@ -55,8 +55,7 @@ class RaftFactory
 			}
 			// Painted as the objects paint them; the raw models are place-holder purple.
 			hull = recolour(hull.cloneVertices().cloneColors(), boat.getHullFrom(), boat.getHullTo());
-			helm = recolour(helm.cloneVertices().cloneColors(), GolemContent.RAFT_HELM_RECOLOUR_FROM,
-				GolemContent.RAFT_HELM_RECOLOUR_TO);
+			helm = recolour(helm.cloneVertices().cloneColors(), boat.getHelmFrom(), boat.getHelmTo());
 			// The helm is its own tile at the stern. The rig is not in here: a sail plays an animation
 			// of its own, which would fold a hull merged with it, so it is drawn apart; see rigModel.
 			helm = helm.translate(0, 0, boat.getHelmOffset());

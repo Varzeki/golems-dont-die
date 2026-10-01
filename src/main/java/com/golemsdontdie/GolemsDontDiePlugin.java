@@ -2504,12 +2504,12 @@ public class GolemsDontDiePlugin extends Plugin
 			rafts.put(golem, raft);
 		}
 
-		// The hull follows the golem, which is at the helm at the stern, so the boat's middle is
-		// ahead of it - the way it faces: 0 south, 512 west, 1024 north, 1536 east. How far ahead
-		// is the boat's own business: a sloop's helm sits three and a half tiles back.
+		// The hull follows the golem, which is steering at the stern, so the boat's middle is ahead
+		// of it - the way it faces: 0 south, 512 west, 1024 north, 1536 east. How far ahead is the
+		// boat's own business: a sloop's helmsman stands two and a half tiles back.
 		double facing = golem.getOrientation() * Math.PI / 1024;
-		int aheadX = (int) Math.round(-Math.sin(facing) * kind.getHelmOffset());
-		int aheadY = (int) Math.round(-Math.cos(facing) * kind.getHelmOffset());
+		int aheadX = (int) Math.round(-Math.sin(facing) * kind.getSteerOffset());
+		int aheadY = (int) Math.round(-Math.cos(facing) * kind.getSteerOffset());
 		// At the golem's ground height, always in the scene when the golem is drawn.
 		WorldView view = client.getTopLevelWorldView();
 		int localX = golem.getFineX() - (view == null ? 0 : view.getBaseX() * Golem.TILE);
@@ -3230,6 +3230,11 @@ public class GolemsDontDiePlugin extends Plugin
 	/** Whether the tab is in the sidebar, so it is neither added twice nor removed twice. */
 	private boolean sidebarShown;
 
+	/** The menu entries that are about a game object, whose identifier is the object's id. */
+	private static final Set<MenuAction> OBJECT_ENTRIES = EnumSet.of(MenuAction.GAME_OBJECT_FIRST_OPTION,
+		MenuAction.GAME_OBJECT_SECOND_OPTION, MenuAction.GAME_OBJECT_THIRD_OPTION, MenuAction.GAME_OBJECT_FOURTH_OPTION,
+		MenuAction.GAME_OBJECT_FIFTH_OPTION, MenuAction.EXAMINE_OBJECT);
+
 	/**
 	 * Offers to revive missing golems from the plinth they were carved on, for a player with the
 	 * sidebar off - and for anyone standing at the plinth, which is where it would occur to them.
@@ -3251,7 +3256,9 @@ public class GolemsDontDiePlugin extends Plugin
 		}
 		for (MenuEntry entry : event.getMenuEntries())
 		{
-			if (GolemContent.isPlinth(entry.getIdentifier()))
+			// On an object: an NPC's or an item's identifier is something else, and one that happened
+			// to match a plinth offered a revive on it.
+			if (OBJECT_ENTRIES.contains(entry.getType()) && GolemContent.isPlinth(entry.getIdentifier()))
 			{
 				// Named as the plinth the player is pointing at, which is one of six carvings.
 				menu.addReviveEntry(missing, entry.getTarget(), this::reviveMissing);
@@ -3461,8 +3468,8 @@ public class GolemsDontDiePlugin extends Plugin
 	{
 		obstacleObserver.onClientTick();
 
-		// The map as soon as it opens, and every frame until it knows where it draws a cave.
-		if (mapPoints.wantsFrame(golems))
+		// The map as soon as it opens, and as soon as another map is picked.
+		if (mapPoints.wantsFrame())
 		{
 			refreshMap();
 		}

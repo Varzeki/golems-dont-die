@@ -364,7 +364,8 @@ final class MotionCurve
 		// observations holds still rather than snapping back to the start.
 		for (int i = 1; i < count; i++)
 		{
-			if (forward[i] == 0 && lateral[i] == 0 && (forward[i - 1] != 0 || lateral[i - 1] != 0))
+			// By what was seen, not by zero: a real sample back at the start is somewhere to be.
+			if (!seen[i])
 			{
 				forward[i] = forward[i - 1];
 				lateral[i] = lateral[i - 1];

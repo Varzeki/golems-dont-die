@@ -1426,6 +1426,9 @@ class Golem
 		// stone and hop back where they began.
 		GolemTransport wayBack = null;
 
+		// The spaces it recently left, asked for once something has won its roll. See below.
+		Set<Integer> cameFrom = null;
+
 		// Scanned as a box rather than by asking for neighbours, because the index is by
 		// exact origin tile and most tiles have nothing on them: 49 cheap lookups that
 		// almost always all miss.
@@ -1465,8 +1468,7 @@ class Golem
 						// Not straight after the last one, unless looking for a way out of a
 						// crowd or out of a pen. See TransportMemory.TRANSPORT_REST_TICKS.
 						if (transportMemory.restingFromTransports(context.getTick())
-							&& !context.crowdedRegion(tileX, tileY, plane)
-							&& context.enclosedArea(tileX, tileY, plane) >= PENNED_TILES)
+							&& !mayGoBack(tileX, tileY, context))
 						{
 							continue;
 						}
@@ -1487,6 +1489,21 @@ class Golem
 						if (!context.mayEnter(transport))
 						{
 							continue;
+						}
+						// Not straight back into a space it just left, as golems out of view are
+						// not: in view, a golem between two rooms went back and forth through
+						// their doors and ladders, a different one each time, for as long as it
+						// was watched. Unless penned or in a crowd, where back may be the way out.
+						if (!mayGoBack(tileX, tileY, context))
+						{
+							if (cameFrom == null)
+							{
+								cameFrom = context.spacesLeft(tileX, tileY, plane, transportMemory);
+							}
+							if (context.leadsInto(cameFrom, transport))
+							{
+								continue;
+							}
 						}
 						// A dead end now and then, not as often as anywhere that leads on.
 						float onward = context.wayOnAppeal(transport);
@@ -1655,6 +1672,48 @@ class Golem
 		}
 		take(back, context);
 		return true;
+	}
+
+	/**
+	 * True if this is a door whose two sides are a step or two apart and every step between them is
+	 * open now: the door is open. Two, for a door in a wall a tile thick, or a gate with a tile between.
+	 */
+	private boolean standsOpen(GolemTransport transport, RoamContext context)
+	{
+		int x = transport.getFromX();
+		int y = transport.getFromY();
+		int toX = transport.getToX();
+		int toY = transport.getToY();
+		if (transport.getArchetype() != GolemTransport.ARCHETYPE_DOOR || transport.getFromPlane() != transport.getToPlane()
+			|| Math.max(Math.abs(toX - x), Math.abs(toY - y)) > OPEN_DOOR_SPAN || x == toX && y == toY)
+		{
+			return false;
+		}
+		while (x != toX || y != toY)
+		{
+			int dx = Integer.signum(toX - x);
+			int dy = Integer.signum(toY - y);
+			if (!context.getMemory().canStep(x, y, transport.getFromPlane(), dx, dy))
+			{
+				return false;
+			}
+			x += dx;
+			y += dy;
+		}
+		return true;
+	}
+
+	/** The furthest apart, in tiles, a door's two sides are walked between when it stands open. */
+	private static final int OPEN_DOOR_SPAN = 2;
+
+	/**
+	 * Whether a golem here may go back the way it came, or rest less: in a crowd, or penned in, where
+	 * back is often the only way out. Asked only once something is otherwise to be taken, since
+	 * measuring a pen floods the ground around it.
+	 */
+	private boolean mayGoBack(int tileX, int tileY, RoamContext context)
+	{
+		return context.crowdedRegion(tileX, tileY, plane) || context.enclosedArea(tileX, tileY, plane) < PENNED_TILES;
 	}
 
 	/** How far a golem stuck on a small floor looks for the way off it, in tiles. */
@@ -1988,6 +2047,14 @@ class Golem
 	 */
 	private void take(GolemTransport transport, RoamContext context)
 	{
+		// A door standing open is a doorway, walked through as anything else is. The push through on
+		// the spot is for a shut door; played in an open one, the golem looked to teleport across it.
+		// Still remembered, so it is not turned straight back through.
+		if (standsOpen(transport, context) && walkTo(transport.getToX(), transport.getToY(), context))
+		{
+			transportMemory.walkedThrough(transport, context.getTick());
+			return;
+		}
 		// Turned to face it first, where anyone can see: a golem that arrived at a stile walking
 		// the other way climbed it backwards, snapping round only as it went over. Not between the
 		// hops of a crossing, whose timing was measured stone to stone, and not a ladder or a
@@ -2350,11 +2417,15 @@ class Golem
 	@Getter
 	private boolean crewed;
 
+	/** The pose this golem steers in if it has the helm: its boat's. A raft's when sailing alone. */
+	private int helmPose = GolemContent.ANIM_GOLEM_HELM;
+
 	/** Takes a berth on a boat. See GolemCrew, which hands them out. */
-	void board(int across, int along)
+	void board(int across, int along, int helmPose)
 	{
 		deckAcross = across;
 		deckAlong = along;
+		this.helmPose = helmPose;
 		crewed = true;
 	}
 
@@ -2363,6 +2434,7 @@ class Golem
 	{
 		deckAcross = 0;
 		deckAlong = 0;
+		helmPose = GolemContent.ANIM_GOLEM_HELM;
 		crewed = false;
 		boatSeed = 0;
 	}
@@ -2942,7 +3014,7 @@ class Golem
 		{
 			// One pair of hands on the wheel. The rest of a crew stands on deck: every one of them
 			// steering read as eight helmsmen and no helm.
-			return isAtHelm() ? GolemContent.ANIM_GOLEM_HELM : snapshot.getIdlePoseAnimation();
+			return isAtHelm() ? helmPose : snapshot.getIdlePoseAnimation();
 		}
 		if (gaitWalk != -1)
 		{

@@ -146,6 +146,18 @@ final class RoamContext
 		return planner == null ? 1f : planner.wayOnAppeal(transport, tick, this);
 	}
 
+	/** The spaces a golem recently left, other than the one it is in. See RoamPlanner.spacesLeft. */
+	Set<Integer> spacesLeft(int x, int y, int plane, TransportMemory memory)
+	{
+		return planner == null ? Collections.emptySet() : planner.spacesLeft(x, y, plane, tick, memory);
+	}
+
+	/** True if this transport lands in one of these spaces. See RoamPlanner.leadsInto. */
+	boolean leadsInto(Set<Integer> spaces, GolemTransport transport)
+	{
+		return planner != null && planner.leadsInto(spaces, transport);
+	}
+
 	/** The shared model and animation cache, for clip lengths. Set after construction. */
 	@Setter
 	private GolemModelFactory models;

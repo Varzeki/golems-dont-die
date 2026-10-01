@@ -514,6 +514,15 @@ class ObstacleObserver
 			String menu = silentMenu;
 			clearSilent();
 
+			// Hurt since the click is a fall, a death or a boss's throw, not the way across: as in
+			// complete, and learned it put a silent crossing in place of the obstacle's clip.
+			if (hurt)
+			{
+				hurt = false;
+				reset();
+				return;
+			}
+
 			// A silent traversal has no clip to measure a window against but still has a shape:
 			// without one a staircase appeared at the far end the tick the golem arrived. A silent
 			// exit is reported a tick after the overworld loads, so its template is a tick older.

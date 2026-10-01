@@ -84,6 +84,8 @@ class GolemNames
 			if (in == null)
 			{
 				log.warn("No names on the classpath; golems will go unnamed");
+				// The ordinals are their own file, and need not go with them.
+				loadOrdinals();
 				return;
 			}
 			List<String> names = new ArrayList<>();

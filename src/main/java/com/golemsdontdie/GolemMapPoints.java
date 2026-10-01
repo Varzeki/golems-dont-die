@@ -28,10 +28,10 @@ import static com.golemsdontdie.RouteGeometry.span;
  * and the cells shrink until each golem has a face of its own; zoom out and a crowd becomes one face
  * with a number. Either way the map holds about as many points as there are places to put them.
  *
- * <p>Only while the map is open, and only for the stretch on screen. Which map that is does not
- * matter: the coordinates of a golem underground fall inside the layer drawn when that layer is the
- * one being looked at, so golems appear on a dungeon map as readily as on the surface. Closed, the
- * map holds nothing and this costs one widget lookup a tick.
+ * <p>Only while the map is open, and only for the stretch on screen. Any map: a golem in a dungeon
+ * goes where that dungeon's map draws its tile and floor (see WorldMapLayers), so golems appear on a
+ * dungeon map as readily as on the surface. Closed, the map holds nothing and this costs one widget
+ * lookup a tick.
  */
 @Slf4j
 @Singleton
@@ -59,77 +59,24 @@ class GolemMapPoints
 	 */
 	private WorldMapData showing;
 
-	/**
-	 * How far the open map draws this layer from where it really is.
-	 *
-	 * <p>A dungeon is not drawn at the coordinates it has. Wyrmscraig's cavern really sits at
-	 * x 2560-2620; the map draws it 192 tiles east of that, and refuses every point given to it in
-	 * the coordinates the cave actually has. Nothing in the client's interface offers the
-	 * translation, so it is measured: the player is one tile whose place in both spaces is known,
-	 * because the map centres on the player when it opens.
-	 */
-	private int offsetX;
-	private int offsetY;
-
-	/** Set once the offset above has been established for the map on screen. */
-	private boolean measured;
-
-	/** The map the offset was measured for. A different map is a different translation. */
-	private Object measuredFor;
-
-	/** Whether the map was shut last time this ran: opening it is what starts a measurement. */
+	/** Whether the map was shut last time this ran: the frame it opens is refreshed at once. */
 	private boolean wasShut = true;
-
-	/** Game ticks since the map opened, while the measurement is still being attempted. */
-	private int sinceOpen;
 
 	/**
 	 * Whether the map wants a refresh before the next game tick: on the frame it opens, and on the
-	 * frame the measurement succeeds. A tick is 600ms, and a golem underground has no place on the
-	 * map until the measurement is made; asked once a tick, the golems in a cave came onto the map
-	 * a second or more after everything else. Only the measurement is tried each frame - a whole
-	 * refresh every frame, for a map that could not be measured, was the roster sorted fifty times
-	 * a second for seven seconds.
+	 * frame another map is picked. A tick is 600ms, and asked only once a tick, the golems came onto
+	 * a map a second or more after everything else on it.
 	 */
-	boolean wantsFrame(List<Golem> roster)
+	boolean wantsFrame()
 	{
-		if (wasShut)
-		{
-			Widget window = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
-			return window != null && !window.isHidden();
-		}
-		if (measured || sinceOpen > MEASURE_TICKS)
+		Widget window = client.getWidget(InterfaceID.Worldmap.MAP_CONTAINER);
+		if (window == null || window.isHidden())
 		{
 			return false;
 		}
 		WorldMap map = client.getWorldMap();
-		if (map == null || map.getWorldMapData() != measuredFor)
-		{
-			// Another map was picked: the refresh starts its measurement over.
-			return true;
-		}
-		measure(map.getWorldMapPosition(), roster);
-		return measured;
+		return wasShut || map != null && map.getWorldMapData() != showing;
 	}
-
-	/**
-	 * How long after the map opens, in game ticks, the translation may be measured. The first
-	 * frames can be too early - the map still holds the position it was left at, and the centre is
-	 * not the player yet, which measure's checks turn down - and long after it the player may have
-	 * panned somewhere else, where the centre means nothing.
-	 */
-	private static final int MEASURE_TICKS = 12;
-
-	/** Golems sampled to check a measurement, and how near the player they must be to count. */
-	private static final int SAMPLE = 30;
-	private static final int SAMPLE_TILES = 500;
-
-	/**
-	 * Translations further than this are not believed. A player on the grass looking at a dungeon
-	 * map is not on the map at all, and the distance between them says so - a hundred regions,
-	 * against the three that separate a dungeon from its true place.
-	 */
-	private static final int MOST_OFFSET = 4096;
 
 	/** Named faces kept before the oldest are dropped: renaming in the sidebar makes one a keystroke. */
 	private static final int MOST_LABELS = 256;
@@ -146,6 +93,28 @@ class GolemMapPoints
 	/** What a golem is called, auto name and all, for the tooltip. See GolemNames. */
 	@Inject
 	private GolemNames names;
+
+	/** Where each map other than the surface draws the game's tiles. */
+	@Inject
+	private WorldMapLayers layers;
+
+	/** Where the map draws a golem, reused for every golem. */
+	private final int[] spot = new int[2];
+
+	/**
+	 * For a map newer than the shipped table, how far it draws its ground from where it really is,
+	 * measured from the player, on whom the map centres as it opens; and the map it was measured for.
+	 * A map the table knows never needs it.
+	 */
+	private int offsetX;
+	private int offsetY;
+	private WorldMapData measuredFor;
+
+	/**
+	 * Translations further than this are not believed: a player on the grass looking at a dungeon
+	 * map is not on it, a hundred regions off, against the few that separate a dungeon from its place.
+	 */
+	private static final int MOST_OFFSET = 4096;
 
 	/** Read only to tell sea from land, when a dungeon is folded onto the surface map. */
 	@Inject
@@ -175,6 +144,7 @@ class GolemMapPoints
 	void startUp()
 	{
 		face = ImageUtil.loadImageResource(GolemsDontDiePlugin.class, "/golem-map-icon.png");
+		layers.load();
 	}
 
 	/** Takes every golem off the map. */
@@ -195,6 +165,7 @@ class GolemMapPoints
 		used = 0;
 		cells.clear();
 		labelled.clear();
+		measuredFor = null;
 	}
 
 	/**
@@ -218,16 +189,11 @@ class GolemMapPoints
 	 */
 	void refresh(List<Golem> golems, boolean named, int tick, Golem only)
 	{
-		// Refreshed each frame while measuring, so the time allowed for it is counted in ticks.
-		boolean newTick = tick != this.tick;
 		this.tick = tick;
 		if (face == null)
 		{
 			return;
 		}
-		// Kept before the list is narrowed: the measurement below is checked against the golems
-		// around the player, and while one golem is being looked for it is the only one left.
-		List<Golem> roster = golems;
 		if (only != null)
 		{
 			golems = Collections.singletonList(only);
@@ -242,20 +208,7 @@ class GolemMapPoints
 			clear();
 			return;
 		}
-		if (wasShut)
-		{
-			// Opened. Whatever was measured for the last map is not to be trusted for this one,
-			// and the frames that follow are the ones that can measure it.
-			wasShut = false;
-			sinceOpen = 0;
-			measured = false;
-			offsetX = 0;
-			offsetY = 0;
-		}
-		else if (newTick)
-		{
-			sinceOpen++;
-		}
+		wasShut = false;
 
 		// How near two golems have to be to share a face, in tiles: half a face's width at this
 		// zoom, so two faces touching is what merges them rather than two faces near each other.
@@ -264,22 +217,18 @@ class GolemMapPoints
 		int cellTiles = Math.max(1, Math.round(FACE_PIXELS / zoom / 2f));
 		Point centre = map.getWorldMapPosition();
 		showing = map.getWorldMapData();
-		int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2) + MARGIN;
-		int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2) + MARGIN;
-
 		if (showing != measuredFor)
 		{
-			// A different map, drawn somewhere else again.
 			measuredFor = showing;
-			measured = false;
 			offsetX = 0;
 			offsetY = 0;
-			sinceOpen = 0;
+			if (layers.layerOf(showing) == null)
+			{
+				measure(map.getWorldMapPosition());
+			}
 		}
-		if (!measured && sinceOpen <= MEASURE_TICKS)
-		{
-			measure(centre, roster);
-		}
+		int halfWidth = (int) Math.ceil(window.getBounds().getWidth() / zoom / 2) + MARGIN;
+		int halfHeight = (int) Math.ceil(window.getBounds().getHeight() / zoom / 2) + MARGIN;
 
 		gather(golems, named, cellTiles, centre.getX() - halfWidth, centre.getX() + halfWidth,
 			centre.getY() - halfHeight, centre.getY() + halfHeight);
@@ -294,73 +243,27 @@ class GolemMapPoints
 	}
 
 	/**
-	 * Works out where this map draws the layer the player is standing on, from the one tile whose
-	 * place in both spaces is known.
-	 *
-	 * <p>Run on the frame the map opens, because that is when the client has centred it on the
-	 * player: the centre is then the player, in the map's own coordinates, and the player's real
-	 * tile is the player in the game's. The difference is the translation for everything else on
-	 * that layer. It is only believed if it looks like one - whole regions, and near enough that
-	 * the player could be on the map at all - so a map of somewhere else leaves it unmeasured and
-	 * the golems fall back to the surface.
+	 * Works out where a map the table does not know draws the ground the player is on: on the frame
+	 * it opens it is centred on the player, so the centre, in the map's coordinates, against the
+	 * player's own tile is the translation. Only believed if it is whole map squares and lands on the
+	 * map, so a map of somewhere else is left unmeasured.
 	 */
-	private void measure(Point centre, List<Golem> golems)
+	private void measure(Point centre)
 	{
 		WorldPoint at = PlayerPosition.of(client);
-		if (showing == null || at == null)
+		if (showing == null || at == null || centre == null || showing.surfaceContainsPosition(at.getX(), at.getY()))
 		{
 			return;
 		}
-		if (showing.surfaceContainsPosition(at.getX(), at.getY()))
-		{
-			// The map draws this layer where it really is, which is the ordinary case.
-			measured = true;
-			return;
-		}
-
 		int dx = centre.getX() - at.getX();
 		int dy = centre.getY() - at.getY();
-		if ((dx & 63) != 0 || (dy & 63) != 0
-			|| Math.abs(dx) > MOST_OFFSET || Math.abs(dy) > MOST_OFFSET
-			|| !showing.surfaceContainsPosition(at.getX() + dx, at.getY() + dy))
+		if ((dx & 63) == 0 && (dy & 63) == 0 && Math.abs(dx) <= MOST_OFFSET && Math.abs(dy) <= MOST_OFFSET
+			&& showing.surfaceContainsPosition(at.getX() + dx, at.getY() + dy))
 		{
-			return;
+			offsetX = dx;
+			offsetY = dy;
+			log.debug("A map newer than the table draws its ground {},{} from where it is", dx, dy);
 		}
-
-		// And the golems around the player check it. A translation taken from a map the player has
-		// panned away from would still look like a translation; it would not put the golems
-		// standing beside them onto the map as well.
-		int sampled = 0;
-		int landed = 0;
-		for (Golem golem : golems)
-		{
-			if (golem.isDying())
-			{
-				continue;
-			}
-			int x = golem.getFineX() / Golem.TILE;
-			int y = golem.getFineY() / Golem.TILE;
-			if (Math.abs(x - at.getX()) > SAMPLE_TILES || Math.abs(y - at.getY()) > SAMPLE_TILES
-				|| showing.surfaceContainsPosition(x, y))
-			{
-				continue;
-			}
-			landed += showing.surfaceContainsPosition(x + dx, y + dy) ? 1 : 0;
-			if (++sampled >= SAMPLE)
-			{
-				break;
-			}
-		}
-		if (sampled >= 3 && landed * 2 < sampled)
-		{
-			return;
-		}
-
-		offsetX = dx;
-		offsetY = dy;
-		measured = true;
-		log.debug("The map draws this layer {},{} from where it is; {} of {} golems agree",
-			dx, dy, landed, sampled);
 	}
 
 	/** Sorts the golems on screen into cells, counting each and keeping a few names. */
@@ -368,6 +271,7 @@ class GolemMapPoints
 	{
 		cells.clear();
 		used = 0;
+		WorldMapLayers.Layer layer = layers.layerOf(showing);
 
 		for (Golem golem : golems)
 		{
@@ -393,37 +297,38 @@ class GolemMapPoints
 					y = at.getY();
 				}
 			}
-			// Where this golem goes on the map that is open. Its own coordinates if they are on it
-			// - a dungeon's own view draws the dungeon where it really is. Otherwise the surface
-			// coordinates it is beneath, because the surface map draws a dungeon over the ground
-			// above it. Neither, and it is on some other map and is not drawn at all.
-			//
-			// Asked of the map rather than worked out from the player: the two are not the same
-			// thing, and taking the player's floor for the map's left every golem underground off
-			// a dungeon view whenever the player was standing on the grass above it.
-			if (showing != null && !showing.surfaceContainsPosition(x, y))
+			// Where this golem goes on the map that is open. On a dungeon's map, where that map draws
+			// the golem's own tile and floor, which may be far from where it is: see WorldMapLayers. On
+			// the surface, where it is; or for a golem underground, over the ground above it, which is
+			// what a player looking at the surface expects. Neither, and it is on some other map.
+			if (layer != null)
 			{
-				if ((offsetX != 0 || offsetY != 0)
-					&& showing.surfaceContainsPosition(x + offsetX, y + offsetY))
+				if (!layer.place(x, y, golem.getPlane(), spot))
 				{
-					// A dungeon drawn away from its own coordinates: the same translation the
-					// player's own tile needed.
+					continue;
+				}
+				x = spot[0];
+				y = spot[1];
+			}
+			else if (showing != null && !showing.surfaceContainsPosition(x, y))
+			{
+				// Most dungeons are dug at their surface coordinates plus this. Not all of them are: the
+				// Observatory's dungeon folds into open water west of Falador, and a golem was on the map
+				// in the middle of the sea labelled with the cave it was really in. Where the fold lands
+				// in the sea it is no place at all, so nothing is drawn.
+				if ((offsetX != 0 || offsetY != 0) && showing.surfaceContainsPosition(x + offsetX, y + offsetY))
+				{
 					x += offsetX;
 					y += offsetY;
 				}
-				else if (y >= UNDERGROUND && showing.surfaceContainsPosition(x, y - UNDERGROUND)
-					&& !mesh.isOcean(x, y - UNDERGROUND, 0))
+				else if (y < UNDERGROUND || !showing.surfaceContainsPosition(x, y - UNDERGROUND)
+					|| mesh.isOcean(x, y - UNDERGROUND, 0))
 				{
-					// Most dungeons are dug at their surface coordinates plus this, and drawing one
-					// over the ground above it is what a player expects. Not all of them are: the
-					// Observatory's dungeon folds into open water west of Falador, and a golem was
-					// on the map in the middle of the sea labelled with the cave it was really in.
-					// Where the fold lands in the sea it is no place at all, so nothing is drawn.
-					y -= UNDERGROUND;
+					continue;
 				}
 				else
 				{
-					continue;
+					y -= UNDERGROUND;
 				}
 			}
 			// The golem being looked for is kept whether or not the map is looking at it: its face
@@ -442,7 +347,7 @@ class GolemMapPoints
 			{
 				for (int dy = -1; dy <= 1; dy++)
 				{
-					int at = (int) cells.getOrDefault(bucket(x / cellTiles + dx, y / cellTiles + dy), -1);
+					int at = (int) cells.getOrDefault(bucket(x / cellTiles + dx, y / cellTiles + dy, golem.getPlane()), -1);
 					if (at < 0)
 					{
 						continue;
@@ -482,8 +387,13 @@ class GolemMapPoints
 				fresh.plane = golem.getPlane();
 				fresh.count = 0;
 				fresh.first = golem;
-				// Bucketed where it started, so the golems after it can find it.
-				cells.add(bucket(x / cellTiles, y / cellTiles), index);
+				// Bucketed where it started, so the golems after it can find it. Once: a second
+				// cell in a bucket, its group grown out of reach, was a second entry for one key.
+				long key = bucket(x / cellTiles, y / cellTiles, golem.getPlane());
+				if (!cells.containsKey(key))
+				{
+					cells.add(key, index);
+				}
 			}
 			Cell cell = cellList.get(index);
 			cell.count++;
@@ -563,10 +473,11 @@ class GolemMapPoints
 	/** How many times the joining is run over. A joined group reaches further than its halves. */
 	private static final int JOIN_PASSES = 3;
 
-	/** The key of a cell of the lookup grid. */
-	private static long bucket(int x, int y)
+	/** A cell's key, by floor too: a group upstairs shared its bucket with one below, and each golem
+	 * up there that found the downstairs group in its bucket made a cell of its own. */
+	private static long bucket(int x, int y, int plane)
 	{
-		return ((long) x << 32) | y & 0xFFFFFFFFL;
+		return ((long) plane << 60) | ((long) x << 32) | y & 0xFFFFFFFFL;
 	}
 
 	/** Puts a point on each filled cell, keeping the ones already on the map. */

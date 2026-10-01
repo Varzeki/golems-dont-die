@@ -46,7 +46,7 @@ class GolemCrew
 			return false;
 		}
 		members.add(golem);
-		golem.board(boat.getDeck()[berth][0], boat.getDeck()[berth][1]);
+		golem.board(boat.getDeck()[berth][0], boat.getDeck()[berth][1], boat.getHelmPose());
 		// One boat, one swell: everyone aboard rides it as the helm's boat does.
 		golem.setBoatSeed(members.get(0).getId());
 		return true;

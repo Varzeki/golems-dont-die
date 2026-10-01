@@ -390,8 +390,15 @@ class RoamPlanner
 		{
 			return Collections.emptySet();
 		}
+		// Never back to the port a golem last left (see Voyage), so with two docks open a crossing is
+		// one way: the sea is a way back only once there is a third to go round by.
+		List<SailingDocks.Dock> open = docks.openDocks();
+		if (open.size() < 3)
+		{
+			return Collections.emptySet();
+		}
 		Set<Integer> ports = new HashSet<>();
-		for (SailingDocks.Dock dock : docks.openDocks())
+		for (SailingDocks.Dock dock : open)
 		{
 			WorldPoint shore = dock.getShore();
 			int space = mesh.componentAt(shore.getX(), shore.getY(), shore.getPlane());
@@ -1231,6 +1238,51 @@ class RoamPlanner
 	private int lastCandidates;
 
 	/**
+	 * The spaces a golem recently set off from, other than the one it stands in. Not straight back
+	 * into one: at Castle Wars three portals from the lobby lead into two waiting rooms, and golems
+	 * went lobby, room, lobby, room for good, each hop through a different portal, so no single
+	 * cooldown caught it. By the space around a tile, since a journey often starts on its object,
+	 * a tile no space holds, and asked by that tile alone it was never counted.
+	 */
+	Set<Integer> spacesLeft(int x, int y, int plane, int tick, TransportMemory memory)
+	{
+		if (memory == null)
+		{
+			return Collections.emptySet();
+		}
+		Set<Integer> left = new HashSet<>();
+		List<Integer> here = mesh.spacesAt(x, y, plane);
+		for (int[] origin : memory.recentOrigins(tick))
+		{
+			// Only a start in one space. One on an object set in a wall has a space on either side,
+			// and the far one, never stood in, was barred with it.
+			List<Integer> spaces = mesh.spacesAt(origin[0], origin[1], origin[2]);
+			if (spaces.size() == 1 && !here.contains(spaces.get(0)))
+			{
+				left.add(spaces.get(0));
+			}
+		}
+		return left;
+	}
+
+	/** True if this transport lands in one of these spaces. */
+	boolean leadsInto(Set<Integer> spaces, GolemTransport transport)
+	{
+		if (spaces.isEmpty())
+		{
+			return false;
+		}
+		for (int space : mesh.spacesAt(transport.getToX(), transport.getToY(), transport.getToPlane()))
+		{
+			if (spaces.contains(space))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * A walk to a transport in range and the transport itself, or null. Every transport starting
 	 * within reach is considered in a random order, which keeps the choice fair - except for a
 	 * golem with a taste in places, which considers the ones that suit it first.
@@ -1238,22 +1290,9 @@ class RoamPlanner
 	private Itinerary toNearbyTransport(WorldPoint from, int tick, Random random, TransportMemory memory,
 		Reach reach, boolean mayGoBack)
 	{
-		// The spaces this golem recently came from. Not straight back into one: at Castle Wars three
-		// portals from the lobby lead into two waiting rooms, and golems went lobby, room, lobby,
-		// room for good, each hop through a different portal, so no single cooldown caught it. A
-		// golem penned in may go back, since that is often the only way out.
-		Set<Integer> cameFrom = new HashSet<>();
-		if (!mayGoBack && memory != null)
-		{
-			for (int[] origin : memory.recentOrigins(tick))
-			{
-				int space = mesh.componentAt(origin[0], origin[1], origin[2]);
-				if (space != 0 && space != mesh.componentAt(from.getX(), from.getY(), from.getPlane()))
-				{
-					cameFrom.add(space);
-				}
-			}
-		}
+		// A golem penned in may go back, since that is often the only way out. See spacesLeft.
+		Set<Integer> cameFrom = mayGoBack ? Collections.emptySet()
+			: spacesLeft(from.getX(), from.getY(), from.getPlane(), tick, memory);
 		List<GolemTransport> near = new ArrayList<>();
 		transports.near(from.getX(), from.getY(), TRANSPORT_SEARCH, near);
 		Collections.shuffle(near, random);
@@ -1280,8 +1319,7 @@ class RoamPlanner
 					from.getPlane())
 				|| !abilities.canUse(transport)
 				|| !landsSomewhereUseful(transport)
-				|| !cameFrom.isEmpty() && cameFrom.contains(mesh.componentAt(transport.getToX(), transport.getToY(),
-					transport.getToPlane())))
+				|| leadsInto(cameFrom, transport))
 			{
 				continue;
 			}
