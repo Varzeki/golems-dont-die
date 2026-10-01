@@ -2433,12 +2433,16 @@ class Golem
 	/** The pose this golem steers in if it has the helm: its boat's. A raft's when sailing alone. */
 	private int helmPose = GolemContent.ANIM_GOLEM_HELM;
 
-	/** Takes a berth on a boat. See GolemCrew, which hands them out. */
-	void board(int across, int along, int helmPose)
+	/** Which rail this golem looks out over on its crew's boat: 1 starboard, -1 port, 0 forward. */
+	private int lookOut;
+
+	/** Takes a berth on a boat, and the side of the hull it is on. See GolemCrew, which hands them out. */
+	void board(int across, int along, int helmPose, int side)
 	{
 		deckAcross = across;
 		deckAlong = along;
 		this.helmPose = helmPose;
+		lookOut = side;
 		crewed = true;
 	}
 
@@ -2447,6 +2451,7 @@ class Golem
 	{
 		deckAcross = 0;
 		deckAlong = 0;
+		lookOut = 0;
 		helmPose = GolemContent.ANIM_GOLEM_HELM;
 		crewed = false;
 		boatSeed = 0;
@@ -2488,14 +2493,14 @@ class Golem
 			// Out over the rail, in the ship's own frame: the client turns the ship.
 			return deckFacing;
 		}
-		if (!crewed || deckAcross == 0)
+		if (!crewed || isAtHelm() || lookOut == 0)
 		{
 			// In a turned instance chunk, turned with it: a quarter turn takes east to south, and
 			// south (0) round to west (512) is a quarter of the way round.
 			return orientation + 512 * drawQuarters & 2047;
 		}
 		// Right of a golem facing south is west, which is 512 further round.
-		return orientation + (deckAcross > 0 ? 512 : -512) & 2047;
+		return orientation + (lookOut > 0 ? 512 : -512) & 2047;
 	}
 
 	// ------------------------------------------------------------------ aboard the player's ship

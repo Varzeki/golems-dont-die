@@ -49,7 +49,10 @@ class GolemCrew
 			return false;
 		}
 		members.add(golem);
-		golem.board(boat.getDeck()[berth][0], boat.getDeck()[berth][1], boat.getHelmPose());
+		// Which rail it looks out over is the side of the hull its berth is on, not of the helmsman,
+		// which on a sloop stands to one side: judged from that, the whole crew looked out the one way.
+		golem.board(boat.getDeck()[berth][0], boat.getDeck()[berth][1], boat.getHelmPose(),
+			Integer.signum(boat.getDeck()[berth][0] - boat.getSteerAcross()));
 		// One boat, one swell: everyone aboard rides it as the helm's boat does.
 		golem.setBoatSeed(members.get(0).getId());
 		return true;

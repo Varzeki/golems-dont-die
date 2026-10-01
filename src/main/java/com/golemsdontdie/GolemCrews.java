@@ -264,8 +264,10 @@ class GolemCrews
 			}
 			// However many are waiting: a crew no crossing can be planned for waited the same as one
 			// nobody joined, and then went its separate ways. Left to wait until one could be, it
-			// never could, and they stood at the quay for good.
-			if (over)
+			// never could, and they stood at the quay for good. But not while its crossing is still
+			// being worked out, which it waits on as a lone golem waits on its own: let go then, a crew
+			// whose first try came as the muster ran out cast off on a raft apiece.
+			if (over && (muster.port == null || tick > muster.portUntil))
 			{
 				release(muster.waiting, tick, context);
 				it.remove();
@@ -405,21 +407,23 @@ class GolemCrews
 	}
 
 	/**
-	 * Lets golems waiting at a quay go, and not to be held again straight away: each sails alone, as
-	 * it meant to before it stopped to wait. Let go to choose again, most chose not to, and a group
-	 * that had waited to sail together walked off instead.
+	 * Lets golems waiting at a quay go, and not to be held again straight away. One that waited and
+	 * nobody came sails alone, as it meant to before it stopped to wait; let go to choose again, it
+	 * mostly chose not to. A crew that could not be given a crossing goes its separate ways on foot:
+	 * sent off alone, a crew that had gathered and waved left on a raft apiece.
 	 */
 	private void release(List<Golem> golems, int tick, RoamContext context)
 	{
+		boolean alone = golems.size() < GolemCrew.LEAST;
 		for (Golem golem : golems)
 		{
 			released.put(golem, tick);
 			golem.endWait();
-			Itinerary alone = context == null ? null
+			Itinerary crossing = !alone || context == null ? null
 				: planner.planVoyageAlone(golem.currentTile(), tick, random, golem.getTransportMemory(), context);
-			if (alone != null && alone.isVoyage())
+			if (crossing != null && crossing.isVoyage())
 			{
-				golem.boardCrossing(alone);
+				golem.boardCrossing(crossing);
 			}
 		}
 	}
