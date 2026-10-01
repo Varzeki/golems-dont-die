@@ -1,0 +1,7 @@
+# Personality Expansion mosaic, in order: file | focus across,down | size | whole
+# The window is kept whole, in a column of its own at its own shape; the rest are cropped to fit.
+../Personality3.png | 0.55,0.45 | 1.08
+../Personality5.png | 0.45,0.45 | 1.08
+../Personality4.png | 0.5,0.5 | 4.0
+../Personality2.png | 0.5,0.5 | 2.1 | whole
+../Personality1.png | 0.5,0.45 | 1.75

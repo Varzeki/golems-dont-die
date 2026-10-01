@@ -10,11 +10,26 @@ You can even name them.
 ---
 
 **NEW UPDATE**
+![Personality Expansion: golems dancing, waving, crewing boats and keeping journals](media/personality-expansion.jpg)
+
+The golems have begun to work together and celebrate the little things in life.
+
+Crews will now form when multiple golems wish to sail, celebrations will occur when the player achieves different things, and each golem now has a profile describing their personality and journey so far. Various small social interactions included.
+
+Golems are now present on the world map, and the sidebar UI has been reworked and extended.
+
+The pathfinding and collision model has been completely reworked.
+
+
+
+---
+
+**PREVIOUS UPDATE**
 ![Exploration Expansion: golems sailing, climbing, hopping stones and exploring dungeons](media/exploration-expansion.jpg)
 
 The golems figured out Sailing. They've trained Agility. They've even done quests.
 
-### They explore.
+#### They explore.
 
 Golems now inherit your characters capabilities - they can access the same agility shortcuts and quest areas you can, and are *mostly* capable of getting there.
 
@@ -34,18 +49,18 @@ They can sail, use shortcuts, activate travel systems such as fairy rings or spi
 | Limit golems | Off | Cap golems, for anyone who notices the framerate dip after crafting 1000+ golems. |
 | Maximum golems | 25 | The cap, when Limit golems is on. |
 | Show golem names | On | Show golem names above their head. |
-| Name colour | Yellow (#FFE700) | The colour of the golem names. |
+| Name colour | Yellow (#FFE700) | The colour of the golem names, and how transparent they are. |
 | World map | Named | Draws golems on the world map: Off, Named (golems you have named or starred) or All. Golems too close together to draw apart become one face with a count. |
 | Restrict Golem ambition | Off | Keeps golems on Wyrmscraig. Golems do not sail, and any that are elsewhere return to Wyrmscraig. |
-| Auto name golems | Off | Gives golems you have not named one anyway, in the name style below. A golem always gets the same name, and one you type yourself is kept whatever this is set to. |
-| Name style | Default | The names auto naming gives. Default: a name from Gielinor and a surname off the rocks, like Reginald Scree or Megan Gneiss. Ordinal: the order the golem was crafted in, in Latin: Primus, Vicesimus Septimus, Bis Millesimus Quingentesimus Nonagesimus Sextus. |
+| Auto name golems | Off | Gives golems you have not named one anyway, in the name style below. A golem always gets the same name, and one you type yourself takes priority. |
+| Name style | Default | The names auto naming gives. Default: a name from OSRS and a surname off the rocks. Ordinal: the order the golem was crafted in, in Latin.
 | Enable sidebar | On | Shows the Golems tab. With it off, missing golems can still be revived by right-clicking a golem plinth. |
 | Path to a golem being found | On | While you are finding a golem, the [Shortest Path](https://github.com/Skretzo/shortest-path) plugin draws the way to it. Does nothing without Shortest Path installed. |
 | Golems join your ship | On | Golems standing near your boat when you step aboard come too. Not while golem ambition is restricted. |
 
 **Celebrations**
 
-Golems in view stop what they are doing, dance for about ten seconds and set off fireworks.
+Golems in view stop what they are doing, dancing and setting off fireworks.
 
 | Setting | Default | |
 |---|---|---|
@@ -54,51 +69,31 @@ Golems in view stop what they are doing, dance for about ten seconds and set off
 | Golem crafted | Off | Golems dance each time you craft another golem. |
 | Quest complete | On | Golems dance when you finish a quest or miniquest. |
 | Achievement diary | On | Golems dance when you finish a tier of an achievement diary. |
-| Combat achievement | On | Golems dance when you complete a combat task. |
-| Pet | On | Golems dance when a pet finds you. |
-| Personal best | On | Golems dance when you beat your best time at a boss, a raid or a course. |
+| Combat achievement | On | Golems dance when you complete a CA. |
+| Pet | On | Golems dance when you receive a pet. |
+| Personal best | On | Golems dance when you get a new PB. |
 | Clue scroll | Off | Golems dance when you finish a clue scroll. |
 
 
-## Finding a golem
+## Interactions
 
-The sidebar lists your golems nearest first, fifteen to a page, with a search box for names. Under
-each name is where that golem is: "Catherby", "Taverley Dungeon", "Sailing to Port Khazard".
-
-Star a golem to keep it at the top of the list, wherever it is.
-
-Right-click either carving plinth on Wyrmscraig to revive missing golems without the sidebar. The
-option carries the number missing, and is only there while any are.
-
-With **Auto name golems** on, the ones you have not named are called something anyway: above
-their heads, on their page and in the map's tooltips, and dimmed in the list so a name you typed
-still reads as yours. Only names you give are written on the world map itself. Nothing is written
-down: a golem keeps its name because the name comes from the golem, and turning the setting off
-leaves them all plain golems again.
-
-In the **Ordinal** style a golem is named for the order it was crafted in. Golems you had before
-this are numbered oldest first, and every golem crafted after takes the next number. The list runs
-to fifty thousand; the fifty-one-thousandth golem and every one after it is Ultimus.
-
-**Find** points an arrow at a golem and keeps it there as the golem moves, until you come within
-eight tiles of it or stop looking. While you are looking, that golem is the only one on the world
-map, its face sticks to the edge of the map when you pan away from it, and an infobox says how far
-off it is; right-click it to stop. With Shortest Path installed, the way there is drawn too.
-
-On the map, a named golem wears its name. Hover any face to see where it is.
-
-
-## Your ship
-
-Golems standing near you when you step aboard come with you (starred golems first, then
-named ones) and stand at the rail looking out while you sail. They step off where you do. Leave
-the boat any other way, by teleport or by logging out, and they go back to the quay they boarded
-from.
+- You can use the sidebar to rename golems, open their info page, or track them so you can find them ingame.
+- You can respawn golems that the plugin didn't see you craft, so you don't miss out on golems if you installed the plugin late, or did some crafting on mobile. This can be done either through the sidebar or right clicking the plinth. If you aren't missing any, it won't appear.
+- You can emote at golems that you find in the world and they may mimic you.
+- Golems nearby will come on your ship with you when you set sail.
+- Golems can be quickly renamed or have their info shown by shift-right-clicking them.
+- You can star golems, which makes them always visible on the sidebar list, the map, and prioritises them joining your ship.
+- You can search for a particular golem in the sidebar.
+- Golems will learn how to use obstacles, entrances, and other transports based on what your player does. They may ignore certain paths or obstacles until you perform them yourself.
 
 
 ## Credits
 
-Collision map and transport data from [Shortest Path](https://github.com/Skretzo/shortest-path) by Skretzo. 
+Transport data from [Shortest Path](https://github.com/Skretzo/shortest-path) by Skretzo, which also
+draws the way to a golem being found. The collision map is now built from the game's own cache instead.
+
+Place names from the region list in [Location Display](https://github.com/trinhc2/Location-Display) by
+trinhc2, alongside the world map's own labels.
 
 Model and animation technique from
 [Creator's Kit](https://github.com/ScreteMonge/creators-kit) by ScreteMonge. 
@@ -108,7 +103,7 @@ on [Turning Circles](https://github.com/anmcgrath/turning-circles) by anmcgrath.
 
 Dancing contributed by [NathanVegetable](https://github.com/Varzeki/golems-dont-die/pull/1), who took
 the idea from [Dance Party](https://github.com/dekvall/runelite-external-plugins/tree/dance-party) by
-dekvall. Fireworks after [Death Party](https://github.com/DangItOSRS/death-party) by DangItOSRS. 
+dekvall. 
 
 Latin ordinal names from the list [Hjaldr](https://github.com/Varzeki/golems-dont-die/issues/2)
 contributed. 
