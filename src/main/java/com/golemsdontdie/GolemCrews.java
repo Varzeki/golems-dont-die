@@ -9,7 +9,7 @@ import net.runelite.api.coords.*;
  * Golems that leave a dock together sail together.
  *
  * <p>A golem about to cast off alone is held at the quayside for a few seconds first, in case
- * anyone else is coming. Three or more and they take a boat instead of a raft each: the route is
+ * anyone else is coming. Two or more and they take a boat instead of a raft each: the route is
  * chosen after the crew is, so it is one they all suit rather than whichever port the first of them
  * happened to pick, and the crossing itself is shared, so they leave, cross and land as one.
  *
@@ -22,6 +22,9 @@ class GolemCrews
 {
 	/** How long a golem waits at the quayside for company before sailing alone, in ticks. */
 	private static final int MUSTER_TICKS = 30;
+
+	/** How long a crew enough to sail waits after the last of them came, for anyone else, in ticks. */
+	private static final int SETTLE_TICKS = 8;
 
 	/** How near the dock a golem must still be to count as waiting at it. */
 	private static final int QUAYSIDE = 4;
@@ -69,6 +72,9 @@ class GolemCrews
 		/** Golems that have just come to wait, to be waved at. */
 		final Map<Golem, Newcomer> newcomers = new IdentityHashMap<>();
 
+		/** When the last of them came, so a crew enough to sail still waits a moment for more. */
+		int lastJoined;
+
 		Muster(SailingDocks.Dock dock, int since)
 		{
 			this.dock = dock;
@@ -83,6 +89,7 @@ class GolemCrews
 				waiting.add(golem);
 				newcomers.put(golem, new Newcomer(tick));
 				port = null;
+				lastJoined = tick;
 			}
 		}
 	}
@@ -244,7 +251,13 @@ class GolemCrews
 			muster.waiting.removeIf(golem -> golem.isDying() || golem.isAboard()
 				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE);
 
-			if (muster.waiting.size() >= GolemCrew.LEAST && cast(muster, tick, context))
+			// Enough to sail, it still waits a moment for anyone else coming, until the boat is full or
+			// the muster is up. Cast the moment there were enough, every crew was the least there could
+			// be, and no sloop ever sailed.
+			boolean over = tick - muster.since >= MUSTER_TICKS || tick < muster.since;
+			boolean ready = muster.waiting.size() >= GolemBoat.SLOOP.getBerths()
+				|| tick - muster.lastJoined >= SETTLE_TICKS || tick < muster.lastJoined || over;
+			if (muster.waiting.size() >= GolemCrew.LEAST && ready && cast(muster, tick, context))
 			{
 				it.remove();
 				continue;
@@ -252,9 +265,9 @@ class GolemCrews
 			// However many are waiting: a crew no crossing can be planned for waited the same as one
 			// nobody joined, and then went its separate ways. Left to wait until one could be, it
 			// never could, and they stood at the quay for good.
-			if (tick - muster.since >= MUSTER_TICKS || tick < muster.since)
+			if (over)
 			{
-				release(muster.waiting, tick);
+				release(muster.waiting, tick, context);
 				it.remove();
 				continue;
 			}
@@ -392,9 +405,26 @@ class GolemCrews
 	}
 
 	/**
-	 * Lets golems waiting at a quay go, each to sail alone or not as it would have without company,
-	 * and not to be held again straight away.
+	 * Lets golems waiting at a quay go, and not to be held again straight away: each sails alone, as
+	 * it meant to before it stopped to wait. Let go to choose again, most chose not to, and a group
+	 * that had waited to sail together walked off instead.
 	 */
+	private void release(List<Golem> golems, int tick, RoamContext context)
+	{
+		for (Golem golem : golems)
+		{
+			released.put(golem, tick);
+			golem.endWait();
+			Itinerary alone = context == null ? null
+				: planner.planVoyageAlone(golem.currentTile(), tick, random, golem.getTransportMemory(), context);
+			if (alone != null && alone.isVoyage())
+			{
+				golem.boardCrossing(alone);
+			}
+		}
+	}
+
+	/** Lets golems go to do as they like: more waiting than a boat holds. Not sent sailing. */
 	private void release(List<Golem> golems, int tick)
 	{
 		for (Golem golem : golems)
@@ -432,7 +462,7 @@ class GolemCrews
 		// rather than stand out the muster.
 		if (muster.port == null || tick > muster.portUntil)
 		{
-			release(muster.waiting, tick);
+			release(muster.waiting, tick, context);
 			return true;
 		}
 		WorldPoint at = crew.get(0).currentTile();

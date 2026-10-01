@@ -607,12 +607,15 @@ class Golem
 	 */
 	void waitAshore(int tick, int ticks, WorldPoint quayside, RoamContext context)
 	{
-		WorldPoint at = currentTile();
+		// Where it will stand once the step it is partway through is done. Told to wait mid-step, it
+		// stopped walking but not moving: it finished the step in its standing pose, a slide, or stood
+		// frozen between two tiles for the whole wait.
+		WorldPoint at = stepping ? new WorldPoint(stepToX / TILE, stepToY / TILE, plane) : currentTile();
 		if (context != null && renderer != null && !inTransition() && at.getPlane() == quayside.getPlane()
 			&& span(quayside.getX() - at.getX(), quayside.getY() - at.getY()) <= WALK_TO_WAIT
-			&& (at.equals(quayside) || walkTo(quayside.getX(), quayside.getY(), context)))
+			&& (at.equals(quayside) ? clearPath() : walkTo(quayside.getX(), quayside.getY(), context)))
 		{
-			walking = !path.isEmpty();
+			walking = stepping || !path.isEmpty();
 			// Whatever it was walking to use is given up with the crossing.
 			queuedTransport = null;
 			wayOffDeadEnd = null;
@@ -622,6 +625,13 @@ class Golem
 			return;
 		}
 		waitAshore(tick, ticks, quayside);
+	}
+
+	/** Drops the walk ahead, keeping the step under way. True, for use in a condition. */
+	private boolean clearPath()
+	{
+		path.clear();
+		return true;
 	}
 
 	/** True while the golem is on a wait at a quayside, for a crew to make up around it. */
@@ -1171,7 +1181,7 @@ class Golem
 			{
 				itinerary = null;
 			}
-			else if (path.isEmpty())
+			else if (path.isEmpty() && !stepping)
 			{
 				walking = false;
 				turnToward(cycles);
@@ -1394,8 +1404,9 @@ class Golem
 			return false;
 		}
 
+		// The step under way is finished, not dropped: held at the quayside for a crew instead of
+		// sailing, a golem stopped mid-step stood between two tiles for the whole wait.
 		path.clear();
-		stepping = false;
 		embark(crossing, context);
 		return true;
 	}
@@ -1922,8 +1933,10 @@ class Golem
 	 */
 	private boolean walkTo(int goalX, int goalY, RoamContext context)
 	{
-		int tileX = fineX / TILE;
-		int tileY = fineY / TILE;
+		// From where it will stand next: a step under way is finished first, and the walk goes on from
+		// its end. Planned from the tile being left, the first step could double back.
+		int tileX = (stepping ? stepToX : fineX) / TILE;
+		int tileY = (stepping ? stepToY : fineY) / TILE;
 
 		path.clear();
 		path.addAll(context.getPathfinder().findPath(tileX, tileY, plane, goalX, goalY,

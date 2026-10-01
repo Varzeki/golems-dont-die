@@ -13,8 +13,11 @@ import lombok.*;
  */
 class GolemCrew
 {
-	/** The smallest crew that is worth a boat. Fewer than this and each golem takes its raft. */
-	static final int LEAST = 3;
+	/**
+	 * The smallest crew that is worth a boat: two, as a skiff takes. At three, a pair waiting together
+	 * waited out the muster and walked off, and every crew sailed at three, the moment the third came.
+	 */
+	static final int LEAST = 2;
 
 	@Getter
 	private final GolemBoat boat;

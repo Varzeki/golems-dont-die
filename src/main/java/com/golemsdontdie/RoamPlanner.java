@@ -1095,6 +1095,15 @@ class RoamPlanner
 				* (context == null ? 1f : context.wanderlust(memory, from.getX(), from.getY())));
 	}
 
+	/**
+	 * A voyage for a golem that decided to sail and waited at the quay for company that never made
+	 * a crew: it sails alone, as it meant to, rather than rolling again and, as often as not, not.
+	 */
+	Itinerary planVoyageAlone(WorldPoint from, int tick, Random random, TransportMemory memory, RoamContext context)
+	{
+		return planVoyage(from, tick, random, memory, context, 1f);
+	}
+
 	/** Chance a far golem at a dock sets sail, per plan: higher, as it plans once per leg. */
 	private static final float AT_DOCK_SAIL_CHANCE = 0.6f;
 

@@ -38,10 +38,10 @@ enum GolemBoat
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
 	 * 1,090 long.
 	 */
-	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 460, -240, 240, -554, 536, 8,
-		new int[][]{{0, 0}, {-120, 52}, {120, 52}, {-120, 272}, {120, 272}, {-120, 492},
-			{120, 492}, {0, 702}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
-		58206, Palette.HELM_FROM, Palette.HELM_TO, 332, 13363);
+	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 576, -240, 240, -554, 536, 8,
+		new int[][]{{0, 0}, {-120, 168}, {120, 168}, {-120, 388}, {120, 388}, {-120, 608},
+			{120, 608}, {0, 818}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
+		58206, Palette.HELM_FROM, Palette.HELM_TO, 448, 13363);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -79,9 +79,9 @@ enum GolemBoat
 
 	/**
 	 * Where the helm sits from the middle of the hull, along its length, in model units. Behind is
-	 * +z, a model facing -z. On the last row of the boat's tiles, as the game lays it: half a tile
-	 * short of half its length, so a skiff's rudder hangs off the back of its hull. Only a raft's is
-	 * stood on; see steerOffset.
+	 * +z, a model facing -z. As the game lays it: on the last row of a raft's or a skiff's tiles,
+	 * half a tile short of half its length, and on a sloop the row past them, off the end of its
+	 * hull. Either way the rudder hangs off the back. Only a raft's is stood on; see steerOffset.
 	 */
 	private final int helmOffset;
 
