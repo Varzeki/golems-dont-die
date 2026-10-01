@@ -46,9 +46,6 @@ class GolemMapPoints
 	/** The face's size on screen, in pixels, which sets how far apart two faces must be. */
 	private static final int FACE_PIXELS = 15;
 
-	/** How far north of the ground above it a cave is laid out, and drawn. See WorldLayout. */
-	private static final int UNDERGROUND = WorldLayout.CAVE_OFFSET;
-
 	/**
 	 * The map being looked at, which is what decides where a golem belongs on it.
 	 *
@@ -115,10 +112,6 @@ class GolemMapPoints
 	 * map is not on it, a hundred regions off, against the few that separate a dungeon from its place.
 	 */
 	private static final int MOST_OFFSET = 4096;
-
-	/** Read only to tell sea from land, when a dungeon is folded onto the surface map. */
-	@Inject
-	private WorldMesh mesh;
 
 	@Inject
 	private GolemsDontDieConfig config;
@@ -297,10 +290,10 @@ class GolemMapPoints
 					y = at.getY();
 				}
 			}
-			// Where this golem goes on the map that is open. On a dungeon's map, where that map draws
-			// the golem's own tile and floor, which may be far from where it is: see WorldMapLayers. On
-			// the surface, where it is; or for a golem underground, over the ground above it, which is
-			// what a player looking at the surface expects. Neither, and it is on some other map.
+			// Where this golem goes on the map that is open, and only that map, as the game shows the
+			// player: on a dungeon's map, where that map draws the golem's own tile and floor, which may
+			// be far from where it is (see WorldMapLayers); on the surface, where it is. A golem
+			// underground is not on the surface map, and one on the surface is not on a dungeon's.
 			if (layer != null)
 			{
 				if (!layer.place(x, y, golem.getPlane(), spot))
@@ -312,24 +305,14 @@ class GolemMapPoints
 			}
 			else if (showing != null && !showing.surfaceContainsPosition(x, y))
 			{
-				// Most dungeons are dug at their surface coordinates plus this. Not all of them are: the
-				// Observatory's dungeon folds into open water west of Falador, and a golem was on the map
-				// in the middle of the sea labelled with the cave it was really in. Where the fold lands
-				// in the sea it is no place at all, so nothing is drawn.
-				if ((offsetX != 0 || offsetY != 0) && showing.surfaceContainsPosition(x + offsetX, y + offsetY))
-				{
-					x += offsetX;
-					y += offsetY;
-				}
-				else if (y < UNDERGROUND || !showing.surfaceContainsPosition(x, y - UNDERGROUND)
-					|| mesh.isOcean(x, y - UNDERGROUND, 0))
+				// A map newer than the table, drawn away from its own coordinates by the offset measured
+				// for it; anything it does not draw is somewhere else.
+				if ((offsetX == 0 && offsetY == 0) || !showing.surfaceContainsPosition(x + offsetX, y + offsetY))
 				{
 					continue;
 				}
-				else
-				{
-					y -= UNDERGROUND;
-				}
+				x += offsetX;
+				y += offsetY;
 			}
 			// The golem being looked for is kept whether or not the map is looking at it: its face
 			// snaps to the edge to say which way it lies.
