@@ -58,10 +58,11 @@ public interface GolemsDontDieConfig extends Config
 		return true;
 	}
 
+	@Alpha
 	@ConfigItem(
 		keyName = "nameplateColour",
 		name = "Name colour",
-		description = "Colour of golem names shown above their heads.",
+		description = "Colour of golem names shown above their heads, and how see-through they are.",
 		section = golemsSection,
 		position = 3
 	)

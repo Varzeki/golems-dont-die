@@ -609,7 +609,8 @@ class GolemMapPoints
 		// The game's own shadow, a pixel down and right, so the name reads over any map colour.
 		graphics.setColor(Color.BLACK);
 		graphics.drawString(name, textX + 1, baseline + 1);
-		graphics.setColor(config.nameplateColour());
+		// The colour without its see-through: a name on the map is written on, as the map's own are.
+		graphics.setColor(new Color(config.nameplateColour().getRGB() & 0xFFFFFF));
 		graphics.drawString(name, textX, baseline);
 		graphics.drawImage(face, (width - face.getWidth()) / 2, textHeight, null);
 		graphics.dispose();

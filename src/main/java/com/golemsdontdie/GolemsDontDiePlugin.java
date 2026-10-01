@@ -2396,49 +2396,67 @@ public class GolemsDontDiePlugin extends Plugin
 	 */
 	static final String VERSION = "3.0";
 
-	/** Set once an update has been announced, or on a new install with nothing to say. */
-	private static final String ANNOUNCED_KEY = "announcedSailing";
+	/**
+	 * The updates announced in chat, oldest first, each as the key set once it has been said (or on a
+	 * new install, with nothing to say) and its line. A player who skipped one hears both, in order.
+	 */
+	private static final String[][] UPDATES = {
+		{"announcedSailing", "The Golems have learned to sail..."},
+		{"announcedDancing", "The Golems have learned to dance..."},
+	};
 
 	/** Keys the version before sailing wrote; any of them means this is an update, not an install. */
 	private static final String[] OLD_VERSION_KEYS = {
 		GolemsDontDieConfig.SAVED_GOLEMS_KEY, GolemTally.TOTAL_KEY, IslandMemory.MAP_KEY,
 	};
 
-	/** True if this launch is an update from the version before sailing, not yet announced. */
-	private boolean announcementPending;
+	/** The updates still to announce at the next login, oldest first. */
+	private final List<String[]> announcements = new ArrayList<>();
 
 	/**
-	 * Decides, once, whether this is an update worth announcing. A new install has none of the
-	 * old version's keys and is marked announced straight away; an update has some, and hears
-	 * about it at its next login.
+	 * Decides, once, which updates are worth announcing. A new install has none of an older
+	 * version's keys and is marked as having heard them all straight away; an update has some, and
+	 * hears about each it has not at its next login.
 	 */
 	private void checkForUpdate()
 	{
-		if (setting(ANNOUNCED_KEY) != null)
+		announcements.clear();
+		// Any update already announced, or anything the version before sailing kept, is an older install.
+		boolean older = false;
+		for (String[] update : UPDATES)
 		{
-			return;
+			older |= setting(update[0]) != null;
 		}
 		for (String key : OLD_VERSION_KEYS)
 		{
-			if (setting(key) != null)
+			older |= setting(key) != null;
+		}
+		for (String[] update : UPDATES)
+		{
+			if (!older)
 			{
-				announcementPending = true;
-				return;
+				setSetting(update[0], true);
+			}
+			else if (setting(update[0]) == null)
+			{
+				announcements.add(update);
 			}
 		}
-		setSetting(ANNOUNCED_KEY, true);
 	}
 
-	/** Says it once, on the first tick logged in, and marks it only once said. */
+	/** Says them on the first tick logged in, oldest first, marking each only once said. */
 	private void announceUpdate()
 	{
-		if (!announcementPending || client.getGameState() != GameState.LOGGED_IN)
+		if (announcements.isEmpty() || client.getGameState() != GameState.LOGGED_IN)
 		{
 			return;
 		}
-		announcementPending = false;
-		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>The Golems have learned to sail...</col>", null);
-		setSetting(ANNOUNCED_KEY, true);
+		for (String[] update : announcements)
+		{
+			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>" + update[1] + "</col>", null);
+			setSetting(update[0], true);
+		}
+		announcements.clear();
 	}
 
 	/** Animated scenery currently on screen. Short-lived: each plays once and goes. */

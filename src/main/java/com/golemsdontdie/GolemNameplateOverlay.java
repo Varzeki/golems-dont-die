@@ -50,8 +50,10 @@ class GolemNameplateOverlay extends Overlay
 			return null;
 		}
 
-		// Read once for the frame, not through the config proxy for every named golem.
+		// Read once for the frame, not through the config proxy for every named golem. The shadow fades
+		// with the name: an opaque shadow under a faint name read as a black name.
 		Color colour = config.nameplateColour();
+		Color shadow = new Color(0, 0, 0, colour.getAlpha());
 		for (Golem golem : plugin.drawnGolems())
 		{
 			String name = names.of(golem);
@@ -73,7 +75,11 @@ class GolemNameplateOverlay extends Overlay
 				drawn.getModelHeight() + NAME_GAP + golem.jumpArc() + golem.deckLift());
 			if (at != null)
 			{
-				OverlayUtil.renderTextLocation(graphics, at, name, colour);
+				// Drawn here rather than by OverlayUtil, which makes every name opaque whatever its colour.
+				graphics.setColor(shadow);
+				graphics.drawString(name, at.getX() + 1, at.getY() + 1);
+				graphics.setColor(colour);
+				graphics.drawString(name, at.getX(), at.getY());
 			}
 		}
 

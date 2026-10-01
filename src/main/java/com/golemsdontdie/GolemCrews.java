@@ -247,9 +247,10 @@ class GolemCrews
 		for (Iterator<Map.Entry<Integer, Muster>> it = mustering.entrySet().iterator(); it.hasNext(); )
 		{
 			Muster muster = it.next().getValue();
-			// Anyone who wandered off, died or was carried away is no longer waiting.
-			muster.waiting.removeIf(golem -> golem.isDying() || golem.isAboard()
-				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE);
+			// Anyone who wandered off, died or was carried away is no longer waiting, nor held to the
+			// crew's wait: kept, one set down elsewhere stood idle wherever it was put.
+			muster.waiting.removeIf(golem -> (golem.isDying() || golem.isAboard()
+				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE) && endWait(golem));
 
 			boolean over = isOver(tick, muster.since);
 			// Everyone waiting waits as long as the crew does: to the end of the muster, and past it
@@ -277,6 +278,13 @@ class GolemCrews
 			}
 			mill(muster, tick, context);
 		}
+	}
+
+	/** Ends a golem's wait at the quay. True, for use in a condition. */
+	private static boolean endWait(Golem golem)
+	{
+		golem.endWait();
+		return true;
 	}
 
 	/** Whether a muster's time is up, or the tick count has started again since it began. */
