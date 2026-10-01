@@ -460,10 +460,16 @@ class GolemCrews
 		{
 			muster.port = voyage.crewPort(muster.dock, memories, random, context);
 			muster.portUntil = tick + TransportMemory.PENDING_WAIT_TICKS;
+			// Nowhere they all agree on this time: the choice is a few rolls, so they roll again next
+			// tick while the muster lasts. Given up on the first, a crew with one picky golem in it
+			// gathered, waved, and walked off.
+			if (muster.port == null && tick - muster.since < MUSTER_TICKS && tick >= muster.since)
+			{
+				return false;
+			}
 		}
-		// Nowhere all of them would go, and waiting longer changes nothing about that; nor does
-		// waiting any longer on a crossing still being worked out. They go their separate ways now
-		// rather than stand out the muster.
+		// Nowhere all of them would go by the time the muster is up; or a crossing waited on as long
+		// as a lone golem waits on its own. They go their separate ways now rather than stand there.
 		if (muster.port == null || tick > muster.portUntil)
 		{
 			release(muster.waiting, tick, context);
