@@ -627,6 +627,22 @@ class Golem
 		waitAshore(tick, ticks, quayside);
 	}
 
+	/**
+	 * Keeps a golem waiting at its place at a quayside until this tick, if it is waiting there and
+	 * would stop sooner: a crew whose crossing is still being worked out waits past the muster, and
+	 * the golems in it whose own waits ran out walked off while still counted as its crew.
+	 */
+	void holdWaitUntil(int tick, int until)
+	{
+		if (waiting == null || itinerary != waiting || waiting.getStartTick() + waiting.getDuration() >= until
+			|| until <= tick)
+		{
+			return;
+		}
+		itinerary = RoamPlanner.stayPut(waiting.destination(), tick, until - tick);
+		waiting = itinerary;
+	}
+
 	/** Drops the walk ahead, keeping the step under way. True, for use in a condition. */
 	private boolean clearPath()
 	{
@@ -1937,6 +1953,13 @@ class Golem
 		// its end. Planned from the tile being left, the first step could double back.
 		int tileX = (stepping ? stepToX : fineX) / TILE;
 		int tileY = (stepping ? stepToY : fineY) / TILE;
+		if (tileX == goalX && tileY == goalY)
+		{
+			// There already, or arriving with the step under way: a walk of nothing, not no way there.
+			// Taken for none, a shortcut starting where the step ends was passed over.
+			path.clear();
+			return true;
+		}
 
 		path.clear();
 		path.addAll(context.getPathfinder().findPath(tileX, tileY, plane, goalX, goalY,

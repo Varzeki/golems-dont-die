@@ -251,13 +251,15 @@ class GolemCrews
 			muster.waiting.removeIf(golem -> golem.isDying() || golem.isAboard()
 				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE);
 
-			// Enough to sail, it still waits a moment for anyone else coming, until the boat is full or
-			// the muster is up. Cast the moment there were enough, every crew was the least there could
-			// be, and no sloop ever sailed.
-			boolean over = tick - muster.since >= MUSTER_TICKS || tick < muster.since;
-			boolean ready = muster.waiting.size() >= GolemBoat.SLOOP.getBerths()
-				|| tick - muster.lastJoined >= SETTLE_TICKS || tick < muster.lastJoined || over;
-			if (muster.waiting.size() >= GolemCrew.LEAST && ready && cast(muster, tick, context))
+			boolean over = isOver(tick, muster.since);
+			// Everyone waiting waits as long as the crew does: to the end of the muster, and past it
+			// while the crew's crossing is still being worked out.
+			int until = Math.max(muster.since + MUSTER_TICKS, muster.port == null ? 0 : muster.portUntil) + 1;
+			for (Golem golem : muster.waiting)
+			{
+				golem.holdWaitUntil(tick, until);
+			}
+			if (isReady(muster.waiting.size(), tick, muster.since, muster.lastJoined) && cast(muster, tick, context))
 			{
 				it.remove();
 				continue;
@@ -269,12 +271,29 @@ class GolemCrews
 			// whose first try came as the muster ran out cast off on a raft apiece.
 			if (over && (muster.port == null || tick > muster.portUntil))
 			{
-				release(muster.waiting, tick, context);
+				release(muster.waiting, tick, context, true);
 				it.remove();
 				continue;
 			}
 			mill(muster, tick, context);
 		}
+	}
+
+	/** Whether a muster's time is up, or the tick count has started again since it began. */
+	static boolean isOver(int tick, int since)
+	{
+		return tick - since >= MUSTER_TICKS || tick < since;
+	}
+
+	/**
+	 * Whether a muster may cast off now: enough of them to sail, and the boat full, or nobody new for
+	 * a few seconds, or its time up. Cast the moment there were enough, every crew was the least
+	 * there could be, and no sloop ever sailed.
+	 */
+	static boolean isReady(int waiting, int tick, int since, int lastJoined)
+	{
+		return waiting >= GolemCrew.LEAST && (waiting >= GolemBoat.SLOOP.getBerths()
+			|| tick - lastJoined >= SETTLE_TICKS || tick < lastJoined || isOver(tick, since));
 	}
 
 	/** Ticks between one move about the quay and a waiting golem's next: three to seven seconds. */
@@ -410,31 +429,32 @@ class GolemCrews
 	 * Lets golems waiting at a quay go, and not to be held again straight away. One that waited and
 	 * nobody came sails alone, as it meant to before it stopped to wait; let go to choose again, it
 	 * mostly chose not to. A crew that could not be given a crossing goes its separate ways on foot:
-	 * sent off alone, a crew that had gathered and waved left on a raft apiece.
+	 * sent off alone, a crew that had gathered and waved left on a raft apiece. More waiting than a
+	 * boat holds are let go to do as they like.
 	 */
-	private void release(List<Golem> golems, int tick, RoamContext context)
+	private void release(List<Golem> golems, int tick, RoamContext context, boolean mayGoAlone)
 	{
-		boolean alone = golems.size() < GolemCrew.LEAST;
+		boolean alone = mayGoAlone && context != null && golems.size() < GolemCrew.LEAST;
 		for (Golem golem : golems)
 		{
 			released.put(golem, tick);
 			golem.endWait();
-			Itinerary crossing = !alone || context == null ? null
-				: planner.planVoyageAlone(golem.currentTile(), tick, random, golem.getTransportMemory(), context);
+			if (!alone)
+			{
+				continue;
+			}
+			TransportMemory memory = golem.getTransportMemory();
+			Itinerary crossing = planner.planVoyageAlone(golem.currentTile(), tick, random, memory, context);
 			if (crossing != null && crossing.isVoyage())
 			{
 				golem.boardCrossing(crossing);
 			}
-		}
-	}
-
-	/** Lets golems go to do as they like: more waiting than a boat holds. Not sent sailing. */
-	private void release(List<Golem> golems, int tick)
-	{
-		for (Golem golem : golems)
-		{
-			released.put(golem, tick);
-			golem.endWait();
+			else
+			{
+				// Its crossing still being worked out, it goes on foot, and nothing in its memory says
+				// it is waiting to sail from here: left pending, it walked off still waiting for a boat.
+				memory.clearPending();
+			}
 		}
 	}
 
@@ -463,7 +483,7 @@ class GolemCrews
 			// Nowhere they all agree on this time: the choice is a few rolls, so they roll again next
 			// tick while the muster lasts. Given up on the first, a crew with one picky golem in it
 			// gathered, waved, and walked off.
-			if (muster.port == null && tick - muster.since < MUSTER_TICKS && tick >= muster.since)
+			if (muster.port == null && !isOver(tick, muster.since))
 			{
 				return false;
 			}
@@ -472,7 +492,7 @@ class GolemCrews
 		// as a lone golem waits on its own. They go their separate ways now rather than stand there.
 		if (muster.port == null || tick > muster.portUntil)
 		{
-			release(muster.waiting, tick, context);
+			release(muster.waiting, tick, context, true);
 			return true;
 		}
 		WorldPoint at = crew.get(0).currentTile();
@@ -504,7 +524,7 @@ class GolemCrews
 		// a quayside whose crew has sailed.
 		List<Golem> left = new ArrayList<>(muster.waiting);
 		left.removeIf(golem -> crews.get(golem) == made);
-		release(left, tick);
+		release(left, tick, context, false);
 		log.debug("{} golems crewed a {} from {}", made.size(), boat, muster.dock.getName());
 		return true;
 	}
