@@ -39,9 +39,9 @@ enum GolemBoat
 	 * 1,090 long.
 	 */
 	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 576, -240, 240, -554, 536, 8,
-		new int[][]{{0, 0}, {80, 168}, {320, 168}, {80, 388}, {320, 388}, {80, 608},
-			{320, 608}, {200, 818}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
-		58206, Palette.HELM_FROM, Palette.HELM_TO, 448, 13363, 200);
+		new int[][]{{0, 0}, {8, 168}, {248, 168}, {8, 388}, {248, 388}, {8, 608},
+			{248, 608}, {128, 818}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
+		58206, Palette.HELM_FROM, Palette.HELM_TO, 448, 13363, 128);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -164,11 +164,11 @@ enum GolemBoat
 	private final int helmPose;
 
 	/**
-	 * How far across the hull the golem steering stands, in model x: beside the tiller's handle with
-	 * its hands on it. A sloop's tiller angles forward to a handle two hundred units to one side, and
-	 * its pose reaches the other way: stood on the middle line, the golem held nothing, the pole on
-	 * the wrong side of it. Deck berths are measured across from here, a starboard berth being
-	 * model -x.
+	 * How far across the hull the golem steering stands, in model x: beside the tiller with its hands
+	 * on it. A sloop's pose reaches its hands a column's width to one side, so its helmsman stands in
+	 * the next column over from the tiller, which runs up the middle; stood on the middle line, the
+	 * golem held nothing, the pole on the wrong side of it. Deck berths are measured across from
+	 * here, a starboard berth being model -x.
 	 */
 	private final int steerAcross;
 
