@@ -35,7 +35,9 @@ class GolemClimate
 		"Ice Queen's Lair", "Asgarnian Ice Dungeon", "Polar Eagle Cave", "Ghorrock Dungeon",
 		"Rellekka", "Neitiznot", "Jatizso", "Iceberg", "Ungael", "Waterbirth Island",
 		"Wintertodt", "The Wintertodt", "Northern Tundras", "The Darkfrost", "Mount Quidamortem",
-		"Winttumber Island",
+		"Winttumber Island", "Settlement Ruins", "Fishing Hamlet", "Lunar Isle",
+		"Mons Gratia", "The Teomat", "The Proudspire", "Ralos Rise", "Cam Torum Entrance", "Custodia Mountains",
+		"God Wars Dungeon", "Wilderness God Wars Dungeon",
 	};
 
 	/**
@@ -51,7 +53,18 @@ class GolemClimate
 		"Necropolis", "Ruins of Ullek", "Ruins of Unkah", "Smoke Dungeon",
 		"Karamja", "Musa Point", "Mor Ul Rek", "Mount Karuulm", "Volcanic Mine", "Chasm of Fire",
 		"Lava Maze", "Lava Dragon Isle", "Avium Savannah", "Locus Oasis",
+		"Tombs of Amascut Lobby", "Lovakengj", "Lovakengj Assembly", "Fight Pits", "The Inferno", "Corsair Cove",
+		"Gu'Tanoth", "Ourania Cave", "Callisto's Den", "Mage Arena", "Deserted Keep", "Blighted Volcano",
 	};
+
+	/**
+	 * Hot places with no name of their own, or one another place shares, by region: the Wilderness's
+	 * Chaos Temple (the other is by Goblin Village), the ruined chaos temple over the Ourania Cave west
+	 * of Ardougne, and the Tombs of Amascut's raid, whose rooms are an instance a golem in it is
+	 * simulated at the template of (the regions are RuneLite's own, from its Discord plugin).
+	 */
+	private static final int[] HOT_REGIONS = {12856, 9778,
+		14160, 14162, 14164, 14674, 14676, 15184, 15186, 15188, 15696, 15698, 15700};
 
 	/** Regions across the world, each side. A region ID is {@code x >> 6 << 8 | y >> 6}. */
 	private static final int SIDE = 256;
@@ -82,6 +95,10 @@ class GolemClimate
 	{
 		Set<Integer> cold = names.regionsNamed(COLD);
 		Set<Integer> hot = names.regionsNamed(HOT);
+		for (int region : HOT_REGIONS)
+		{
+			hot.add(region);
+		}
 		Set<Integer> home = new HashSet<>();
 		for (int region : GolemContent.ISLAND_REGIONS)
 		{
