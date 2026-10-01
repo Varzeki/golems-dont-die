@@ -2507,9 +2507,11 @@ public class GolemsDontDiePlugin extends Plugin
 		// The hull follows the golem, which is steering at the stern, so the boat's middle is ahead
 		// of it - the way it faces: 0 south, 512 west, 1024 north, 1536 east. How far ahead is the
 		// boat's own business: a sloop's helmsman stands two and a half tiles back.
+		// And across, where the helmsman stands to one side of the middle line, a sloop's beside its
+		// tiller: model x turned with the boat.
 		double facing = golem.getOrientation() * Math.PI / 1024;
-		int aheadX = (int) Math.round(-Math.sin(facing) * kind.getSteerOffset());
-		int aheadY = (int) Math.round(-Math.cos(facing) * kind.getSteerOffset());
+		int aheadX = (int) Math.round(-Math.sin(facing) * kind.getSteerOffset() - Math.cos(facing) * kind.getSteerAcross());
+		int aheadY = (int) Math.round(-Math.cos(facing) * kind.getSteerOffset() + Math.sin(facing) * kind.getSteerAcross());
 		// At the golem's ground height, always in the scene when the golem is drawn.
 		WorldView view = client.getTopLevelWorldView();
 		int localX = golem.getFineX() - (view == null ? 0 : view.getBaseX() * Golem.TILE);

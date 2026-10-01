@@ -24,7 +24,7 @@ enum GolemBoat
 	RAFT(58216, 58248, 60445, GolemContent.RAFT_HULL_RECOLOUR_FROM, GolemContent.RAFT_HULL_RECOLOUR_TO,
 		128, -90, 94, -221, 228, 1, new int[][]{{0, 0}}, -1, 0, 0, 0, 0, 0, 256, -1, 13373, 13881,
 		GolemContent.RAFT_HELM_MODEL, GolemContent.RAFT_HELM_RECOLOUR_FROM, GolemContent.RAFT_HELM_RECOLOUR_TO, 128,
-		GolemContent.ANIM_GOLEM_HELM),
+		GolemContent.ANIM_GOLEM_HELM, 0),
 
 	/**
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
@@ -32,16 +32,16 @@ enum GolemBoat
 	 */
 	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 320, -162, 162, -438, 276, 4,
 		new int[][]{{0, 0}, {-80, 142}, {80, 272}, {-40, 402}}, 58227, -192, -320, 64, 64, 64, 192, 58209, 13382, 13890,
-		58204, Palette.HELM_FROM, Palette.HELM_TO, 192, 13352),
+		58204, Palette.HELM_FROM, Palette.HELM_TO, 192, 13352, 0),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
 	 * 1,090 long.
 	 */
 	SLOOP(58220, 58267, 60470, Palette.LARGE_FROM, Palette.LARGE_TO, 576, -240, 240, -554, 536, 8,
-		new int[][]{{0, 0}, {-120, 168}, {120, 168}, {-120, 388}, {120, 388}, {-120, 608},
-			{120, 608}, {0, 818}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
-		58206, Palette.HELM_FROM, Palette.HELM_TO, 448, 13363);
+		new int[][]{{0, 0}, {80, 168}, {320, 168}, {80, 388}, {320, 388}, {80, 608},
+			{320, 608}, {200, 818}}, 58228, -256, -448, 128, 448, 128, 576, 58210, 13391, 13899,
+		58206, Palette.HELM_FROM, Palette.HELM_TO, 448, 13363, 200);
 
 	/**
 	 * The palette both larger hulls are painted from. Held in a class of its own because a
@@ -162,6 +162,15 @@ enum GolemBoat
 
 	/** The pose a player steers this boat in, which the golem at the helm takes: one per helm. */
 	private final int helmPose;
+
+	/**
+	 * How far across the hull the golem steering stands, in model x: beside the tiller's handle with
+	 * its hands on it. A sloop's tiller angles forward to a handle two hundred units to one side, and
+	 * its pose reaches the other way: stood on the middle line, the golem held nothing, the pole on
+	 * the wrong side of it. Deck berths are measured across from here, a starboard berth being
+	 * model -x.
+	 */
+	private final int steerAcross;
 
 	static short[] trimFrom()
 	{

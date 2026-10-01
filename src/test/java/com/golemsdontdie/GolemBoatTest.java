@@ -17,7 +17,8 @@ public class GolemBoatTest
 		{
 			for (int[] berth : boat.getDeck())
 			{
-				int across = berth[0];
+				// A starboard berth is model -x, measured from where the helmsman stands across.
+				int across = boat.getSteerAcross() - berth[0];
 				int along = boat.getSteerOffset() - berth[1];
 				assertTrue(boat + " berth " + berth[0] + "," + berth[1] + " off the side",
 					across >= boat.getHullMinX() && across <= boat.getHullMaxX());
