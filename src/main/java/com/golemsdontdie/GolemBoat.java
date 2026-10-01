@@ -30,9 +30,9 @@ enum GolemBoat
 	 * The 2x6 boat, hull 58218 from object 59501: three or four golems, one at the helm and the
 	 * rest along a deck 324 units across and 714 long.
 	 */
-	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 220, -162, 162, -438, 276, 4,
-		new int[][]{{0, 0}, {-80, 42}, {80, 172}, {-40, 302}}, 58227, -192, -320, 64, 64, 64, 192, 58209, 13382, 13890,
-		58204, Palette.HELM_FROM, Palette.HELM_TO, 92, 13352),
+	SKIFF(58218, 58257, 60457, Palette.LARGE_FROM, Palette.LARGE_TO, 320, -162, 162, -438, 276, 4,
+		new int[][]{{0, 0}, {-80, 142}, {80, 272}, {-40, 402}}, 58227, -192, -320, 64, 64, 64, 192, 58209, 13382, 13890,
+		58204, Palette.HELM_FROM, Palette.HELM_TO, 192, 13352),
 
 	/**
 	 * The 3x8 boat, hull 58220 from object 59508: up to eight, on a deck 480 units across and
@@ -79,7 +79,9 @@ enum GolemBoat
 
 	/**
 	 * Where the helm sits from the middle of the hull, along its length, in model units. Behind is
-	 * +z, a model facing -z. Only a raft's is stood on; see steerOffset.
+	 * +z, a model facing -z. On the last row of the boat's tiles, as the game lays it: half a tile
+	 * short of half its length, so a skiff's rudder hangs off the back of its hull. Only a raft's is
+	 * stood on; see steerOffset.
 	 */
 	private final int helmOffset;
 
