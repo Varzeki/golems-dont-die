@@ -65,7 +65,7 @@ jobs:
           curl --location --fail --retry 4 --max-time 30 --output bundle.tar.zst \
             "https://github.com/runelite/plugin-hub-tooling/releases/download/v1/bundle.tar.zst"
           tar xf bundle.tar.zst
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@v6
         id: restore-cache
         with:
           path: |
@@ -75,7 +75,7 @@ jobs:
       - name: Prepare
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: ./prepare.sh
-      - uses: actions/cache/save@v5
+      - uses: actions/cache/save@v6
         if: steps.restore-cache.outputs.cache-hit != 'true'
         with:
           path: |
