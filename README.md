@@ -20,7 +20,7 @@ Golems are now present on the world map, and the sidebar UI has been reworked an
 
 The pathfinding and collision model has been completely reworked.
 
-**3.1:** Golems can now wear hats, picked from their info page. Very rarely, a freshly crafted golem keeps a special chisel for itself.
+**Patch 3.1:** Golems can now wear hats, picked from their info page. Very rarely, a freshly crafted golem can now receive a chisel drop.
 
 
 
@@ -80,7 +80,7 @@ Golems in view stop what they are doing, dancing and setting off fireworks.
 
 | Setting | Default | |
 |---|---|---|
-| Share obstacle data | Off | Sends the obstacle data the plugin keeps, so every player's golems can use those obstacles in a later update. See [Obstacle data](#obstacle-data) below. |
+| Share obstacle data | Off | Sends the obstacle data the plugin keeps, so every player's golems can use those obstacles in a later update. See [Telemetry](#telemetry) below. |
 
 
 ## Interactions
@@ -96,15 +96,13 @@ Golems in view stop what they are doing, dancing and setting off fireworks.
 - Golems will learn how to use obstacles, entrances, and other transports based on what your player does. They may ignore certain paths or obstacles until you perform them yourself.
 
 
-## Obstacle data
+## Telemetry
 
-Golems only use an obstacle once they know how it moves you, and the only way to learn that is to watch a player use it. The plugin keeps what it sees in `golem-obstacle-data.tsv` in its own folder, which you can open in any spreadsheet.
 
-The plugin keeps this record either way. If you turn on **Share obstacle data**, it is sent to a small server run by the plugin's author, so the obstacles in it can be added for everyone in a later release: everything kept so far, then whatever is new as you play. It is off unless you turn it on, and asks before it does. Turn it off and nothing more is sent.
+The plugin keeps a record of some obstacles and transports the player crosses. With your permission, a setting can be toggled on to help development.
+This setting sends the collected traversal data to a server. It does not share any account specific data, such as display name, world, or even time.
 
-What is sent: each obstacle's id and name as the game has them, the animations it played, how long it took, the two tiles it joins, and the path across it measured from those tiles. For golems, the route they took over an obstacle, so ones they get wrong can be fixed. Also the plugin's version.
-
-What is not sent: your account, display name, world, any other location, or the time. The server sees your IP address, as with any connection, and does not keep it. The code that does all of this is the `telemetry` package.
+What is sent: each obstacle's ID and name as the game has them, the animations it played, how long it took, the tiles it joins, and the path across it measured from those tiles. For golems, the route they took over an obstacle, so obstacles they perform incorrectly can be fixed. Also, the plugin version.
 
 ## Credits
 
@@ -125,7 +123,7 @@ the idea from [Dance Party](https://github.com/dekvall/runelite-external-plugins
 dekvall. 
 
 Latin ordinal names from the list [Hjaldr](https://github.com/Varzeki/golems-dont-die/issues/2)
-contributed, and [corrected](https://github.com/Varzeki/golems-dont-die/pull/8). 
+contributed.
 
 ## Licence
 
