@@ -111,7 +111,7 @@ class ObstacleDataBridge
 			s.fromX, s.fromY, s.fromPlane, s.toX, s.toY, s.toPlane, s.lineX, s.lineY, s.instance,
 			curve == null ? new int[0][] : curve.samples(),
 			curve == null ? new int[0][] : curve.animationChanges(),
-			curve == null ? -1 : curve.facing()));
+			curve == null ? -1 : curve.facing(), s.fromInstance, s.toInstance));
 	}
 
 	/** A crossing a golem made in view. See GolemTraversal. */

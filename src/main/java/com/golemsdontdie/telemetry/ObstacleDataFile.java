@@ -27,21 +27,27 @@ public final class ObstacleDataFile
 {
 	public static final String FILE_NAME = "golem-obstacle-data.tsv";
 
-	/** Bumped whenever a column changes. A file from another schema is replaced, not misread. */
-	static final int SCHEMA = 3;
+	/**
+	 * Bumped whenever a column changes. A file from another schema is replaced, not misread, except
+	 * the one before: schema 3 lacked the player lines' last two columns, and has them added blank.
+	 */
+	static final int SCHEMA = 4;
 
 	/** Lines kept of each kind. */
 	static final int MAX_LINES = 2000;
 
-	/** Points kept of any one path. A longer path is thinned evenly, keeping its first and last. */
-	static final int PATH_POINTS = 60;
+	/**
+	 * Points kept of any one path: every sample of the longest traversal recorded. A longer path is
+	 * thinned evenly, keeping its first and last.
+	 */
+	static final int PATH_POINTS = 300;
 
 	/** 128ths of a tile in a tile. */
 	private static final int TILE = 128;
 
 	private static final String PLAYER_COLUMNS = "#P\tobject\tname\tmenu\tanimations\tticks\tmoveDelay\tmoveSpan"
 		+ "\tfromX\tfromY\tfromPlane\ttoX\ttoY\ttoPlane\tlineX\tlineY\tinstance\tseen\tfacing"
-		+ "\tanimationChanges\tpath";
+		+ "\tanimationChanges\tpath\tfromInstance\ttoInstance";
 
 	private static final String GOLEM_COLUMNS = "#G\tobject\tfromX\tfromY\tfromPlane\ttoX\ttoY\ttoPlane"
 		+ "\tattempts\tworstSide\tworstLanding\tworstStart\toverStone\tpath";
@@ -135,6 +141,7 @@ public final class ObstacleDataFile
 		try (BufferedReader in = store.reader())
 		{
 			boolean sameSchema = false;
+			boolean before = false;
 			String line;
 			while ((line = in.readLine()) != null)
 			{
@@ -142,6 +149,17 @@ public final class ObstacleDataFile
 				if (columns[0].equals("#schema"))
 				{
 					sameSchema = columns.length > 1 && columns[1].equals(String.valueOf(SCHEMA));
+					before = columns.length > 1 && columns[1].equals(String.valueOf(SCHEMA - 1));
+					sameSchema |= before;
+				}
+				else if (before && columns[0].equals("P") && columns.length == columnCount(PLAYER_COLUMNS) - 2)
+				{
+					// Kept from the schema before: which side was an instance was not recorded.
+					String[] row = Arrays.copyOf(withoutKind(columns), columns.length + 1);
+					row[row.length - 2] = "";
+					row[row.length - 1] = "";
+					player.put(playerKey(row), row);
+					changed = true;
 				}
 				else if (sameSchema && columns[0].equals("P") && columns.length == columnCount(PLAYER_COLUMNS))
 				{
@@ -182,7 +200,8 @@ public final class ObstacleDataFile
 		out.append("# P lines: crossings of obstacles by the player. G lines: crossings by golems.\n");
 		out.append("# S lines: how many sightings of a crossing have been sent.\n");
 		out.append("# Distances in 128ths of a tile, times in 20 ms client cycles unless named otherwise.\n");
-		out.append("# A path is cycle:along:side, measured from the start tile towards the end tile.\n");
+		out.append("# A path is cycle:along:side, measured from the start tile towards the end tile; a player's\n");
+		out.append("# adds the animation keyframe (-1 none). Animation changes are cycle:animation:startingFrame.\n");
 		out.append("#schema\t").append(SCHEMA).append('\n');
 		out.append("#plugin\t").append(pluginVersion).append('\n');
 		out.append(PLAYER_COLUMNS).append('\n');
@@ -225,7 +244,8 @@ public final class ObstacleDataFile
 			String.valueOf(c.fromX), String.valueOf(c.fromY), String.valueOf(c.fromPlane),
 			String.valueOf(c.toX), String.valueOf(c.toY), String.valueOf(c.toPlane),
 			String.valueOf(c.lineX), String.valueOf(c.lineY), c.instance ? "1" : "0",
-			"1", String.valueOf(c.facing), pairs(c.animationChanges), path(c.path),
+			"1", String.valueOf(c.facing), entries(c.animationChanges), path(c.path),
+			c.fromInstance ? "1" : "0", c.toInstance ? "1" : "0",
 		};
 		// The newest recording of a crossing replaces the old one; only the count carries over.
 		String[] kept = player.get(playerKey(row));
@@ -395,7 +415,7 @@ public final class ObstacleDataFile
 		return (int) Math.round(Math.hypot(x, y));
 	}
 
-	/** A path as cycle:along:side entries, thinned evenly to {@link #PATH_POINTS}. */
+	/** A path as cycle:along:side entries (and a keyframe, for a player's), thinned evenly to {@link #PATH_POINTS}. */
 	private static String path(int[][] points)
 	{
 		StringBuilder sb = new StringBuilder();
@@ -408,23 +428,33 @@ public final class ObstacleDataFile
 		{
 			if (i % step == 0 || i == points.length - 1)
 			{
-				sb.append(sb.length() == 0 ? "" : ",")
-					.append(points[i][0]).append(':').append(points[i][1]).append(':').append(points[i][2]);
+				sb.append(sb.length() == 0 ? "" : ",").append(entry(points[i]));
 			}
 		}
 		return sb.toString();
 	}
 
-	/** {a, b} pairs as a:b entries. */
-	private static String pairs(int[][] values)
+	/** Number groups as a:b:c entries. */
+	private static String entries(int[][] values)
 	{
 		StringBuilder sb = new StringBuilder();
 		if (values != null)
 		{
-			for (int[] pair : values)
+			for (int[] value : values)
 			{
-				sb.append(sb.length() == 0 ? "" : ",").append(pair[0]).append(':').append(pair[1]);
+				sb.append(sb.length() == 0 ? "" : ",").append(entry(value));
 			}
+		}
+		return sb.toString();
+	}
+
+	/** One group of numbers as a:b:c. */
+	private static String entry(int[] value)
+	{
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < value.length; i++)
+		{
+			sb.append(i == 0 ? "" : ":").append(value[i]);
 		}
 		return sb.toString();
 	}

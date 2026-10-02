@@ -96,18 +96,19 @@ final class MotionCurve
 		int[][] out = new int[forward.length][];
 		for (int i = 0; i < forward.length; i++)
 		{
-			out[i] = new int[]{i * SAMPLE_EVERY, forward[i], i < lateral.length ? lateral[i] : 0};
+			out[i] = new int[]{i * SAMPLE_EVERY, forward[i], i < lateral.length ? lateral[i] : 0,
+				keyframes != null && i < keyframes.length ? keyframes[i] : -1};
 		}
 		return out;
 	}
 
-	/** Each point the animation changed, as plain numbers: {cycle, animation}. */
+	/** Each point the animation changed, as plain numbers: {cycle, animation, starting frame}. */
 	int[][] animationChanges()
 	{
 		int[][] out = new int[animations.length][];
 		for (int i = 0; i < animations.length; i++)
 		{
-			out[i] = new int[]{animations[i][0], animations[i][1]};
+			out[i] = new int[]{animations[i][0], animations[i][1], animations[i].length > 2 ? animations[i][2] : 0};
 		}
 		return out;
 	}

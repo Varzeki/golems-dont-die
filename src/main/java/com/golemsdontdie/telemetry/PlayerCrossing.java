@@ -63,4 +63,11 @@ public final class PlayerCrossing
 
 	/** Which way the player faced relative to the way they moved, 0 to 2047 (1024 is backwards); -1 unknown. */
 	public final int facing;
+
+	/**
+	 * Whether the crossing began inside an instance, and whether it ended inside one: its tiles are
+	 * the instance's template either way, so only these say which side was an instance.
+	 */
+	public final boolean fromInstance;
+	public final boolean toInstance;
 }

@@ -149,6 +149,46 @@ public class ObstacleDataFileTest
 		Assert.assertArrayEquals(new int[]{128, 0}, ObstacleDataFile.alongAndSide(0, 128, 0, 256));
 	}
 
+	/**
+	 * A file from the schema before is kept, not replaced: its player lines get the two new columns
+	 * blank, its golem lines and what it had sent carry over, and it is written back in this schema.
+	 */
+	@Test
+	public void aFileFromTheSchemaBeforeIsKept() throws Exception
+	{
+		String oldPlayer = "P\t12345\tStile\tClimb-over Stile\t839\t3\t33\t12\t3300\t3300\t0\t3300"
+			+ "\t3302\t0\t0\t2\t0\t5\t0\t0:839\t0:0:0,2:64:0";
+		String oldGolem = "G\t62250\t2539\t2215\t0\t2537\t2215\t0\t4\t11\t255\t0\t0\t0:0:0";
+		contents = "#schema\t3\n" + oldPlayer + "\n" + oldGolem + "\nS\tP12345|839|3300,3300,0>3300,3302,0\t5\n";
+		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
+		data.load();
+		Assert.assertEquals(1, data.playerLines());
+		Assert.assertEquals(1, data.golemLines());
+		Assert.assertEquals("what was sent carries over", 0, data.unsent(10).stream().filter(u -> u.kind.equals("P")).count());
+		data.save();
+		Assert.assertTrue(contents.contains("#schema\t" + ObstacleDataFile.SCHEMA + "\n"));
+		String[] line = line("P\t12345");
+		Assert.assertEquals("seen", "5", value("P", line, "seen"));
+		Assert.assertEquals("not recorded then", "", value("P", line, "fromInstance"));
+		Assert.assertEquals("", value("P", line, "toInstance"));
+	}
+
+	/** A player's path carries the keyframe at each sample, and each animation change its starting frame. */
+	@Test
+	public void keyframesAndStartingFramesAreKept() throws Exception
+	{
+		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
+		data.load();
+		data.add(new PlayerCrossing(777, "Stone", "Jump-to Stone", new int[]{769}, 2, 10, 20, 3000, 3000, 0, 3002, 3000, 0,
+			2, 0, true, new int[][]{{0, 0, 0, -1}, {2, 128, 0, 3}}, new int[][]{{0, 769, 4}}, 0, true, false));
+		data.save();
+		String[] line = line("P\t777");
+		Assert.assertEquals("0:0:0:-1,2:128:0:3", value("P", line, "path"));
+		Assert.assertEquals("0:769:4", value("P", line, "animationChanges"));
+		Assert.assertEquals("1", value("P", line, "fromInstance"));
+		Assert.assertEquals("0", value("P", line, "toInstance"));
+	}
+
 	@Test
 	public void aFileFromAnotherSchemaIsReplacedNotMisread() throws Exception
 	{
@@ -178,7 +218,7 @@ public class ObstacleDataFileTest
 		{
 			if (line.startsWith(startingWith))
 			{
-				return line.trim().split("\t", -1);
+				return line.replace("\r", "").split("\t", -1);
 			}
 		}
 		throw new AssertionError("no line starting " + startingWith);
@@ -188,6 +228,6 @@ public class ObstacleDataFileTest
 	{
 		return new PlayerCrossing(12345, "Stile\there", "Climb-over Stile", new int[]{839, 839}, 3, 33, 12,
 			fromX, fromY, 0, toX, toY, 0, 0, 2, false,
-			new int[][]{{0, 0, 0}, {2, 64, 0}, {4, 256, 0}}, new int[][]{{0, 839}}, 0);
+			new int[][]{{0, 0, 0}, {2, 64, 0}, {4, 256, 0}}, new int[][]{{0, 839}}, 0, false, false);
 	}
 }
