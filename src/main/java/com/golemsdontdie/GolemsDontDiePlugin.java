@@ -47,7 +47,7 @@ import static com.golemsdontdie.RouteGeometry.span;
 	name = "Golems Don't Die",
 	internalName = "golems-dont-die",
 	description = "Golems should live forever.",
-	tags = {"golem", "crafting", "wyrmscraig", "skilling", "cosmetic", "npc", "sailing", "exploration", "shortcuts"}
+	tags = {"golem", "crafting", "wyrmscraig", "skilling", "cosmetic", "npc", "sailing", "exploration", "shortcuts", "personality", "hats"}
 )
 public class GolemsDontDiePlugin extends Plugin
 {
@@ -2437,7 +2437,7 @@ public class GolemsDontDiePlugin extends Plugin
 	 * {@code runelite-plugin.properties} and {@code build.gradle}, which the Plugin Hub reads;
 	 * this one is what the plugin writes into the data it keeps.
 	 */
-	static final String VERSION = "3.0";
+	static final String VERSION = "3.1.0";
 
 	/**
 	 * The updates announced in chat, oldest first, each as the key set once it has been said (or on a
