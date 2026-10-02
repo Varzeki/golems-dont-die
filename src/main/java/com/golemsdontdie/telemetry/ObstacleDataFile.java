@@ -15,7 +15,12 @@ import lombok.extern.slf4j.*;
  * line; past {@link #MAX_LINES} of a kind, the one seen least recently is dropped. So the file stays
  * small however long the plugin is used.
  *
- * <p>Nothing here sends anything. See the package documentation for what is kept and why.
+ * <p>{@code S} lines remember how many sightings of each crossing have been sent, so only what is
+ * new goes next time. A reader that does not know them passes over them, as it does any line it does
+ * not know.
+ *
+ * <p>Nothing here sends anything: it says what has not been sent, for {@link ObstacleDataSender},
+ * and is told what has. See the package documentation for what is kept and why.
  */
 @Slf4j
 public final class ObstacleDataFile
@@ -72,6 +77,34 @@ public final class ObstacleDataFile
 
 	private boolean changed;
 
+	/**
+	 * Sightings of each crossing already sent, by kind and key. Read on the client thread, and added
+	 * to from a network thread when the server takes a post, so only under this file's lock.
+	 */
+	private final Map<String, Integer> sent = new HashMap<>();
+
+	/** A crossing with sightings not yet sent: what to post, and how far it will have been sent. */
+	public static final class Unsent
+	{
+		/** P or G, the line as it is posted, and how many sightings it carries. */
+		public final String kind;
+		public final String row;
+		public final int count;
+
+		/** Its key in {@link #sent}, and the sightings sent once this is taken. */
+		final String key;
+		final int upTo;
+
+		Unsent(String kind, String row, int count, String key, int upTo)
+		{
+			this.kind = kind;
+			this.row = row;
+			this.count = count;
+			this.key = key;
+			this.upTo = upTo;
+		}
+	}
+
 	public ObstacleDataFile(Store store, String pluginVersion)
 	{
 		this.store = store;
@@ -81,10 +114,11 @@ public final class ObstacleDataFile
 	// ------------------------------------------------------------------ reading and writing
 
 	/** Reads the file, if there is one. An unreadable file or another schema starts afresh. */
-	public void load()
+	public synchronized void load()
 	{
 		player.clear();
 		golem.clear();
+		sent.clear();
 		changed = false;
 		try
 		{
@@ -119,18 +153,23 @@ public final class ObstacleDataFile
 					String[] row = withoutKind(columns);
 					golem.put(golemKey(row), row);
 				}
+				else if (sameSchema && columns[0].equals("S") && columns.length == 3)
+				{
+					sent.put(columns[1], number(columns[2]));
+				}
 			}
 		}
 		catch (IOException | RuntimeException e)
 		{
 			player.clear();
 			golem.clear();
+			sent.clear();
 			log.warn("Obstacle data unreadable; starting a fresh file", e);
 		}
 	}
 
-	/** Writes the file, if anything has been added since it was last written. */
-	public void save()
+	/** Writes the file, if anything has been added or sent since it was last written. */
+	public synchronized void save()
 	{
 		if (!changed)
 		{
@@ -138,8 +177,10 @@ public final class ObstacleDataFile
 		}
 		changed = false;
 		StringBuilder out = new StringBuilder();
-		out.append("# Golems Don't Die obstacle data. Kept on this computer; nothing in it is sent anywhere.\n");
+		out.append("# Golems Don't Die obstacle data. Kept on this computer; sent only if Share obstacle data\n");
+		out.append("# is turned on in the plugin's settings.\n");
 		out.append("# P lines: crossings of obstacles by the player. G lines: crossings by golems.\n");
+		out.append("# S lines: how many sightings of a crossing have been sent.\n");
 		out.append("# Distances in 128ths of a tile, times in 20 ms client cycles unless named otherwise.\n");
 		out.append("# A path is cycle:along:side, measured from the start tile towards the end tile.\n");
 		out.append("#schema\t").append(SCHEMA).append('\n');
@@ -154,6 +195,15 @@ public final class ObstacleDataFile
 		{
 			out.append("G\t").append(String.join("\t", row)).append('\n');
 		}
+		// Only for crossings still kept: one dropped from the file is forgotten here too.
+		for (Map.Entry<String, Integer> entry : sent.entrySet())
+		{
+			String key = entry.getKey();
+			if ((key.startsWith("P") ? player : golem).containsKey(key.substring(1)))
+			{
+				out.append("S\t").append(key).append('\t').append(entry.getValue()).append('\n');
+			}
+		}
 		try
 		{
 			store.write(out.toString());
@@ -167,7 +217,7 @@ public final class ObstacleDataFile
 	// ------------------------------------------------------------------ adding crossings
 
 	/** Adds a crossing by the player, or counts another of one already kept. */
-	public void add(PlayerCrossing c)
+	public synchronized void add(PlayerCrossing c)
 	{
 		String[] row = {
 			String.valueOf(c.objectId), text(c.name), text(c.menu), list(c.animations),
@@ -187,7 +237,7 @@ public final class ObstacleDataFile
 	}
 
 	/** Adds a crossing by a golem, or counts another on a route already kept. */
-	public void add(GolemCrossing c)
+	public synchronized void add(GolemCrossing c)
 	{
 		// The route is the straight line between the middles of its two tiles.
 		int fromX = c.fromX * TILE + TILE / 2;
@@ -240,6 +290,62 @@ public final class ObstacleDataFile
 		return golem.size();
 	}
 
+	// ------------------------------------------------------------------ sending
+
+	/**
+	 * Up to this many crossings with sightings not yet sent, players' first. Each is its line as the
+	 * file has it, but with its counts as plain marks (seen once, crossed once, over a stone or not),
+	 * so the same crossing posts the same line however often it has been seen; how many sightings it
+	 * carries is the count beside it. Nothing is marked sent until {@link #markSent} is told so.
+	 */
+	public synchronized List<Unsent> unsent(int most)
+	{
+		List<Unsent> found = new ArrayList<>();
+		collect(found, most, "P", player, P_SEEN);
+		collect(found, most, "G", golem, G_ATTEMPTS);
+		return found;
+	}
+
+	private void collect(List<Unsent> into, int most, String kind, Map<String, String[]> lines, int counted)
+	{
+		// Over the entries, not by looking each up: a look-up would reorder the least recently seen.
+		for (Map.Entry<String, String[]> entry : lines.entrySet())
+		{
+			if (into.size() >= most)
+			{
+				return;
+			}
+			String key = kind + entry.getKey();
+			int seen = number(entry.getValue()[counted]);
+			int already = sent.getOrDefault(key, 0);
+			if (seen > already)
+			{
+				String[] row = entry.getValue().clone();
+				row[counted] = "1";
+				if (kind.equals("G"))
+				{
+					row[G_OVER_STONE] = number(row[G_OVER_STONE]) > 0 ? "1" : "0";
+				}
+				into.add(new Unsent(kind, String.join("\t", row), seen - already, key, seen));
+			}
+		}
+	}
+
+	/**
+	 * Marks crossings as sent, once the server has taken them, and writes the file so that is kept:
+	 * the last post comes back after the file was written on stopping, and, not written, would be
+	 * sent again next time. From a network thread.
+	 */
+	public synchronized void markSent(List<Unsent> taken)
+	{
+		for (Unsent u : taken)
+		{
+			sent.merge(u.key, u.upTo, Math::max);
+		}
+		changed = true;
+		save();
+	}
+
 	// ------------------------------------------------------------------ helpers
 
 	private void put(Map<String, String[]> lines, String key, String[] row)
@@ -247,7 +353,10 @@ public final class ObstacleDataFile
 		lines.put(key, row);
 		while (lines.size() > MAX_LINES)
 		{
-			lines.remove(lines.keySet().iterator().next());
+			// Dropped, it is forgotten as sent too: seen again, it starts its count afresh.
+			String dropped = lines.keySet().iterator().next();
+			lines.remove(dropped);
+			sent.remove((lines == player ? "P" : "G") + dropped);
 		}
 		changed = true;
 	}

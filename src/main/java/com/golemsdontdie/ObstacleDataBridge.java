@@ -1,9 +1,11 @@
 package com.golemsdontdie;
 
 import com.golemsdontdie.telemetry.*;
+import com.google.gson.*;
 import java.io.*;
 import javax.inject.*;
 import net.runelite.client.util.*;
+import okhttp3.*;
 
 /**
  * The one place the plugin hands anything to the obstacle data file.
@@ -18,7 +20,17 @@ class ObstacleDataBridge
 	@Inject
 	private TransportNetwork transports;
 
+	@Inject
+	private GolemsDontDieConfig config;
+
+	@Inject
+	private OkHttpClient http;
+
+	@Inject
+	private Gson gson;
+
 	private ObstacleDataFile file;
+	private ObstacleDataSender sender;
 
 	/**
 	 * @param folder the plugin's own folder, or null if RuneLite could not give it one: then nothing
@@ -54,14 +66,37 @@ class ObstacleDataBridge
 			}
 		}, GolemsDontDiePlugin.VERSION);
 		file.load();
+		sender = new ObstacleDataSender(http, gson, GolemsDontDiePlugin.VERSION);
 	}
 
+	/** Writes the file, and sends what is waiting if the player shares it and it is time. */
 	void save()
 	{
-		if (file != null)
+		save(false, null);
+	}
+
+	/**
+	 * As {@link #save()}, sending what is waiting now rather than when it is next due: stopping.
+	 *
+	 * @param after run once the post is answered or given up on, or straight away if none is made
+	 */
+	void saveAndSend(Runnable after)
+	{
+		save(true, after);
+	}
+
+	private void save(boolean now, Runnable after)
+	{
+		if (file == null)
 		{
-			file.save();
+			if (after != null)
+			{
+				after.run();
+			}
+			return;
 		}
+		file.save();
+		sender.send(file, config.shareObstacleData(), now, after);
 	}
 
 	/** A crossing the player made, already judged to be an obstacle. */

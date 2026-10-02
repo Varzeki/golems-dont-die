@@ -62,6 +62,58 @@ public class ObstacleDataFileTest
 		Assert.assertEquals("and counting carries on", "3", value("P", line("P\t12345\tStile here\tClimb-over Stile\t839,839\t3\t33\t12\t3300\t3300"), "seen"));
 	}
 
+	/**
+	 * Everything kept is offered to send, including what was kept before sharing was turned on, as
+	 * plain lines with the sightings not yet sent beside them. Once taken, only new sightings are
+	 * offered, and that survives a restart; a post that was never taken leaves it all to go again.
+	 */
+	@Test
+	public void sendsWhatHasNotBeenSentAndRemembersWhatHas() throws Exception
+	{
+		ObstacleDataFile data = new ObstacleDataFile(store(), "test");
+		data.load();
+		data.add(stile(3300, 3300, 3300, 3302));
+		data.add(stile(3300, 3300, 3300, 3302));
+		data.add(stile(3400, 3400, 3400, 3402));
+		data.save();
+
+		java.util.List<ObstacleDataFile.Unsent> first = data.unsent(10);
+		Assert.assertEquals("both crossings, though nothing was ever sent before", 2, first.size());
+		ObstacleDataFile.Unsent twice = first.get(0);
+		Assert.assertEquals("P", twice.kind);
+		Assert.assertEquals("seen twice", 2, twice.count);
+		Assert.assertEquals("the line's own count as a plain mark", "1",
+			value("P", ("P\t" + twice.row).split("\t", -1), "seen"));
+		Assert.assertEquals("not taken, so offered again", 2, data.unsent(10).size());
+		Assert.assertEquals("no more than asked for", 1, data.unsent(1).size());
+
+		data.markSent(first);
+		Assert.assertEquals("all sent", 0, data.unsent(10).size());
+		Assert.assertTrue("and written down at once", contents.contains("\nS\tP12345|"));
+		data.add(stile(3300, 3300, 3300, 3302));
+		java.util.List<ObstacleDataFile.Unsent> again = data.unsent(10);
+		Assert.assertEquals(1, again.size());
+		Assert.assertEquals("only the new sighting", 1, again.get(0).count);
+		Assert.assertEquals("the same line as before", twice.row, again.get(0).row);
+		data.save();
+
+		ObstacleDataFile reloaded = new ObstacleDataFile(store(), "test");
+		reloaded.load();
+		Assert.assertEquals("what was sent is remembered", 1, reloaded.unsent(10).size());
+		Assert.assertEquals(1, reloaded.unsent(10).get(0).count);
+	}
+
+	/** What is posted: the schema, the version, and each crossing's kind, line and count. */
+	@Test
+	public void postsEachCrossingWithItsKindAndCount()
+	{
+		java.util.List<ObstacleDataFile.Unsent> batch = java.util.Collections.singletonList(
+			new ObstacleDataFile.Unsent("G", "1\t2\t3", 4, "Gkey", 4));
+		String json = new com.google.gson.Gson().toJson(ObstacleDataSender.body(batch, "3.1.0"));
+		Assert.assertEquals("{\"schema\":" + ObstacleDataFile.SCHEMA + ",\"plugin\":\"3.1.0\",\"records\":"
+			+ "[{\"kind\":\"G\",\"row\":\"1\\t2\\t3\",\"count\":4}]}", json);
+	}
+
 	@Test
 	public void measuresHowFarAGolemStrayedFromItsRoute() throws Exception
 	{

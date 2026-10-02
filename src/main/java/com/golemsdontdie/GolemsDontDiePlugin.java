@@ -820,7 +820,7 @@ public class GolemsDontDiePlugin extends Plugin
 			// first line threw, the roster stayed in memory, and re-enabling doubled every
 			// golem. Save before tearing down.
 			safely("stopping the obstacle observer", obstacleObserver::shutDown);
-			safely("saving obstacle data", obstacleData::save);
+			safely("saving obstacle data", () -> obstacleData.saveAndSend(null));
 			safely("saving learned routes", () ->
 			{
 				if (routesChanged)
@@ -980,13 +980,24 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 		CompletableFuture<Void> saved = new CompletableFuture<>();
+		CompletableFuture<Void> sent = new CompletableFuture<>();
 		event.waitFor(saved);
+		event.waitFor(sent);
 		onClientThread(() ->
 		{
 			safely("saving golems", this::saveGolems);
 			safely("saving the island map", this::saveIslandMemory);
 			safely("saving learned routes", this::saveLearnedObstacles);
-			safely("saving obstacle data", obstacleData::save);
+			// The last post is waited for too, as far as the client waits for anything at shutdown.
+			try
+			{
+				obstacleData.saveAndSend(() -> sent.complete(null));
+			}
+			catch (RuntimeException e)
+			{
+				log.warn("Failed saving obstacle data while shutting down; carrying on", e);
+				sent.complete(null);
+			}
 			saved.complete(null);
 		});
 	}
@@ -3500,7 +3511,7 @@ public class GolemsDontDiePlugin extends Plugin
 			saveGolems();
 			saveIslandMemory();
 			// Golems crossing obstacles add to the record constantly; written with the rest.
-			obstacleData.save();
+			safely("saving obstacle data", obstacleData::save);
 		}
 	}
 

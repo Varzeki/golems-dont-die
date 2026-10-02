@@ -42,7 +42,13 @@
  *
  * <h2>What leaves the machine</h2>
  *
- * <p>Nothing, in this release. There is no network code anywhere in the plugin. A later update will
- * add sending, off by default, to be reviewed on its own.
+ * <p>Nothing, unless the player turns on <i>Share obstacle data</i>, which is off by default and
+ * warns before it turns on. The file is kept either way; the setting is the player's permission to
+ * send it. With it on, {@link com.golemsdontdie.telemetry.ObstacleDataSender} sends whatever in the
+ * file has not been sent yet, including what was kept before it was turned on, to
+ * {@link com.golemsdontdie.telemetry.ObstacleDataSender#URL}: the file's own lines, each with how
+ * many new sightings it carries, and the plugin's version. A batch at a time, a minute apart while
+ * there is a backlog and then at most every fifteen minutes, and once more as the plugin stops.
+ * Nothing else is sent, and this package is the only network code in the plugin.
  */
 package com.golemsdontdie.telemetry;
