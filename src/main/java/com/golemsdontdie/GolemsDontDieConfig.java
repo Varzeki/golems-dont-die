@@ -337,12 +337,9 @@ public interface GolemsDontDieConfig extends Config
 		description = "Sends the obstacle data the plugin keeps (the shortcuts and obstacles you have crossed, "
 			+ "and how golems crossed them) to the plugin's author, so every player's golems can use them in a "
 			+ "later update. No account, name, world or location of yours is sent: only the obstacles themselves.",
-		// The first sentence is the Plugin Hub's own wording for a plugin that adds networking.
+		// The Plugin Hub's own wording for a plugin that adds networking.
 		warning = "This feature submits your IP address and various account data to a 3rd-party server not "
-			+ "controlled or verified by Runelite developers. What it sends is the obstacle data the plugin has "
-			+ "kept, and what it learns from now on: the obstacles you cross and how they move you. The server, "
-			+ "run by the plugin's author, does not keep your IP address, and no account, name, world or other "
-			+ "location is sent. Turn it on?",
+			+ "controlled or verified by Runelite developers.",
 		section = obstacleDataSection,
 		position = 0
 	)
