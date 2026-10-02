@@ -1,5 +1,9 @@
 package com.golemsdontdie;
 
+import java.io.*;
+import java.nio.charset.*;
+import java.util.*;
+import lombok.extern.slf4j.*;
 import net.runelite.api.coords.WorldPoint;
 
 /**
@@ -10,6 +14,7 @@ import net.runelite.api.coords.WorldPoint;
  * on {@code NPCComposition} at all. The four
  * island shortcuts are data, not identity, so they ship in the transport table.
  */
+@Slf4j
 final class GolemContent
 {
 	private GolemContent()
@@ -56,13 +61,6 @@ final class GolemContent
 	static final String GOLEM_EXAMINE = "*cough* Golem. *cough* GOHLEM. *cough*";
 
 	/**
-	 * The golem's own lighting offsets from the NPC definition: the client lights an NPC with
-	 * {@code 64 + ambient} and {@code 850 + contrast}, so bare defaults look wrong.
-	 */
-	static final int GOLEM_AMBIENT = 10;
-	static final int GOLEM_CONTRAST = 60;
-
-	/**
 	 * The jeweller's chisel: golem crafting's own rare reward, one craft in three hundred. A golem
 	 * crafted can come off the plinth holding one, at the same odds. The item's inventory icon's
 	 * model, the only model it has: it is never worn or wielded. See GolemModelFactory.
@@ -81,6 +79,13 @@ final class GolemContent
 	 * play to be the game's own for a golem's gift. The game may play a jingle, which a plugin cannot.
 	 */
 	static final int CHISEL_SOUND = 2655;
+
+	/**
+	 * The golem's own lighting offsets from the NPC definition: the client lights an NPC with
+	 * {@code 64 + ambient} and {@code 850 + contrast}, so bare defaults look wrong.
+	 */
+	static final int GOLEM_AMBIENT = 10;
+	static final int GOLEM_CONTRAST = 60;
 
 	/**
 	 * The game's own count of golems this player has crafted, ever: bits 16 to 31 of varp
@@ -384,4 +389,34 @@ final class GolemContent
 		return npcId == GOLEM_NPC_ID;
 	}
 
+
+	/**
+	 * A text table shipped with the plugin: each line that is not blank or a {@code #} comment, split
+	 * at its tabs. Empty, and logged, if it is missing or unreadable.
+	 */
+	static List<String[]> table(String resource)
+	{
+		List<String[]> rows = new ArrayList<>();
+		try (InputStream in = GolemContent.class.getResourceAsStream(resource))
+		{
+			if (in == null)
+			{
+				log.warn("{} is missing", resource);
+				return rows;
+			}
+			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+			for (String line = reader.readLine(); line != null; line = reader.readLine())
+			{
+				if (!line.trim().isEmpty() && !line.startsWith("#"))
+				{
+					rows.add(line.trim().split("\t"));
+				}
+			}
+		}
+		catch (IOException e)
+		{
+			log.warn("{} is unreadable", resource, e);
+		}
+		return rows;
+	}
 }

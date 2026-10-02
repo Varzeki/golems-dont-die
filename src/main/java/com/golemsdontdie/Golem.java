@@ -1709,7 +1709,7 @@ class Golem
 		int toX = transport.getToX();
 		int toY = transport.getToY();
 		if (transport.getArchetype() != GolemTransport.ARCHETYPE_DOOR || transport.getFromPlane() != transport.getToPlane()
-			|| Math.max(Math.abs(toX - x), Math.abs(toY - y)) > OPEN_DOOR_SPAN || x == toX && y == toY)
+			|| span(toX - x, toY - y) > OPEN_DOOR_SPAN || x == toX && y == toY)
 		{
 			return false;
 		}
@@ -1771,7 +1771,7 @@ class Golem
 		{
 			for (int dy = -WAY_OUT_REACH; dy <= WAY_OUT_REACH; dy++)
 			{
-				int span = Math.max(Math.abs(dx), Math.abs(dy));
+				int span = span(dx, dy);
 				if (span >= bestSpan)
 				{
 					continue;
@@ -2107,7 +2107,7 @@ class Golem
 		// Only a crossing: the same floor and a few tiles. A dungeon ladder's far end is 6,400 tiles
 		// north and a fairy ring's anywhere, and golems turned to face those before climbing.
 		boolean crossing = transport.getFromPlane() == transport.getToPlane()
-			&& Math.max(Math.abs(dx), Math.abs(dy)) <= FACE_REACH;
+			&& span(dx, dy) <= FACE_REACH;
 		if (tier == GolemTier.SCENE && (dx != 0 || dy != 0) && crossing && !hopping)
 		{
 			int heading = headingFor(dx, dy);

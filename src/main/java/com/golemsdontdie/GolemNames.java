@@ -49,12 +49,10 @@ class GolemNames
 	 * Surnames, all of them something a rock is or is made of. The first names do the work of
 	 * telling golems apart; these do the work of making them golems.
 	 */
-	private static final String[] ROCKS = ("Pebble Boulder Granite Flint Slate Marble Gravel Quartz Basalt "
-		+ "Cobble Shale Chalk Clay Grit Rubble Cairn Crag Scree Moss Lime Ochre Onyx Jasper Opal Amber "
-		+ "Obsidian Pumice Sable Tuff Geode Mica Schist Gneiss Flagstone Kerb Cinder Ash Ember Soot Dolomite "
-		+ "Lode Seam Quarry Millstone Keystone Cobblestone Bedrock Gritstone Whetstone Ironstone Limestone "
-		+ "Sandstone Greystone Blackstone Brownstone Fieldstone Riverstone Rubblehead Stonewall Chippings "
-		+ "Boulderfoot Flintlock Gravelly Marblewell Slatebottom Quarryman").split(" ");
+	private static final String ROCKS = "/rocks.txt";
+
+	/** The surnames, read with the names; one fallback if the file were ever missing. */
+	private String[] rocks = {"Pebble"};
 
 	@Inject
 	private GolemsDontDieConfig config;
@@ -79,6 +77,11 @@ class GolemNames
 	/** Reads the harvested names. Called once at start-up, beside the other data files. */
 	void load()
 	{
+		List<String[]> rows = GolemContent.table(ROCKS);
+		if (!rows.isEmpty())
+		{
+			rocks = rows.stream().map(row -> row[0]).toArray(String[]::new);
+		}
 		try (InputStream in = GolemNames.class.getResourceAsStream(FILE))
 		{
 			if (in == null)
@@ -296,6 +299,6 @@ class GolemNames
 		{
 			first = gielinor[random.nextInt(gielinor.length)];
 		}
-		return first + " " + ROCKS[random.nextInt(ROCKS.length)];
+		return first + " " + rocks[random.nextInt(rocks.length)];
 	}
 }

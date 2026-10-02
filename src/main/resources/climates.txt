@@ -1,0 +1,109 @@
+# Golems Don't Die: where it is cold and where it is hot, for golems with a taste for either.
+# One place a line: its kind, a tab, then a name the world map or the region list gives it.
+# Names are resolved to whole regions on load; one that no longer names anywhere is skipped.
+#
+# cold: snow and ice. Underground places are named separately where they are cold in their own
+# right; a cave under a glacier is not, being a cave. Nothing here is a name two places share.
+cold	Weiss
+cold	Weissmere
+cold	Weiss Melt
+cold	Trollweiss Mountain
+cold	Ice Path
+cold	Trollheim
+cold	Death Plateau
+cold	Troll Stronghold
+cold	Mountain Camp
+cold	White Wolf Mountain
+cold	Ice Mountain
+cold	Ice Queen's Lair
+cold	Asgarnian Ice Dungeon
+cold	Polar Eagle Cave
+cold	Ghorrock Dungeon
+cold	Rellekka
+cold	Neitiznot
+cold	Jatizso
+cold	Iceberg
+cold	Ungael
+cold	Waterbirth Island
+cold	Wintertodt
+cold	The Wintertodt
+cold	Northern Tundras
+cold	The Darkfrost
+cold	Mount Quidamortem
+cold	Winttumber Island
+cold	Settlement Ruins
+cold	Fishing Hamlet
+cold	Lunar Isle
+cold	Mons Gratia
+cold	The Teomat
+cold	The Proudspire
+cold	Ralos Rise
+cold	Cam Torum Entrance
+cold	Custodia Mountains
+cold	God Wars Dungeon
+cold	Wilderness God Wars Dungeon
+#
+# hot: desert and lava, which a golem that likes the heat makes no distinction between.
+# "Bandit Camp" is deliberately absent: the desert has one and so does the Wilderness.
+hot	Al Kharid
+hot	Shantay Pass
+hot	Kharidian Desert
+hot	Bedabin Camp
+hot	Desert Mining Camp
+hot	Quarry
+hot	Pollnivneach
+hot	Nardah
+hot	Uzer
+hot	Emir's Arena
+hot	Desert Eagle Cave
+hot	Kalphite Lair
+hot	Kalphite Cave
+hot	Agility Pyramid
+hot	Pyramid
+hot	Sophanem
+hot	Menaphos
+hot	Necropolis
+hot	Ruins of Ullek
+hot	Ruins of Unkah
+hot	Smoke Dungeon
+hot	Karamja
+hot	Musa Point
+hot	Mor Ul Rek
+hot	Mount Karuulm
+hot	Volcanic Mine
+hot	Chasm of Fire
+hot	Lava Maze
+hot	Lava Dragon Isle
+hot	Avium Savannah
+hot	Locus Oasis
+hot	Tombs of Amascut Lobby
+hot	Lovakengj
+hot	Lovakengj Assembly
+hot	Fight Pits
+hot	The Inferno
+hot	Corsair Cove
+hot	Gu'Tanoth
+hot	Ourania Cave
+hot	Callisto's Den
+hot	Mage Arena
+hot	Deserted Keep
+hot	Blighted Volcano
+#
+# hot regions: hot places with no name of their own, or one another place shares, by region id:
+# the Wilderness's Chaos Temple (the other is by Goblin Village), the ruined chaos temple over the
+# Ourania Cave west of Ardougne, and the Tombs of Amascut's raid, whose rooms are an instance a
+# golem in it is simulated at the template of (the regions are RuneLite's own, from its Discord
+# plugin). A region id is x >> 6 << 8 | y >> 6.
+hotRegion	12856
+hotRegion	9778
+hotRegion	14160
+hotRegion	14162
+hotRegion	14164
+hotRegion	14674
+hotRegion	14676
+hotRegion	15184
+hotRegion	15186
+hotRegion	15188
+hotRegion	15696
+hotRegion	15698
+hotRegion	15700

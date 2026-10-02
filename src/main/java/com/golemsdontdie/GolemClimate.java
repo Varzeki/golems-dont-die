@@ -8,8 +8,8 @@ import lombok.extern.slf4j.*;
  * Where it is cold, where it is hot, and where home is, so that a golem with a taste for one of
  * them can be found there.
  *
- * <p>Curated by name against the place names the plugin already ships: every entry below is a name
- * the map or the region list gives that place, and the names are resolved to regions on load, so a
+ * <p>Curated by name against the place names the plugin already ships, in {@value #PLACES}: every
+ * entry is a name the map or the region list gives that place, and the names are resolved to regions on load, so a
  * name that no longer exists costs nothing but a debug line. Places are marked a whole region at a
  * time, which is as fine as this needs to be - a taste in weather is not a taste in tiles.
  *
@@ -23,48 +23,8 @@ import lombok.extern.slf4j.*;
 @Singleton
 class GolemClimate
 {
-	/**
-	 * Snow and ice.
-	 *
-	 * <p>Underground places are named separately where they are cold in their own right; a cave
-	 * under a glacier is not, being a cave. Nothing here is a name two places share.
-	 */
-	private static final String[] COLD = {
-		"Weiss", "Weissmere", "Weiss Melt", "Trollweiss Mountain", "Ice Path", "Trollheim",
-		"Death Plateau", "Troll Stronghold", "Mountain Camp", "White Wolf Mountain", "Ice Mountain",
-		"Ice Queen's Lair", "Asgarnian Ice Dungeon", "Polar Eagle Cave", "Ghorrock Dungeon",
-		"Rellekka", "Neitiznot", "Jatizso", "Iceberg", "Ungael", "Waterbirth Island",
-		"Wintertodt", "The Wintertodt", "Northern Tundras", "The Darkfrost", "Mount Quidamortem",
-		"Winttumber Island", "Settlement Ruins", "Fishing Hamlet", "Lunar Isle",
-		"Mons Gratia", "The Teomat", "The Proudspire", "Ralos Rise", "Cam Torum Entrance", "Custodia Mountains",
-		"God Wars Dungeon", "Wilderness God Wars Dungeon",
-	};
-
-	/**
-	 * Desert and lava, which a golem that likes the heat makes no distinction between.
-	 *
-	 * <p>"Bandit Camp" is deliberately absent: the desert has one and so does the Wilderness, and
-	 * a name that means two places would mark them both.
-	 */
-	private static final String[] HOT = {
-		"Al Kharid", "Shantay Pass", "Kharidian Desert", "Bedabin Camp", "Desert Mining Camp",
-		"Quarry", "Pollnivneach", "Nardah", "Uzer", "Emir's Arena", "Desert Eagle Cave",
-		"Kalphite Lair", "Kalphite Cave", "Agility Pyramid", "Pyramid", "Sophanem", "Menaphos",
-		"Necropolis", "Ruins of Ullek", "Ruins of Unkah", "Smoke Dungeon",
-		"Karamja", "Musa Point", "Mor Ul Rek", "Mount Karuulm", "Volcanic Mine", "Chasm of Fire",
-		"Lava Maze", "Lava Dragon Isle", "Avium Savannah", "Locus Oasis",
-		"Tombs of Amascut Lobby", "Lovakengj", "Lovakengj Assembly", "Fight Pits", "The Inferno", "Corsair Cove",
-		"Gu'Tanoth", "Ourania Cave", "Callisto's Den", "Mage Arena", "Deserted Keep", "Blighted Volcano",
-	};
-
-	/**
-	 * Hot places with no name of their own, or one another place shares, by region: the Wilderness's
-	 * Chaos Temple (the other is by Goblin Village), the ruined chaos temple over the Ourania Cave west
-	 * of Ardougne, and the Tombs of Amascut's raid, whose rooms are an instance a golem in it is
-	 * simulated at the template of (the regions are RuneLite's own, from its Discord plugin).
-	 */
-	private static final int[] HOT_REGIONS = {12856, 9778,
-		14160, 14162, 14164, 14674, 14676, 15184, 15186, 15188, 15696, 15698, 15700};
+	/** The curated places: see the file itself for what is in it and why. */
+	private static final String PLACES = "/climates.txt";
 
 	/** Regions across the world, each side. A region ID is {@code x >> 6 << 8 | y >> 6}. */
 	private static final int SIDE = 256;
@@ -90,14 +50,33 @@ class GolemClimate
 	private byte[] toHot;
 	private byte[] toHome;
 
+	/** The curated places by kind: cold and hot names, and hot regions by id. */
+	static Map<String, List<String>> places()
+	{
+		Map<String, List<String>> places = new HashMap<>();
+		for (String kind : new String[]{"cold", "hot", "hotRegion"})
+		{
+			places.put(kind, new ArrayList<>());
+		}
+		for (String[] row : GolemContent.table(PLACES))
+		{
+			if (row.length == 2 && places.containsKey(row[0]))
+			{
+				places.get(row[0]).add(row[1]);
+			}
+		}
+		return places;
+	}
+
 	/** Resolves the curated names and spreads the distance fields. Call once, after the names load. */
 	void learn(PlaceNames names)
 	{
-		Set<Integer> cold = names.regionsNamed(COLD);
-		Set<Integer> hot = names.regionsNamed(HOT);
-		for (int region : HOT_REGIONS)
+		Map<String, List<String>> places = places();
+		Set<Integer> cold = names.regionsNamed(places.get("cold").toArray(new String[0]));
+		Set<Integer> hot = names.regionsNamed(places.get("hot").toArray(new String[0]));
+		for (String region : places.get("hotRegion"))
 		{
-			hot.add(region);
+			hot.add(Integer.parseInt(region));
 		}
 		Set<Integer> home = new HashSet<>();
 		for (int region : GolemContent.ISLAND_REGIONS)

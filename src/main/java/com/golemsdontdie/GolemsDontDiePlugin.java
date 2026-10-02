@@ -2678,7 +2678,7 @@ public class GolemsDontDiePlugin extends Plugin
 					continue;
 				}
 				Tile tile = tiles[plane][x][y];
-				int span = Math.max(Math.abs(x - sceneX), Math.abs(y - sceneY));
+				int span = span(x - sceneX, y - sceneY);
 				if (span >= bestSpan)
 				{
 					continue;

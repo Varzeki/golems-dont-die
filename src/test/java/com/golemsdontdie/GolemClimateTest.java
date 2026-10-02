@@ -1,6 +1,5 @@
 package com.golemsdontdie;
 
-import java.lang.reflect.Field;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
@@ -39,16 +38,16 @@ public class GolemClimateTest
 	@Test
 	public void everyCuratedNameIsAPlace() throws Exception
 	{
-		for (String list : new String[]{"COLD", "HOT"})
+		for (String list : new String[]{"cold", "hot"})
 		{
-			Field field = GolemClimate.class.getDeclaredField(list);
-			field.setAccessible(true);
-			for (String name : (String[]) field.get(null))
+			assertFalse(list + " is empty", GolemClimate.places().get(list).isEmpty());
+			for (String name : GolemClimate.places().get(list))
 			{
 				assertFalse(list + " has no place called " + name,
 					places.regionsNamed(new String[]{name}).isEmpty());
 			}
 		}
+		assertFalse(GolemClimate.places().get("hotRegion").isEmpty());
 	}
 
 	@Test

@@ -907,7 +907,7 @@ class RoamPlanner
 			{
 				for (int dy = -ring; dy <= ring; dy++)
 				{
-					if (Math.max(Math.abs(dx), Math.abs(dy)) != ring)
+					if (span(dx, dy) != ring)
 					{
 						continue;
 					}
