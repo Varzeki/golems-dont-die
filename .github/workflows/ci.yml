@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-java@v5
         with:
-          distribution: adopt
+          distribution: temurin
           java-version: 11
       - name: Fetch the packager
         run: |
@@ -90,6 +90,8 @@ jobs:
       - name: Package
         env:
           FORCE_BUILD: golems-dont-die
+          # As the hub's own CI does for a pull request: build and check, never upload.
+          PACKAGE_IS_PR: "true"
         run: |
           # Nothing the build prints is taken as a workflow command.
           COMMAND_SECRET="$(openssl rand -hex 32)"
