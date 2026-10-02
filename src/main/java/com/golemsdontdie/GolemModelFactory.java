@@ -114,6 +114,16 @@ class GolemModelFactory
 	private static final float CHISEL_CENTRE_Z = -9f;
 	private static final float CHISEL_GRIP = -13f;
 
+	/**
+	 * The top of the golem's head as it stands, read from the cache: the head's upward faces lean
+	 * 9.4 degrees forward, where a player's are level, about a centre within a unit of where a hat's
+	 * base already sits. So a hat is tipped forward that much about that centre, and sits flat on it.
+	 */
+	private static final float HEAD_TOP_Y = -188.6f;
+	private static final float HEAD_TOP_Z = -5.9f;
+	private static final float HEAD_TILT_SIN = 0.163f;
+	private static final float HEAD_TILT_COS = 0.987f;
+
 	/** The golem's right fist as it stands: its middle, and three of its corners to carry the chisel by. */
 	private static final float[] FIST = {-30f, -87f, 0f};
 	private static final float[][] FIST_CORNERS = {{-35f, -88f, -5f}, {-25f, -88f, -5f}, {-35f, -88f, 6f}};
@@ -272,7 +282,7 @@ class GolemModelFactory
 				{
 					return null;
 				}
-				data = data.cloneColors();
+				data = onHead(data.cloneColors().cloneVertices(), hat.getSink());
 				short[] hatFrom = hat.getRecolourFrom();
 				short[] hatTo = hat.getRecolourTo();
 				for (int i = 0; hatFrom != null && i < Math.min(hatFrom.length, hatTo.length); i++)
@@ -324,6 +334,22 @@ class GolemModelFactory
 			log.debug("Could not build golem model for npc {}", snapshot.getNpcId(), e);
 			return null;
 		}
+	}
+
+	/** Tips a worn model forward onto the golem's head, and lowers it this far along it: see HEAD_TOP_Y. */
+	private static ModelData onHead(ModelData worn, float sink)
+	{
+		float[] y = worn.getVerticesY();
+		float[] z = worn.getVerticesZ();
+		for (int i = 0; i < worn.getVerticesCount(); i++)
+		{
+			float dy = y[i] - HEAD_TOP_Y;
+			float dz = z[i] - HEAD_TOP_Z;
+			// Up is -y and forward is -z: turning up towards forward.
+			y[i] = HEAD_TOP_Y + dy * HEAD_TILT_COS - dz * HEAD_TILT_SIN + sink * HEAD_TILT_COS;
+			z[i] = HEAD_TOP_Z + dy * HEAD_TILT_SIN + dz * HEAD_TILT_COS + sink * HEAD_TILT_SIN;
+		}
+		return worn;
 	}
 
 	/** Puts the chisel's icon model in the golem's right fist, as it stands: see CHISEL_AXIS_X. */
