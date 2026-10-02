@@ -334,9 +334,8 @@ public interface GolemsDontDieConfig extends Config
 	@ConfigItem(
 		keyName = "shareObstacleData",
 		name = "Share obstacle data",
-		description = "Sends the obstacle data the plugin keeps (the shortcuts and obstacles you have crossed, "
-			+ "and how golems crossed them) to the plugin's author, so every player's golems can use them in a "
-			+ "later update. No account, name, world or location of yours is sent: only the obstacles themselves.",
+		description = "Help the plugin developer make obstacles and transports more reliable, by sending the "
+			+ "obstacles you and your golems cross.",
 		// The Plugin Hub's own wording for a plugin that adds networking.
 		warning = "This feature submits your IP address and various account data to a 3rd-party server not "
 			+ "controlled or verified by Runelite developers.",
