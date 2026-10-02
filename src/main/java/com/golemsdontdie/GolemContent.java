@@ -63,6 +63,26 @@ final class GolemContent
 	static final int GOLEM_CONTRAST = 60;
 
 	/**
+	 * The jeweller's chisel: golem crafting's own rare reward, one craft in three hundred. A golem
+	 * crafted can come off the plinth holding one, at the same odds. The item's inventory icon's
+	 * model, the only model it has: it is never worn or wielded. See GolemModelFactory.
+	 */
+	static final int CHISEL_MODEL = 61705;
+	static final int CHISEL_ODDS = 300;
+
+	/**
+	 * Said when a golem comes off the plinth holding one: the game's own line for the chisel, in its
+	 * green, but the golem keeps this one.
+	 */
+	static final String CHISEL_MESSAGE = "<col=006000>As you complete the golem, it shows you a chisel it found...</col>";
+
+	/**
+	 * Played with it: the chime of a gem found while mining, the likeliest of the sounds a plugin can
+	 * play to be the game's own for a golem's gift. The game may play a jingle, which a plugin cannot.
+	 */
+	static final int CHISEL_SOUND = 2655;
+
+	/**
 	 * The game's own count of golems this player has crafted, ever: bits 16 to 31 of varp
 	 * {@link #GOLEM_COUNT_VARP}, ceiling 65,535. Sixteen bits is the argument that it is a tally,
 	 * and the low half of that varp holds the two plinth stations' carving state, which makes it

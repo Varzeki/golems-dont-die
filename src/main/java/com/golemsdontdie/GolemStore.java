@@ -25,7 +25,7 @@ class GolemStore
 	/**
 	 * Ten numbers plus the nickname. The rest are optional: whether the golem is in an instance,
 	 * when it may next sail, its seed, the six of its history, its traits, its star, its craft
-	 * number and its journal.
+	 * number, its journal, its hat and its chisel.
 	 *
 	 * <p>The format only ever grows at the end, and a reader takes what it knows and ignores the
 	 * rest. So a save written by a later version still loads here, less whatever was added since;
@@ -48,6 +48,12 @@ class GolemStore
 
 	/** Its journal, after the craft number; see GolemHistory#journalCode. */
 	private static final int JOURNAL_AT = CRAFT_AT + 1;
+
+	/** Its hat, by item id, after the journal; 0 for none. See GolemHat. */
+	private static final int HAT_AT = JOURNAL_AT + 1;
+
+	/** Whether it holds a jeweller's chisel, after its hat. */
+	private static final int CHISEL_AT = HAT_AT + 1;
 
 	/** Characters a nickname may not contain, because they are the separators. */
 	private static final String ILLEGAL_IN_NICKNAME = "[;,]";
@@ -90,6 +96,12 @@ class GolemStore
 
 		/** The journal as GolemHistory#journalCode wrote it; null for a save written before it was kept. */
 		String journal;
+
+		/** Its hat's item id; 0 for none, or a save written before hats. */
+		int hat;
+
+		/** Holding a jeweller's chisel. */
+		boolean chisel;
 
 		/** Its history, in the order GolemHistory.restore takes them; all zero if there was none. */
 		long firstSeen;
@@ -141,7 +153,9 @@ class GolemStore
 				.append(FIELD_SEPARATOR).append(golem.getTraits())
 				.append(FIELD_SEPARATOR).append(golem.isFavourite() ? 1 : 0)
 				.append(FIELD_SEPARATOR).append(golem.getCraftNumber())
-				.append(FIELD_SEPARATOR).append(history.journalCode());
+				.append(FIELD_SEPARATOR).append(history.journalCode())
+				.append(FIELD_SEPARATOR).append(golem.getHat().getItemId())
+				.append(FIELD_SEPARATOR).append(golem.isChisel() ? 1 : 0);
 		}
 		return out.toString();
 	}
@@ -201,6 +215,8 @@ class GolemStore
 				saved.favourite = fields.length > FAVOURITE_AT && "1".equals(fields[FAVOURITE_AT].trim());
 				saved.craftNumber = fields.length > CRAFT_AT ? Integer.parseInt(fields[CRAFT_AT].trim()) : 0;
 				saved.journal = fields.length > JOURNAL_AT ? fields[JOURNAL_AT].trim() : null;
+				saved.hat = fields.length > HAT_AT ? Integer.parseInt(fields[HAT_AT].trim()) : 0;
+				saved.chisel = fields.length > CHISEL_AT && "1".equals(fields[CHISEL_AT].trim());
 				result.add(saved);
 			}
 			catch (NumberFormatException e)
@@ -249,6 +265,8 @@ class GolemStore
 		golem.setNickname(saved.nickname);
 		golem.setFavourite(saved.favourite);
 		golem.setCraftNumber(saved.craftNumber);
+		golem.setHat(GolemHat.byItem(saved.hat));
+		golem.setChisel(saved.chisel);
 		if (saved.firstSeen != 0)
 		{
 			golem.getHistory().restore(saved.firstSeen, saved.transports, saved.voyages, saved.walked,

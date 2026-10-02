@@ -34,29 +34,89 @@ class GolemModelFactory
 	private Client client;
 
 	/**
-	 * One built model per NPC ID, shared by every golem wearing it. Every golem is the same NPC,
-	 * so building one each meant a cache load, merge, vertex clone and lighting pass per golem -
-	 * seconds of stall as a few hundred arrive with the scene. Safe because
+	 * One built look per NPC, hat and chisel, shared by every golem that has it. Every golem is the
+	 * same NPC, so building one each meant a cache load, merge, vertex clone and lighting pass per
+	 * golem - seconds of stall as a few hundred arrive with the scene. Safe because
 	 * {@link Client#applyTransformations} clones its source's vertices rather than writing to it.
 	 */
-	private final Map<Integer, Model> cache = new HashMap<>();
+	private final Map<Long, Look> cache = new HashMap<>();
 
-	/** The lit rest-pose model for a snapshot, built once and shared; null if a part is missing. */
-	Model modelFor(GolemSnapshot snapshot)
+	/**
+	 * A golem's lit rest-pose model, and the chisel in its hand if it has one; held is null otherwise.
+	 * The hat and chisel are what it was built with, which a look standing in for one that could not
+	 * be built has not.
+	 */
+	static final class Look
 	{
-		Model cached = cache.get(snapshot.getNpcId());
+		final Model model;
+		final HeldItem held;
+		final GolemHat hat;
+		final boolean chisel;
+
+		Look(Model model, HeldItem held)
+		{
+			this(model, held, GolemHat.NONE, false);
+		}
+
+		Look(Model model, HeldItem held, GolemHat hat, boolean chisel)
+		{
+			this.model = model;
+			this.held = held;
+			this.hat = hat;
+			this.chisel = chisel;
+		}
+
+		/** True if this is the look the golem has now: its hat, and its chisel if it has one. */
+		boolean isOf(Golem golem)
+		{
+			return hat == golem.getHat() && chisel == golem.isChisel();
+		}
+	}
+
+	/**
+	 * A golem's look as it is now: its hat, and its chisel if it has one. If the hat or chisel cannot
+	 * be loaded yet, the golem bare, until they can; null if even that is missing.
+	 */
+	Look lookFor(Golem golem)
+	{
+		Look look = lookFor(golem.getSnapshot(), golem.getHat(), golem.isChisel());
+		return look != null || golem.getHat() == GolemHat.NONE && !golem.isChisel() ? look
+			: lookFor(golem.getSnapshot(), GolemHat.NONE, false);
+	}
+
+	private Look lookFor(GolemSnapshot snapshot, GolemHat hat, boolean chisel)
+	{
+		long key = (long) snapshot.getNpcId() << 16 | hat.ordinal() << 1 | (chisel ? 1 : 0);
+		Look cached = cache.get(key);
 		if (cached != null)
 		{
 			return cached;
 		}
 
-		Model built = build(snapshot);
+		Look built = build(snapshot, hat, chisel);
 		if (built != null)
 		{
-			cache.put(snapshot.getNpcId(), built);
+			cache.put(key, built);
 		}
 		return built;
 	}
+
+	/**
+	 * The jeweller's chisel as a golem holds it. Its only model is its inventory icon, lying flat
+	 * with its length on a slant; turned to point blade first ahead of the golem, the handle is put
+	 * through the right fist, as a hammer is held. The slant, middle and grip are the icon's own,
+	 * read from the cache: its long axis, its centre, and the middle of its handle along that axis.
+	 */
+	private static final float CHISEL_AXIS_X = 0.784f;
+	private static final float CHISEL_AXIS_Z = 0.621f;
+	private static final float CHISEL_CENTRE_X = -4.1f;
+	private static final float CHISEL_CENTRE_Y = -4f;
+	private static final float CHISEL_CENTRE_Z = -9f;
+	private static final float CHISEL_GRIP = -13f;
+
+	/** The golem's right fist as it stands: its middle, and three of its corners to carry the chisel by. */
+	private static final float[] FIST = {-30f, -87f, 0f};
+	private static final float[][] FIST_CORNERS = {{-35f, -88f, -5f}, {-25f, -88f, -5f}, {-35f, -88f, 6f}};
 
 	/**
 	 * Animation definitions, shared the same way the models are: there are exactly two across the
@@ -147,8 +207,8 @@ class GolemModelFactory
 		animations.clear();
 	}
 
-	/** Builds the rest-pose model a snapshot describes; null if the cache lacks a part. */
-	private Model build(GolemSnapshot snapshot)
+	/** Builds the look a snapshot, hat and chisel describe; null if the cache lacks a part. */
+	private Look build(GolemSnapshot snapshot, GolemHat hat, boolean chisel)
 	{
 		try
 		{
@@ -199,6 +259,47 @@ class GolemModelFactory
 				// Y is the vertical axis, and it is the one the height scale drives.
 				merged.scale(width, height, width);
 			}
+			int golemVertices = merged.getVerticesCount();
+
+			// Hat and chisel after the golem's own recolour and scale: neither is the golem's to repaint.
+			List<ModelData> worn = new ArrayList<>();
+			worn.add(merged);
+			// Either missing is not built without: built, it would be kept that way for good.
+			if (hat.getModel() >= 0)
+			{
+				ModelData data = client.loadModelData(hat.getModel());
+				if (data == null)
+				{
+					return null;
+				}
+				data = data.cloneColors();
+				short[] hatFrom = hat.getRecolourFrom();
+				short[] hatTo = hat.getRecolourTo();
+				for (int i = 0; hatFrom != null && i < Math.min(hatFrom.length, hatTo.length); i++)
+				{
+					data.recolor(hatFrom[i], hatTo[i]);
+				}
+				worn.add(data);
+			}
+			int chiselVertices = 0;
+			if (chisel)
+			{
+				ModelData data = client.loadModelData(GolemContent.CHISEL_MODEL);
+				if (data == null)
+				{
+					return null;
+				}
+				worn.add(inFist(data.cloneVertices()));
+				chiselVertices = data.getVerticesCount();
+			}
+			if (worn.size() > 1)
+			{
+				merged = client.mergeModels(worn.toArray(new ModelData[0]), worn.size());
+				if (merged == null)
+				{
+					return null;
+				}
+			}
 
 			Model model = merged.light(
 				BASE_AMBIENT + GolemContent.GOLEM_AMBIENT,
@@ -209,12 +310,40 @@ class GolemModelFactory
 				return null;
 			}
 			model.calculateBoundsCylinder();
-			return model;
+			HeldItem held = chiselVertices == 0 ? null : HeldItem.in(model, chiselVertices, golemVertices, FIST_CORNERS);
+			if (chiselVertices > 0 && held == null)
+			{
+				// The hand is not where it was measured: a chisel it cannot carry would hang in the air
+				// where the hand was, so the golem goes without.
+				return build(snapshot, hat, false);
+			}
+			return new Look(model, held, hat, chisel);
 		}
 		catch (RuntimeException e)
 		{
 			log.debug("Could not build golem model for npc {}", snapshot.getNpcId(), e);
 			return null;
 		}
+	}
+
+	/** Puts the chisel's icon model in the golem's right fist, as it stands: see CHISEL_AXIS_X. */
+	private static ModelData inFist(ModelData chisel)
+	{
+		float[] x = chisel.getVerticesX();
+		float[] y = chisel.getVerticesY();
+		float[] z = chisel.getVerticesZ();
+		for (int i = 0; i < chisel.getVerticesCount(); i++)
+		{
+			float dx = x[i] - CHISEL_CENTRE_X;
+			float dz = z[i] - CHISEL_CENTRE_Z;
+			// Along its length, from handle to blade; and across it.
+			float along = dx * CHISEL_AXIS_X + dz * CHISEL_AXIS_Z;
+			float across = -dx * CHISEL_AXIS_Z + dz * CHISEL_AXIS_X;
+			// Blade forward, which for a model is -z; the grip on the fist.
+			x[i] = FIST[0] + across;
+			y[i] = FIST[1] + y[i] - CHISEL_CENTRE_Y;
+			z[i] = FIST[2] - (along - CHISEL_GRIP);
+		}
+		return chisel;
 	}
 }

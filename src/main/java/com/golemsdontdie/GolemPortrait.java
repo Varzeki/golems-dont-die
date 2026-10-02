@@ -90,18 +90,20 @@ class GolemPortrait
 		{
 			return null;
 		}
-		Model model = models.modelFor(golem.getSnapshot());
-		if (model == null)
+		// In its hat, and holding its chisel if it has one.
+		GolemModelFactory.Look look = models.lookFor(golem);
+		if (look == null)
 		{
 			return null;
 		}
+		Model model = look.model;
 
 		// Its own pose, out of its own number: one of the animations it plays, held at one frame.
 		long seed = golem.getId();
 		int pose = GolemTrait.LIFE_OF_THE_PARTY.in(golem.getTraits()) ? DANCING
 			: POSES[(int) Math.floorMod(seed >> 3, POSES.length)];
 		int turn = FACING + (int) Math.floorMod(seed >> 17, TURN * 2L) - TURN;
-		return draw(posed(model, pose, (int) (seed >> 5)), model, turn, seed, SHOWN);
+		return draw(posed(look, pose, (int) (seed >> 5)), model, turn, seed, SHOWN);
 	}
 
 	/**
@@ -113,8 +115,8 @@ class GolemPortrait
 	 */
 	BufferedImage of(Golem golem, int degrees, int animation, int frame, float shown)
 	{
-		Model model = golem == null || models == null ? null : models.modelFor(golem.getSnapshot());
-		return model == null ? null : draw(posed(model, animation, frame), model, degrees, 0, shown);
+		GolemModelFactory.Look look = golem == null || models == null ? null : models.lookFor(golem);
+		return look == null ? null : draw(posed(look, animation, frame), look.model, degrees, 0, shown);
 	}
 
 	/**
@@ -123,21 +125,28 @@ class GolemPortrait
 	 */
 	BufferedImage of(Model model, int animation, int frame)
 	{
-		return model == null ? null : draw(posed(model, animation, frame), model, 0, 0, 1f);
+		return model == null ? null : draw(posed(new GolemModelFactory.Look(model, null), animation, frame), model, 0, 0, 1f);
 	}
 
-	/** The model held at one frame of an animation, or as it rests if there is no such animation. */
-	private Model posed(Model model, int animation, int frame)
+	/**
+	 * The model held at one frame of an animation, or as it rests if there is no such animation;
+	 * what it holds carried along with its hand.
+	 */
+	private Model posed(GolemModelFactory.Look look, int animation, int frame)
 	{
 		Animation loaded = animation < 0 ? null : client.loadAnimation(animation);
 		if (loaded == null || loaded.getNumFrames() <= 0)
 		{
-			return model;
+			return look.model;
 		}
 		AnimationController controller = new AnimationController(client, loaded);
 		controller.setFrame(Math.floorMod(frame, loaded.getNumFrames()));
-		Model animated = controller.animate(model);
-		return animated == null ? model : animated;
+		Model animated = controller.animate(look.model);
+		if (animated != null && look.held != null)
+		{
+			look.held.follow(animated);
+		}
+		return animated == null ? look.model : animated;
 	}
 
 	/**

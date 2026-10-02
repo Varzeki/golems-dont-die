@@ -44,6 +44,12 @@ class GolemPage
 	private final JPanel journal = new JPanel();
 	private final JButton find = new JButton("Find");
 
+	/** The hat the golem wears, the player's to choose. */
+	private final JComboBox<GolemHat> hat = new JComboBox<>(GolemHat.values());
+
+	/** Set while the page puts the shown golem's own hat in the box, so that is not taken as a choice. */
+	private boolean settingHat;
+
 	/** The golem the plugin is pointing at, if any: its page's button stops rather than starts. */
 	private Golem finding;
 
@@ -63,6 +69,9 @@ class GolemPage
 	/** Points the arrow at the golem, on the client thread. */
 	private final Consumer<Golem> onFind;
 
+	/** Puts a hat on the golem, on the client thread. */
+	private final BiConsumer<Golem, GolemHat> onHat;
+
 	/** What to call a golem nobody has named; see GolemNames. */
 	private final GolemNames names;
 
@@ -75,9 +84,10 @@ class GolemPage
 	 */
 	private volatile Golem showing;
 
-	GolemPage(Consumer<Golem> onFind, GolemNames names, PlaceNames places)
+	GolemPage(Consumer<Golem> onFind, BiConsumer<Golem, GolemHat> onHat, GolemNames names, PlaceNames places)
 	{
 		this.onFind = onFind;
+		this.onHat = onHat;
 		this.names = names;
 		this.places = places;
 
@@ -187,16 +197,44 @@ class GolemPage
 		close.setForeground(Color.WHITE);
 		close.addActionListener(e -> hide());
 
+		hat.setFont(BODY);
+		hat.setFocusable(false);
+		hat.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		hat.setForeground(Color.WHITE);
+		hat.setToolTipText("Give this golem a hat");
+		hat.addActionListener(e ->
+		{
+			Object chosen = hat.getSelectedItem();
+			if (!settingHat && showing != null && chosen instanceof GolemHat)
+			{
+				onHat.accept(showing, (GolemHat) chosen);
+			}
+		});
+
+		JLabel hatLabel = new JLabel("Hat");
+		hatLabel.setFont(BODY);
+		hatLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		JPanel hatRow = new JPanel(new BorderLayout(8, 0));
+		hatRow.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		hatRow.setBorder(BorderFactory.createEmptyBorder(0, 12, 8, 12));
+		hatRow.add(hatLabel, BorderLayout.WEST);
+		hatRow.add(hat, BorderLayout.CENTER);
+
 		JPanel buttons = new JPanel(new BorderLayout(6, 0));
 		buttons.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		buttons.setBorder(BorderFactory.createEmptyBorder(0, 12, 12, 12));
 		buttons.add(find, BorderLayout.CENTER);
 		buttons.add(close, BorderLayout.EAST);
 
+		JPanel foot = new JPanel(new BorderLayout());
+		foot.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		foot.add(hatRow, BorderLayout.NORTH);
+		foot.add(buttons, BorderLayout.SOUTH);
+
 		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		body.add(heading, BorderLayout.NORTH);
 		body.add(tabs, BorderLayout.CENTER);
-		body.add(buttons, BorderLayout.SOUTH);
+		body.add(foot, BorderLayout.SOUTH);
 
 	}
 
@@ -278,6 +316,9 @@ class GolemPage
 		place.setText(" ");
 		find.setEnabled(true);
 		labelFind();
+		settingHat = true;
+		hat.setSelectedItem(golem.getHat());
+		settingHat = false;
 		picture.setIcon(null);
 		listRecord(golem);
 		listTraits(golem);
@@ -486,6 +527,10 @@ class GolemPage
 			String where = furthest == null ? "" : " (" + furthest + ")";
 			line(record, "Been " + NUMBERS.format(history.getFurthest()) + " tiles from home" + where);
 		}
+		if (golem.isChisel())
+		{
+			line(record, "Kept a jeweller's chisel").setForeground(CHISEL);
+		}
 		// Blank lines to the most the record can have, so every golem's heading is the same height.
 		while (record.getComponentCount() < RECORD_LINES)
 		{
@@ -495,17 +540,21 @@ class GolemPage
 		record.repaint();
 	}
 
-	/** The most lines the record can have: alive since, walked, shortcuts, sailed, furthest. */
-	private static final int RECORD_LINES = 5;
+	/** The most lines the record can have: alive since, walked, shortcuts, sailed, furthest, chisel. */
+	private static final int RECORD_LINES = 6;
+
+	/** The chisel's line in gold, as rare a thing as a golem has. */
+	private static final Color CHISEL = new Color(0xFFB83F);
 
 	/** One line of the record. */
-	private static void line(JPanel into, String text)
+	private static JLabel line(JPanel into, String text)
 	{
 		JLabel label = new JLabel(text);
 		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		label.setAlignmentX(Component.LEFT_ALIGNMENT);
 		into.add(label);
+		return label;
 	}
 
 	/** What to call the furthest place the golem has been, or null if nothing knows. */

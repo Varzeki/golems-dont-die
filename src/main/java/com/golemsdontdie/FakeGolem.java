@@ -23,6 +23,11 @@ class FakeGolem extends RuneLiteObjectController
 	private final Golem golem;
 	private final Model baseModel;
 
+	/** The look it was built with, so a hat changed is seen; and the chisel it carries, or null. */
+	@lombok.Getter
+	private final GolemModelFactory.Look look;
+	private final HeldItem held;
+
 	/** Source of the shared model and animation definitions. */
 	private final GolemModelFactory shared;
 
@@ -41,11 +46,13 @@ class FakeGolem extends RuneLiteObjectController
 		return baseModel.getModelHeight();
 	}
 
-	FakeGolem(Client client, Golem golem, Model baseModel, GolemModelFactory shared)
+	FakeGolem(Client client, Golem golem, GolemModelFactory.Look look, GolemModelFactory shared)
 	{
 		this.client = client;
 		this.golem = golem;
-		this.baseModel = baseModel;
+		this.baseModel = look.model;
+		this.look = look;
+		this.held = look.held;
 		this.shared = shared;
 		this.animation = new AnimationController(client, -1);
 		this.animation.setOnFinished(this::poseFinished);
@@ -81,6 +88,10 @@ class FakeGolem extends RuneLiteObjectController
 		{
 			Model posed = animation.animate(baseModel);
 			drawn = posed == null ? baseModel : posed;
+			if (held != null && posed != null)
+			{
+				held.follow(posed);
+			}
 		}
 		measure(drawn);
 		return drawn;

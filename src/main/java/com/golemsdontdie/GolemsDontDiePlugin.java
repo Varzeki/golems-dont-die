@@ -758,7 +758,8 @@ public class GolemsDontDiePlugin extends Plugin
 			});
 		panel.setOnPlacesWanted(() -> placesWanted = true);
 		// Swing throughout, and it only reads the golem it is given: see GolemPage.
-		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), names, placeNames);
+		page = new GolemPage(golem -> clientThread.invoke(() -> findGolem(golem)), this::hatChosen,
+			names, placeNames);
 		menu.setOnInfo(golem ->
 		{
 			GolemPage open = page;
@@ -882,6 +883,28 @@ public class GolemsDontDiePlugin extends Plugin
 			SwingUtilities.invokeLater(closing::close);
 		}
 		panel = null;
+	}
+
+	/**
+	 * Puts the hat a player chose on a golem's page on that golem. Its renderer sees a new look and
+	 * is built again; the page's picture is drawn again in it. From Swing; done on the client thread.
+	 */
+	private void hatChosen(Golem golem, GolemHat chosen)
+	{
+		clientThread.invoke(() ->
+		{
+			if (golem.getHat() == chosen)
+			{
+				return;
+			}
+			golem.setHat(chosen);
+			saveGolemsSoon();
+			GolemPage open = page;
+			if (open != null)
+			{
+				dressPage(open, golem);
+			}
+		});
 	}
 
 	/** Tells an open golem page that a golem has a new name, in case it is that golem's page. */
@@ -1557,6 +1580,15 @@ public class GolemsDontDiePlugin extends Plugin
 		// faced this frame.
 		GolemSnapshot posed = snapshot.facing(npc.getCurrentOrientation());
 		Golem golem = new Golem(posed, home, seed, fineX, fineY);
+
+		// One craft in three hundred gives the jeweller's chisel; one golem in three hundred comes off
+		// the plinth holding one, and says so as a drop does.
+		if (moods.nextInt(GolemContent.CHISEL_ODDS) == 0)
+		{
+			golem.setChisel(true);
+			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", GolemContent.CHISEL_MESSAGE, null);
+			client.playSoundEffect(GolemContent.CHISEL_SOUND);
+		}
 
 		golems.add(golem);
 		numberNewGolems();
@@ -3185,14 +3217,25 @@ public class GolemsDontDiePlugin extends Plugin
 			return;
 		}
 
+		// A hat given or changed: drawn again in its new look, once that can be built. Only then asked
+		// for, rather than for every golem every time.
+		FakeGolem shown = golem.getRenderer();
+		if (shown != null && !shown.getLook().isOf(golem))
+		{
+			GolemModelFactory.Look look = modelFactory.lookFor(golem);
+			if (look != null && look != shown.getLook())
+			{
+				detachRenderer(golem);
+			}
+		}
 		if (golem.getRenderer() == null)
 		{
-			Model model = modelFactory.modelFor(golem.getSnapshot());
-			if (model == null)
+			GolemModelFactory.Look look = modelFactory.lookFor(golem);
+			if (look == null)
 			{
 				return;
 			}
-			FakeGolem renderer = new FakeGolem(client, golem, model, modelFactory);
+			FakeGolem renderer = new FakeGolem(client, golem, look, modelFactory);
 			golem.setRenderer(renderer);
 			client.registerRuneLiteObject(renderer);
 		}

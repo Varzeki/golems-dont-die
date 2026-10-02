@@ -202,4 +202,41 @@ public class GolemStoreTest
 		assertEquals(2596, read.get(0).craftNumber);
 		assertEquals(0, store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0).craftNumber);
 	}
+
+	/**
+	 * A hat and a chisel go with the golem, and a save from before either reads as bare-headed and
+	 * empty-handed. So does a hat this version does not know: a later one's, read by this one.
+	 */
+	@Test
+	public void aHatAndAChiselSurviveTheSaveFile()
+	{
+		GolemStore store = new GolemStore();
+		Golem dressed = golem(13L, "Topaz");
+		dressed.setHat(GolemHat.BLUE_PARTYHAT);
+		dressed.setChisel(true);
+		List<GolemStore.SavedGolem> read = store.deserialise(store.serialise(
+			Arrays.asList(dressed, golem(14L, null))));
+
+		assertEquals(GolemHat.BLUE_PARTYHAT, GolemHat.byItem(read.get(0).hat));
+		assertEquals(true, read.get(0).chisel);
+		assertEquals(GolemHat.NONE, GolemHat.byItem(read.get(1).hat));
+		assertEquals(false, read.get(1).chisel);
+
+		GolemStore.SavedGolem older = store.deserialise("1234,2596,2256,0,0,2596,2256,-1,-1,-1,Pebble").get(0);
+		assertEquals(GolemHat.NONE, GolemHat.byItem(older.hat));
+		assertEquals(false, older.chisel);
+
+		assertEquals(GolemHat.NONE, GolemHat.byItem(1));
+		assertEquals(GolemHat.NONE, GolemHat.byItem(0));
+	}
+
+	/** Every hat is found again by the item it is saved as, so no two share one. */
+	@Test
+	public void everyHatIsItsOwnItem()
+	{
+		for (GolemHat hat : GolemHat.values())
+		{
+			assertEquals(hat, GolemHat.byItem(hat.getItemId()));
+		}
+	}
 }

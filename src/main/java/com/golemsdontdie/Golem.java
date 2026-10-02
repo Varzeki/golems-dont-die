@@ -489,6 +489,19 @@ class Golem
 	@Setter
 	private volatile int craftNumber;
 
+	/** The hat the player gave it, from its page; none until given one. Read by the page's thread. */
+	@Getter
+	@Setter
+	private volatile GolemHat hat = GolemHat.NONE;
+
+	/**
+	 * Whether it came off the plinth holding a jeweller's chisel: one golem in three hundred, as the
+	 * real chisel is one craft in three hundred, rolled as it is crafted and kept for good.
+	 */
+	@Getter
+	@Setter
+	private volatile boolean chisel;
+
 	/**
 	 * True while the golem is inside an instance - through the pew, in the Mad Angel's room.
 	 * Golems are simulated in the instance's template, ordinary world coordinates, so
