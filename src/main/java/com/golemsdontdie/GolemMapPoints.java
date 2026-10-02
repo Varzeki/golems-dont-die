@@ -285,6 +285,7 @@ class GolemMapPoints
 			// thousand objects a tick otherwise, and most of them are off screen.
 			int x = golem.getFineX() / Golem.TILE;
 			int y = golem.getFineY() / Golem.TILE;
+			int folded;
 			if (golem.isSailing(tick))
 			{
 				// Where the raft is now, which on a map is where you would look for it. The golem's
@@ -323,10 +324,10 @@ class GolemMapPoints
 					x += offsetX;
 					y += offsetY;
 				}
-				else if (pinned && y >= UNDERGROUND && showing.surfaceContainsPosition(x, y - UNDERGROUND)
-					&& !mesh.isOcean(x, y - UNDERGROUND, 0))
+				else if (pinned && (folded = groundAbove(x, y, showing::surfaceContainsPosition,
+					(seaX, seaY) -> mesh.isOcean(seaX, seaY, 0))) >= 0)
 				{
-					y -= UNDERGROUND;
+					y = folded;
 				}
 				else
 				{
@@ -474,6 +475,18 @@ class GolemMapPoints
 
 	/** How many times the joining is run over. A joined group reaches further than its halves. */
 	private static final int JOIN_PASSES = 3;
+
+	/**
+	 * The row of the ground above an underground tile, where the golem being looked for is drawn on
+	 * the surface map; -1 if the tile is not underground, or the ground above it is not on the map or
+	 * is sea.
+	 */
+	static int groundAbove(int x, int y, java.util.function.BiPredicate<Integer, Integer> onMap,
+		java.util.function.BiPredicate<Integer, Integer> sea)
+	{
+		int above = y - UNDERGROUND;
+		return y >= UNDERGROUND && onMap.test(x, above) && !sea.test(x, above) ? above : -1;
+	}
 
 	/** A cell's key, by floor too: a group upstairs shared its bucket with one below, and each golem
 	 * up there that found the downstairs group in its bucket made a cell of its own. */

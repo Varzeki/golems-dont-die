@@ -23,6 +23,18 @@ class GolemCrews
 	/** How long a golem waits at the quayside for company before sailing alone, in ticks. */
 	private static final int MUSTER_TICKS = 30;
 
+	/**
+	 * The longest a muster lasts, however its crossing is going: its own time, then as long again as
+	 * a lone golem waits on a crossing being worked out. Past it, whoever is waiting is let go.
+	 */
+	static final int LONGEST_MUSTER = MUSTER_TICKS + TransportMemory.PENDING_WAIT_TICKS;
+
+	/**
+	 * How long a golem's own wait at the quay is set for. The muster ends it, sailing or letting it
+	 * go, and this is only a backstop for a muster that somehow never does: longer than any muster.
+	 */
+	static final int WAIT_TICKS = LONGEST_MUSTER + 10;
+
 	/** How long a crew enough to sail waits after the last of them came, for anyone else, in ticks. */
 	private static final int SETTLE_TICKS = 8;
 
@@ -186,7 +198,7 @@ class GolemCrews
 		// Put back on the quayside rather than left where it stands. Crossings begin between game
 		// ticks and this runs on one, so by now the golem is a tile or two out on the water, and
 		// standing it there would leave it on the sea until the watchdog fetched it back.
-		golem.waitAshore(tick, MUSTER_TICKS, placeFor(golem, muster));
+		golem.waitAshore(tick, WAIT_TICKS, placeFor(golem, muster));
 		// The crossing it gave up booked shore leave for its whole length; without this the golem
 		// could not sail again for as long as the voyage it is not taking would have lasted.
 		golem.getTransportMemory().clearShoreLeave();
@@ -216,7 +228,7 @@ class GolemCrews
 		}
 		Muster muster = mustering.computeIfAbsent(dock.getRowId(), id -> new Muster(dock, tick));
 		muster.join(golem, tick);
-		golem.waitAshore(tick, MUSTER_TICKS, placeFor(golem, muster), context);
+		golem.waitAshore(tick, WAIT_TICKS, placeFor(golem, muster), context);
 		// Planning the crossing booked shore leave for its whole length.
 		golem.getTransportMemory().clearShoreLeave();
 		sailing.put(golem, false);
@@ -252,14 +264,6 @@ class GolemCrews
 			muster.waiting.removeIf(golem -> (golem.isDying() || golem.isAboard()
 				|| golem.currentTile().distanceTo2D(muster.dock.getShore()) > QUAYSIDE) && endWait(golem));
 
-			boolean over = isOver(tick, muster.since);
-			// Everyone waiting waits as long as the crew does: to the end of the muster, and past it
-			// while the crew's crossing is still being worked out.
-			int until = Math.max(muster.since + MUSTER_TICKS, muster.port == null ? 0 : muster.portUntil) + 1;
-			for (Golem golem : muster.waiting)
-			{
-				golem.holdWaitUntil(tick, until);
-			}
 			if (isReady(muster.waiting.size(), tick, muster.since, muster.lastJoined) && cast(muster, tick, context))
 			{
 				it.remove();
@@ -270,7 +274,7 @@ class GolemCrews
 			// never could, and they stood at the quay for good. But not while its crossing is still
 			// being worked out, which it waits on as a lone golem waits on its own: let go then, a crew
 			// whose first try came as the muster ran out cast off on a raft apiece.
-			if (over && (muster.port == null || tick > muster.portUntil))
+			if (isDone(tick, muster.since, muster.port != null, muster.portUntil))
 			{
 				release(muster.waiting, tick, context, true);
 				it.remove();
@@ -285,6 +289,16 @@ class GolemCrews
 	{
 		golem.endWait();
 		return true;
+	}
+
+	/**
+	 * Whether a muster that has not cast off lets its golems go: its time is up and it is not waiting
+	 * on a crossing being worked out, or that wait is over too, or it has lasted as long as any may.
+	 * The muster is the one clock: a golem waits until it is let go, not on a clock of its own.
+	 */
+	static boolean isDone(int tick, int since, boolean portPending, int portUntil)
+	{
+		return isOver(tick, since) && (!portPending || tick > portUntil) || tick - since >= LONGEST_MUSTER;
 	}
 
 	/** Whether a muster's time is up, or the tick count has started again since it began. */

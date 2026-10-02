@@ -640,22 +640,6 @@ class Golem
 		waitAshore(tick, ticks, quayside);
 	}
 
-	/**
-	 * Keeps a golem waiting at its place at a quayside until this tick, if it is waiting there and
-	 * would stop sooner: a crew whose crossing is still being worked out waits past the muster, and
-	 * the golems in it whose own waits ran out walked off while still counted as its crew.
-	 */
-	void holdWaitUntil(int tick, int until)
-	{
-		if (waiting == null || itinerary != waiting || waiting.getStartTick() + waiting.getDuration() >= until
-			|| until <= tick)
-		{
-			return;
-		}
-		itinerary = RoamPlanner.stayPut(waiting.destination(), tick, until - tick);
-		waiting = itinerary;
-	}
-
 	/** Drops the walk ahead, keeping the step under way. True, for use in a condition. */
 	private boolean clearPath()
 	{
@@ -1902,8 +1886,10 @@ class Golem
 		{
 			return false;
 		}
-		// True once it has searched, found or not. See the caller.
-		if (walkTo(dock.getShore().getX(), dock.getShore().getY(), context))
+		// True once it has searched, found or not. See the caller. Not queued if it is already at the
+		// quayside, or will be when this step ends: that is the voyage roll's business, not a walk.
+		WorldPoint shore = dock.getShore();
+		if (!arrivingAt(shore.getX(), shore.getY()) && walkTo(shore.getX(), shore.getY(), context))
 		{
 			queuedDock = dock;
 		}
@@ -1955,6 +1941,12 @@ class Golem
 		return true;
 	}
 
+	/** True if the golem is on this tile, or will be once the step under way is done. */
+	boolean arrivingAt(int x, int y)
+	{
+		return (stepping ? stepToX : fineX) / TILE == x && (stepping ? stepToY : fineY) / TILE == y;
+	}
+
 	/**
 	 * Paths the golem to a nearby tile.
 	 *
@@ -1966,7 +1958,7 @@ class Golem
 		// its end. Planned from the tile being left, the first step could double back.
 		int tileX = (stepping ? stepToX : fineX) / TILE;
 		int tileY = (stepping ? stepToY : fineY) / TILE;
-		if (tileX == goalX && tileY == goalY)
+		if (arrivingAt(goalX, goalY))
 		{
 			// There already, or arriving with the step under way: a walk of nothing, not no way there.
 			// Taken for none, a shortcut starting where the step ends was passed over.
