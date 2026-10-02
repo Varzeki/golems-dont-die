@@ -243,32 +243,32 @@ public class GolemNamesTest
 		assertEquals("Septies Millesimus Trecentesimus Duodenonagesimus", names.ordinal(7388));
 		assertEquals("Vicies Septies Millesimus", names.ordinal(27000));
 		assertEquals("Quinquagies Millesimus", names.ordinal(50000));
-		assertEquals("Quinquagies Millesimus Nongentesimus Undecentesimus", names.ordinal(50999));
+		assertEquals("Quinquagies Millesimus Nongentesimus Nonagesimus Nonus", names.ordinal(50999));
 		assertEquals("Ultimus", names.ordinal(51000));
 		assertNull("a golem not yet numbered has no ordinal", names.ordinal(0));
 	}
 
 	/**
-	 * Eights and nines count down from the next ten, 98 and 99 from the hundred, and the hundreds
-	 * and thousands in front of them are added unchanged.
+	 * Eights and nines count down from the next ten, but 98 and 99 do not: they are ninety and
+	 * eight, ninety and nine. The hundreds and thousands in front of them are added unchanged.
 	 */
 	@Test
-	public void ninetyEightCountsDownLikeEighteen()
+	public void ninetyEightDoesNotCountDown()
 	{
 		assertEquals("Duodevicesimus", names.ordinal(18));
-		assertEquals("Duodecentesimus", names.ordinal(98));
-		assertEquals("Undecentesimus", names.ordinal(99));
-		assertEquals("Centesimus Duodecentesimus", names.ordinal(198));
-		assertEquals("Millesimus Duodecentesimus", names.ordinal(1098));
-		assertEquals("Bis Millesimus Quingentesimus Undecentesimus", names.ordinal(2599));
+		assertEquals("Nonagesimus Octavus", names.ordinal(98));
+		assertEquals("Nonagesimus Nonus", names.ordinal(99));
+		assertEquals("Centesimus Nonagesimus Octavus", names.ordinal(198));
+		assertEquals("Millesimus Nonagesimus Octavus", names.ordinal(1098));
+		assertEquals("Bis Millesimus Quingentesimus Nonagesimus Nonus", names.ordinal(2599));
 	}
 
 	/** The teens of thousands are each one word, from Undecies to Undevicies. */
 	@Test
 	public void theTeensOfThousandsAreOneWordEach()
 	{
-		String[] teens = {"Undecies", "Duodecies", "Terdecies", "Quaterdecies", "Quinquiesdecies",
-			"Sexiesdecies", "Septiesdecies", "Duodevicies", "Undevicies"};
+		String[] teens = {"Undecies", "Duodecies", "Terdecies", "Quaterdecies", "Quindecies",
+			"Sedecies", "Septiesdecies", "Duodevicies", "Undevicies"};
 		for (int i = 0; i < teens.length; i++)
 		{
 			assertEquals(teens[i] + " Millesimus", names.ordinal((11 + i) * 1000));
