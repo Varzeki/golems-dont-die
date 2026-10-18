@@ -54,7 +54,19 @@ enum GolemTrait
 	PATIENT("Patient", "Whatever it is waiting for, it will wait.", 5),
 	COUNTS_THINGS("Counts things", "Stones, steps, golems. Quietly.", 5),
 	FOND_OF_GOATS("Fond of goats", "Has views on the Wyrmscraig goat, and holds them firmly.", 4),
-	LOYAL("Loyal", "Would never betray you.", 5);
+	LOYAL("Loyal", "Would never betray you.", 5),
+
+	// ------------------------------------------------------------------ how a golem works
+	//
+	// Down here, after the rest, for the save's sake: see the class comment. What each one does is
+	// GolemWork's. One slot of the mask's thirty-two is left after these.
+
+	HARD_WORKING("Hard-working", "Always finds something to do.", 3),
+	WORK_SHY("Work-shy", "Would rather watch.", 3),
+	LUMBERJACK("Lumberjack", "Can't pass a tree without a swing.", 2),
+	PROSPECTOR("Prospector", "Taps every rock it passes.", 2),
+	ANGLER("Angler", "A rod, a river and all day.", 2),
+	CRAFTY("Crafty", "Always making something.", 2);
 
 	/** What the golem's page calls this. */
 	private final String label;
@@ -96,6 +108,13 @@ enum GolemTrait
 		clash(RESTLESS, PATIENT, OLD_SOUL, PONDEROUS);
 		// A golem that just needs a nap is not the one still dancing.
 		clash(OLD_SOUL, LIFE_OF_THE_PARTY);
+		// Work: a golem that would rather watch has no trade to love, and one with a trade has one.
+		clash(WORK_SHY, HARD_WORKING, LUMBERJACK, PROSPECTOR, ANGLER, CRAFTY);
+		clash(LUMBERJACK, PROSPECTOR, ANGLER, CRAFTY);
+		clash(PROSPECTOR, ANGLER, CRAFTY);
+		clash(ANGLER, CRAFTY);
+		// All day at the river is no day for a golem that can't stand still.
+		clash(RESTLESS, ANGLER);
 	}
 
 	/** The first trait against each of the rest, both ways; the rest may still sit together. */

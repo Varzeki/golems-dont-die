@@ -53,23 +53,27 @@ class GolemModelFactory
 		final GolemHat hat;
 		final boolean chisel;
 
+		/** The tool in hand while working, as a wield model id; -1 for none. */
+		final int tool;
+
 		Look(Model model, HeldItem held)
 		{
-			this(model, held, GolemHat.NONE, false);
+			this(model, held, GolemHat.NONE, false, -1);
 		}
 
-		Look(Model model, HeldItem held, GolemHat hat, boolean chisel)
+		Look(Model model, HeldItem held, GolemHat hat, boolean chisel, int tool)
 		{
 			this.model = model;
 			this.held = held;
 			this.hat = hat;
 			this.chisel = chisel;
+			this.tool = tool;
 		}
 
-		/** True if this is the look the golem has now: its hat, and its chisel if it has one. */
+		/** True if this is the look the golem has now: its hat, its chisel if it has one, and its tool. */
 		boolean isOf(Golem golem)
 		{
-			return hat == golem.getHat() && chisel == golem.isChisel();
+			return hat == golem.getHat() && chisel == golem.isChisel() && tool == golem.getWorkTool();
 		}
 	}
 
@@ -79,21 +83,28 @@ class GolemModelFactory
 	 */
 	Look lookFor(Golem golem)
 	{
-		Look look = lookFor(golem.getSnapshot(), golem.getHat(), golem.isChisel());
+		int tool = golem.getWorkTool();
+		Look look = lookFor(golem.getSnapshot(), golem.getHat(), golem.isChisel(), tool);
+		if (look == null && tool != -1)
+		{
+			// A tool that cannot be loaded yet: at work bare-handed rather than not drawn at all.
+			look = lookFor(golem.getSnapshot(), golem.getHat(), golem.isChisel(), -1);
+		}
 		return look != null || golem.getHat() == GolemHat.NONE && !golem.isChisel() ? look
-			: lookFor(golem.getSnapshot(), GolemHat.NONE, false);
+			: lookFor(golem.getSnapshot(), GolemHat.NONE, false, -1);
 	}
 
-	private Look lookFor(GolemSnapshot snapshot, GolemHat hat, boolean chisel)
+	private Look lookFor(GolemSnapshot snapshot, GolemHat hat, boolean chisel, int tool)
 	{
-		long key = (long) snapshot.getNpcId() << 16 | hat.ordinal() << 1 | (chisel ? 1 : 0);
+		// The tool, a model id under 2^20, above the hat and chisel; the NPC above that.
+		long key = (long) snapshot.getNpcId() << 40 | (long) (tool + 1) << 16 | hat.ordinal() << 1 | (chisel ? 1 : 0);
 		Look cached = cache.get(key);
 		if (cached != null)
 		{
 			return cached;
 		}
 
-		Look built = build(snapshot, hat, chisel);
+		Look built = build(snapshot, hat, chisel, tool);
 		if (built != null)
 		{
 			cache.put(key, built);
@@ -217,8 +228,8 @@ class GolemModelFactory
 		animations.clear();
 	}
 
-	/** Builds the look a snapshot, hat and chisel describe; null if the cache lacks a part. */
-	private Look build(GolemSnapshot snapshot, GolemHat hat, boolean chisel)
+	/** Builds the look a snapshot, hat, chisel and tool describe; null if the cache lacks a part. */
+	private Look build(GolemSnapshot snapshot, GolemHat hat, boolean chisel, int tool)
 	{
 		try
 		{
@@ -291,6 +302,17 @@ class GolemModelFactory
 				}
 				worn.add(data);
 			}
+			// Before the chisel, which HeldItem finds as the model's last vertices. The tool's own are
+			// rigged to the hand, as a player's are, so the animation carries it without help.
+			if (tool >= 0)
+			{
+				ModelData data = client.loadModelData(tool);
+				if (data == null)
+				{
+					return null;
+				}
+				worn.add(inGrip(data.cloneVertices()));
+			}
 			int chiselVertices = 0;
 			if (chisel)
 			{
@@ -325,9 +347,9 @@ class GolemModelFactory
 			{
 				// The hand is not where it was measured: a chisel it cannot carry would hang in the air
 				// where the hand was, so the golem goes without.
-				return build(snapshot, hat, false);
+				return build(snapshot, hat, false, tool);
 			}
-			return new Look(model, held, hat, chisel);
+			return new Look(model, held, hat, chisel, tool);
 		}
 		catch (RuntimeException e)
 		{
@@ -350,6 +372,25 @@ class GolemModelFactory
 			z[i] = HEAD_TOP_Z + dy * HEAD_TILT_SIN + dz * HEAD_TILT_COS + sink * HEAD_TILT_SIN;
 		}
 		return worn;
+	}
+
+	/**
+	 * How far below a human's hand a golem's fist is, in model units. A wield model is placed for a
+	 * player's hand, whose right one is at (-30.2, -101.2, 0.8) in the cache's default hands; the
+	 * golem's fist is {@link #FIST}, the same across and forward and this much lower. Both hands are
+	 * mirror images, so the two-handed tools - nets, a lobster pot - come down by as much.
+	 */
+	static final float TOOL_DROP_Y = 14.2f;
+
+	/** Moves a tool's wield model from a human's grip into the golem's. */
+	private static ModelData inGrip(ModelData tool)
+	{
+		float[] y = tool.getVerticesY();
+		for (int i = 0; i < tool.getVerticesCount(); i++)
+		{
+			y[i] += TOOL_DROP_Y;
+		}
+		return tool;
 	}
 
 	/** Puts the chisel's icon model in the golem's right fist, as it stands: see CHISEL_AXIS_X. */

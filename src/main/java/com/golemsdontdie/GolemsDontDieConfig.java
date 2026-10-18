@@ -208,6 +208,19 @@ public interface GolemsDontDieConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "golemsWork",
+		name = "Golems do skills",
+		description = "Golems near you now and then chop trees, mine rocks, fish, cook, spin, weave, rake "
+			+ "patches, fletch and stitch leather. Only for show: nothing is used up.",
+		section = golemsSection,
+		position = 11
+	)
+	default boolean golemsWork()
+	{
+		return true;
+	}
+
 	@ConfigSection(
 		name = "Celebrations",
 		description = "Golems stop what they are doing and dance when something goes well",

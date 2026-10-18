@@ -47,6 +47,10 @@ final class RoamContext
 	@Setter
 	private Consumer<GolemTraversal> traversals;
 
+	/** What golems in view could work at; null while golems are not to work, or in tools. */
+	@Setter
+	private WorkSpots workSpots;
+
 	/** How willing a golem is to enter this tile's region: 1 unless crowded. */
 	float roominess(int x, int y, int plane)
 	{

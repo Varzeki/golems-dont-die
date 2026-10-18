@@ -57,7 +57,32 @@ public class GolemTraitTest
 		{GolemTrait.RESTLESS, GolemTrait.OLD_SOUL},
 		{GolemTrait.RESTLESS, GolemTrait.PONDEROUS},
 		{GolemTrait.OLD_SOUL, GolemTrait.LIFE_OF_THE_PARTY},
+		{GolemTrait.WORK_SHY, GolemTrait.HARD_WORKING},
+		{GolemTrait.WORK_SHY, GolemTrait.LUMBERJACK},
+		{GolemTrait.WORK_SHY, GolemTrait.PROSPECTOR},
+		{GolemTrait.WORK_SHY, GolemTrait.ANGLER},
+		{GolemTrait.WORK_SHY, GolemTrait.CRAFTY},
+		{GolemTrait.LUMBERJACK, GolemTrait.PROSPECTOR},
+		{GolemTrait.LUMBERJACK, GolemTrait.ANGLER},
+		{GolemTrait.LUMBERJACK, GolemTrait.CRAFTY},
+		{GolemTrait.PROSPECTOR, GolemTrait.ANGLER},
+		{GolemTrait.PROSPECTOR, GolemTrait.CRAFTY},
+		{GolemTrait.ANGLER, GolemTrait.CRAFTY},
+		{GolemTrait.RESTLESS, GolemTrait.ANGLER},
 	};
+
+	/**
+	 * The mask is an int, so there is room for thirty-two traits and no more; and a saved golem's
+	 * traits are read by position, so the ones it was dealt must still mean what they meant.
+	 */
+	@Test
+	public void theTraitsStillFitTheSaveAndKeepTheirPlaces()
+	{
+		Assert.assertTrue(GolemTrait.values().length <= 32);
+		Assert.assertEquals(12, GolemTrait.FRIENDLY.ordinal());
+		Assert.assertEquals(24, GolemTrait.LOYAL.ordinal());
+		Assert.assertEquals(25, GolemTrait.HARD_WORKING.ordinal());
+	}
 
 	/** A golem is never dealt two traits that pull against each other. See GolemTrait.CLASHES. */
 	@Test
